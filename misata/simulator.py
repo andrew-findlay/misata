@@ -1255,6 +1255,14 @@ class DataSimulator:
                 needed_cols.add(rel.parent_key)
                 if rel.filters:
                     needed_cols.update(rel.filters.keys())
+                # A ragged panel's row count IS the span between these two
+                # columns, so they have to survive trimming or the child falls
+                # back to its declared `rows:` and stops being a panel at all.
+                _rpp = getattr(rel, "rows_per_parent", None)
+                if _rpp is not None:
+                    needed_cols.add(_rpp.from_column)
+                    if _rpp.to_column:
+                        needed_cols.add(_rpp.to_column)
                 # Denormalized copies: a child column named like this parent's
                 # own head-prefixed attribute (transactions.merchant_city ↔
                 # merchants.merchant_city) is overwritten from the parent later,
@@ -2926,6 +2934,52 @@ class DataSimulator:
             return df
         return self.noise_injector.apply(df, noise_config)
 
+    def _plan_panel(self, table_name: str) -> Optional[pd.DataFrame]:
+        """The (parent key, period date) index for a ragged panel, or None.
+
+        Returns None when the table is not a panel, or when the declaration
+        cannot be honoured — `panels.plan` warns and the caller falls back to the
+        declared row count, because generating nothing is a worse answer than
+        generating something imperfect and saying so.
+        """
+        from misata import panels
+
+        found = panels.relationship_for(self.config, table_name)
+        if found is None:
+            return None
+        rel, spec = found
+
+        parent = self.context.get(rel.parent_table)
+        if parent is None or parent.empty:
+            warnings.warn(
+                f"rows_per_parent on '{table_name}' needs '{rel.parent_table}' to "
+                f"exist first, and it is empty or absent. Falling back to the "
+                f"declared row count.",
+                UserWarning,
+            )
+            return None
+
+        plan = panels.plan(parent, rel.parent_key, spec, table_name)
+        if plan is None:
+            return None
+        return plan.rename(columns={rel.parent_key: rel.child_key})
+
+    def _apply_panel_index(
+        self,
+        df: pd.DataFrame,
+        plan: Optional[pd.DataFrame],
+        offset: int,
+    ) -> pd.DataFrame:
+        """Stamp this batch's slice of the panel onto its key and date columns."""
+        if plan is None or df.empty:
+            return df
+        window = plan.iloc[offset:offset + len(df)]
+        if len(window) != len(df):  # pragma: no cover — batching invariant
+            return df
+        for col in window.columns:
+            df[col] = window[col].to_numpy()
+        return df
+
     def _update_context(self, table_name: str, df: pd.DataFrame) -> None:
         """
         Update the context with key columns from the generated batch.
@@ -2993,6 +3047,21 @@ class DataSimulator:
 
         columns = self.config.get_columns(table_name)
         total_rows = self._planned_row_count(table_name, table.row_count)
+
+        # A ragged panel's row count is the sum of its parents' spans, so it is
+        # discovered here rather than declared. This must run before batching,
+        # because it decides how many batches there are.
+        panel_plan = self._plan_panel(table_name)
+        if panel_plan is not None:
+            if total_rows and total_rows != len(panel_plan):
+                warnings.warn(
+                    f"Table '{table_name}' declares rows={total_rows:,} and a "
+                    f"rows_per_parent span worth {len(panel_plan):,} rows. The span "
+                    f"wins — a panel's row count is the duration, not a number — so "
+                    f"the declared count is ignored. Remove it to say so.",
+                    UserWarning,
+                )
+            total_rows = len(panel_plan)
 
         exact_curves = self._get_exact_outcome_curves(table_name)
         if exact_curves:
@@ -3145,11 +3214,21 @@ class DataSimulator:
             df_batch = self._run_pass("null_rates", table_name, rows_generated,
                                       self._apply_null_rates, df_batch, table_name)
 
+            # A ragged panel's key and date are assigned LAST, deliberately.
+            # Every pass above may legitimately move a date — causality shifts a
+            # child to postdate its parent, time_grids snaps to a clock — and any
+            # of them would put a hole in the panel or a row on the wrong parent.
+            # The panel is the declaration; it wins.
+            df_batch = self._apply_panel_index(df_batch, panel_plan, rows_generated)
+
             # Update context for future batches/tables
             self._update_context(table_name, df_batch)
             output_df = self._run_pass("noise", table_name, rows_generated,
                                        self._apply_configured_noise,
                                        df_batch.copy(), table_name, table)
+            # Noise runs on a copy after the context update, so re-assert rather
+            # than trusting it to have left these two columns alone.
+            output_df = self._apply_panel_index(output_df, panel_plan, rows_generated)
             yield output_df
 
             rows_generated += batch_size
