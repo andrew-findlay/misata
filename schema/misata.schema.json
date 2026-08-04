@@ -319,7 +319,7 @@
       "type": "array",
       "description": "Entity lifecycles: a row's state implies a legal, ordered, fully-timestamped history through every state it must have passed.",
       "items": {
-        "description": "Declare the state machine an entity moves through, and prove it held.\n\nA status column plus a scatter of per-state timestamps is the most common\nshape in real operational data, and the most commonly wrong: an \"active\"\nsubscription carrying a cancellation date, a \"cancelled\" order with a\ndelivery time, a \"shipped\" row whose ship date precedes its order date.\nThose are all the same defect \u2014 a row whose columns describe a history\nthat could not have happened.\n\nDeclaring the machine makes the whole class impossible. For a row in state\nS, the engine derives the path from ``initial`` to S and guarantees:\n\n1. ``state_column`` only ever holds a declared state name.\n2. Every state on the path has its timestamp populated, in path order.\n3. Every state off the path has its timestamp NULL.\n4. The whole chain postdates ``start_column`` when one is given.\n\nThis subsumes hand-written ``when_then`` rules and status gating: instead\nof enumerating \"if cancelled then cancelled_at is not null\" for every pair,\nyou declare the machine once and every implication follows from it.\n\nExample, an order that ships then completes, or is cancelled outright::\n\n    Lifecycle(\n        name=\"order_lifecycle\",\n        table=\"orders\",\n        state_column=\"status\",\n        start_column=\"order_date\",\n        initial=\"placed\",\n        states=[\n            LifecycleState(name=\"placed\",    timestamp=\"placed_at\"),\n            LifecycleState(name=\"shipped\",   timestamp=\"shipped_at\"),\n            LifecycleState(name=\"completed\", timestamp=\"completed_at\", terminal=True),\n            LifecycleState(name=\"cancelled\", timestamp=\"cancelled_at\", terminal=True),\n        ],\n        transitions=[\n            (\"placed\", \"shipped\"),\n            (\"shipped\", \"completed\"),\n            (\"placed\", \"cancelled\"),\n        ],\n        weights={\"placed\": 0.10, \"shipped\": 0.15,\n                 \"completed\": 0.60, \"cancelled\": 0.15},\n    )\n\nAttributes:\n    name:         Identifier used in warnings and audit findings.\n    table:        Table whose rows are the entities.\n    state_column: Column holding the entity's current state.\n    states:       Every reachable state. Names must be unique.\n    transitions:  Legal (from_state, to_state) pairs.\n    initial:      The state every entity starts in.\n    weights:      Optional share of rows to place in each state. Normalised\n                  with a warning if the values do not sum to 1. States\n                  omitted get zero rows. Defaults to uniform over states\n                  that are reachable.\n    start_column: Optional existing timestamp the whole chain must postdate\n                  (an order's ``order_date``, a customer's ``signup_date``).\n    max_days_per_step: Upper bound on the gap between consecutive state\n                  timestamps, so a shipped-to-completed hop stays plausible.",
+        "description": "Declare the state machine an entity moves through, and prove it held.\n\nA status column plus a scatter of per-state timestamps is the most common\nshape in real operational data, and the most commonly wrong: an \"active\"\nsubscription carrying a cancellation date, a \"cancelled\" order with a\ndelivery time, a \"shipped\" row whose ship date precedes its order date.\nThose are all the same defect — a row whose columns describe a history\nthat could not have happened.\n\nDeclaring the machine makes the whole class impossible. For a row in state\nS, the engine derives the path from ``initial`` to S and guarantees:\n\n1. ``state_column`` only ever holds a declared state name.\n2. Every state on the path has its timestamp populated, in path order.\n3. Every state off the path has its timestamp NULL.\n4. The whole chain postdates ``start_column`` when one is given.\n\nThis subsumes hand-written ``when_then`` rules and status gating: instead\nof enumerating \"if cancelled then cancelled_at is not null\" for every pair,\nyou declare the machine once and every implication follows from it.\n\nExample, an order that ships then completes, or is cancelled outright::\n\n    Lifecycle(\n        name=\"order_lifecycle\",\n        table=\"orders\",\n        state_column=\"status\",\n        start_column=\"order_date\",\n        initial=\"placed\",\n        states=[\n            LifecycleState(name=\"placed\",    timestamp=\"placed_at\"),\n            LifecycleState(name=\"shipped\",   timestamp=\"shipped_at\"),\n            LifecycleState(name=\"completed\", timestamp=\"completed_at\", terminal=True),\n            LifecycleState(name=\"cancelled\", timestamp=\"cancelled_at\", terminal=True),\n        ],\n        transitions=[\n            (\"placed\", \"shipped\"),\n            (\"shipped\", \"completed\"),\n            (\"placed\", \"cancelled\"),\n        ],\n        weights={\"placed\": 0.10, \"shipped\": 0.15,\n                 \"completed\": 0.60, \"cancelled\": 0.15},\n    )\n\nAttributes:\n    name:         Identifier used in warnings and audit findings.\n    table:        Table whose rows are the entities.\n    state_column: Column holding the entity's current state.\n    states:       Every reachable state. Names must be unique.\n    transitions:  Legal (from_state, to_state) pairs.\n    initial:      The state every entity starts in.\n    weights:      Optional share of rows to place in each state. Normalised\n                  with a warning if the values do not sum to 1. States\n                  omitted get zero rows. Defaults to uniform over states\n                  that are reachable.\n    start_column: Optional existing timestamp the whole chain must postdate\n                  (an order's ``order_date``, a customer's ``signup_date``).\n    max_days_per_step: Upper bound on the gap between consecutive state\n                  timestamps, so a shipped-to-completed hop stays plausible.",
         "properties": {
           "name": {
             "type": "string"
@@ -442,7 +442,7 @@
       "type": "array",
       "description": "Cohort retention curves: of the entities in a cohort, exactly this fraction are active k periods later.",
       "items": {
-        "description": "Declare a retention curve, and have the cohort table actually show it.\n\n\"Of the customers who signed up in month M, 55% place an order in M+1 and\n40% in M+2\" is the most-quoted invariant in SaaS and ecommerce analytics,\nand until now it was inexpressible here: you could control how many events\nexisted and what they summed to, but not *which* entities produced them\nover time. So the cohort query every analyst runs first returned a shape\nnobody chose.\n\nDeclaring it makes the cohort table exact. For every cohort period and\nevery declared offset k, exactly ``round(fraction \u00d7 cohort_size)`` distinct\nentities have at least one event in period ``cohort + k``.\n\nThis governs the event table's entity key and its timestamp, because those\nare what a retention query reads. Every other column is left alone.\n\nExample, a cohort that halves then flattens::\n\n    CohortRetention(\n        table=\"orders\", event_time=\"order_date\", cohort_key=\"customer_id\",\n        cohort_table=\"customers\", cohort_time=\"signup_date\",\n        unit=\"month\",\n        curve={0: 1.0, 1: 0.55, 2: 0.40, 3: 0.34},\n    )\n\nAttributes:\n    table:        Event table whose rows are the activity.\n    event_time:   Timestamp column on the event table.\n    cohort_key:   Entity key present on both tables.\n    cohort_table: Entity table that defines cohort membership.\n    cohort_time:  Timestamp on the entity table that assigns its cohort.\n    unit:         Period granularity for both cohort and offset.\n    curve:        Offset (0 = the cohort's own period) to fraction of the\n                  cohort active in that period. Offset 0 is normally 1.0.\n                  Fractions must each be between 0 and 1.",
+        "description": "Declare a retention curve, and have the cohort table actually show it.\n\n\"Of the customers who signed up in month M, 55% place an order in M+1 and\n40% in M+2\" is the most-quoted invariant in SaaS and ecommerce analytics,\nand until now it was inexpressible here: you could control how many events\nexisted and what they summed to, but not *which* entities produced them\nover time. So the cohort query every analyst runs first returned a shape\nnobody chose.\n\nDeclaring it makes the cohort table exact. For every cohort period and\nevery declared offset k, exactly ``round(fraction × cohort_size)`` distinct\nentities have at least one event in period ``cohort + k``.\n\nThis governs the event table's entity key and its timestamp, because those\nare what a retention query reads. Every other column is left alone.\n\nExample, a cohort that halves then flattens::\n\n    CohortRetention(\n        table=\"orders\", event_time=\"order_date\", cohort_key=\"customer_id\",\n        cohort_table=\"customers\", cohort_time=\"signup_date\",\n        unit=\"month\",\n        curve={0: 1.0, 1: 0.55, 2: 0.40, 3: 0.34},\n    )\n\nAttributes:\n    table:        Event table whose rows are the activity.\n    event_time:   Timestamp column on the event table.\n    cohort_key:   Entity key present on both tables.\n    cohort_table: Entity table that defines cohort membership.\n    cohort_time:  Timestamp on the entity table that assigns its cohort.\n    unit:         Period granularity for both cohort and offset.\n    curve:        Offset (0 = the cohort's own period) to fraction of the\n                  cohort active in that period. Offset 0 is normally 1.0.\n                  Fractions must each be between 0 and 1.",
         "properties": {
           "table": {
             "type": "string"
@@ -688,7 +688,7 @@
       "type": "array",
       "description": "Exact duplicate rows: exactly this many rows are copies of another row, with keys left distinct and the row count unmoved.",
       "items": {
-        "description": "Exactly this many rows are duplicates of another row.\n\nDeduplication is the most-written and least-tested logic in any pipeline,\nand it cannot be tested against data with no duplicates in it. The old\n``noise_config.duplicate_rate`` sprayed copies at a probability and told you\nnothing afterwards, so a test written against it could not assert a number.\n\nThe declared form is a count. Rows are not appended, they are overwritten:\n``keys`` stay distinct and the row count never moves, which is what a real\nre-ingest looks like \u2014 the same record arriving twice under two surrogate\nkeys. After generation, ``len(table) - len(table[subset].drop_duplicates())``\nequals exactly what you declared.\n\nCosts: duplicates are real rows, so any aggregate over ``table`` counts them.\nDeclare this on a table that no roll-up or curve reconciles against, or\nexpect those totals to include the copies, because they genuinely do.",
+        "description": "Exactly this many rows are duplicates of another row.\n\nDeduplication is the most-written and least-tested logic in any pipeline,\nand it cannot be tested against data with no duplicates in it. The old\n``noise_config.duplicate_rate`` sprayed copies at a probability and told you\nnothing afterwards, so a test written against it could not assert a number.\n\nThe declared form is a count. Rows are not appended, they are overwritten:\n``keys`` stay distinct and the row count never moves, which is what a real\nre-ingest looks like — the same record arriving twice under two surrogate\nkeys. After generation, ``len(table) - len(table[subset].drop_duplicates())``\nequals exactly what you declared.\n\nCosts: duplicates are real rows, so any aggregate over ``table`` counts them.\nDeclare this on a table that no roll-up or curve reconciles against, or\nexpect those totals to include the copies, because they genuinely do.",
         "properties": {
           "table": {
             "type": "string"
@@ -1611,7 +1611,7 @@
         },
         "probabilities": {
           "type": "array",
-          "description": "Sampling weights for `choices`. Must sum to 1.0 (\u00b10.02). Length must match `choices`.",
+          "description": "Sampling weights for `choices`. Must sum to 1.0 (±0.02). Length must match `choices`.",
           "items": {
             "type": "number",
             "minimum": 0,
@@ -1715,7 +1715,7 @@
           "type": "number",
           "minimum": 0,
           "maximum": 0.5,
-          "description": "Fraction of rows to inject as 3-6\u03c3 outliers (numeric) or '__anomaly__' (categorical)."
+          "description": "Fraction of rows to inject as 3-6σ outliers (numeric) or '__anomaly__' (categorical)."
         },
         "null_if": {
           "type": "object",
@@ -1750,34 +1750,90 @@
       "oneOf": [
         {
           "type": "string",
-          "description": "Shorthand: 'parent_table.parent_col \u2192 child_table.child_col'.",
-          "pattern": ".+\\.[^\\s]+\\s*(\u2192|->)\\s*.+\\.[^\\s]+"
+          "description": "Shorthand: 'parent_table.parent_col → child_table.child_col'.",
+          "pattern": ".+\\.[^\\s]+\\s*(→|->)\\s*.+\\.[^\\s]+"
         },
         {
           "type": "object",
-          "required": [
-            "parent",
-            "child"
+          "description": "Either spelling works. The long one (parent_table/child_key) is what the Python API, the dict path and LANGUAGE.md use, and it is the only one that can carry min_children, partition_by, filters or temporal eligibility.",
+          "oneOf": [
+            {
+              "required": [
+                "parent",
+                "child"
+              ]
+            },
+            {
+              "required": [
+                "parent_table",
+                "child_table"
+              ]
+            }
           ],
           "additionalProperties": false,
           "properties": {
             "parent": {
-              "type": "string"
+              "type": "string",
+              "description": "Short spelling of parent_table."
             },
             "child": {
-              "type": "string"
+              "type": "string",
+              "description": "Short spelling of child_table."
             },
             "parent_col": {
               "type": "string",
-              "description": "Defaults to 'id'."
+              "description": "Short spelling of parent_key. Defaults to 'id'."
             },
             "child_col": {
+              "type": "string",
+              "description": "Short spelling of child_key. Defaults to '<parent>_id'."
+            },
+            "parent_table": {
+              "type": "string"
+            },
+            "child_table": {
+              "type": "string"
+            },
+            "parent_key": {
+              "type": "string",
+              "description": "Defaults to 'id'."
+            },
+            "child_key": {
               "type": "string",
               "description": "Defaults to '<parent>_id'."
             },
             "temporal": {
               "type": "boolean",
               "description": "Force child events after parent events."
+            },
+            "min_children": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Every parent gets at least this many children. Enforced per generation batch, so a child table larger than one batch cannot cover all of its parents."
+            },
+            "partition_by": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Columns a foreign key must not cross — a tenant boundary."
+            },
+            "filters": {
+              "type": "object",
+              "description": "Restrict the eligible parents, e.g. {status: active}. A list value means membership.",
+              "additionalProperties": true
+            },
+            "parent_time": {
+              "type": "string",
+              "description": "The parent's creation timestamp, for temporal eligibility."
+            },
+            "child_time": {
+              "type": "string",
+              "description": "The child's own moment."
+            },
+            "child_time_table": {
+              "type": "string",
+              "description": "Table holding the child's moment, when the child has no date of its own."
             }
           }
         }
@@ -1987,18 +2043,84 @@
           "minItems": 2,
           "items": {
             "type": "object",
-            "required": [
-              "period",
-              "value"
+            "description": "Name the bucket with period, date or month; give the target under any of value, target_value, target, amount.",
+            "anyOf": [
+              {
+                "required": [
+                  "period"
+                ]
+              },
+              {
+                "required": [
+                  "date"
+                ]
+              },
+              {
+                "required": [
+                  "month"
+                ]
+              }
             ],
+            "allOf": [
+              {
+                "anyOf": [
+                  {
+                    "required": [
+                      "value"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "target_value"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "target"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "amount"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "additionalProperties": true,
             "properties": {
               "period": {
+                "type": [
+                  "string",
+                  "integer"
+                ],
+                "description": "Period label, e.g. '2024-01', or a bucket index."
+              },
+              "date": {
                 "type": "string",
-                "description": "Period label (e.g. '2024-01' for monthly buckets)."
+                "description": "An explicit date naming the bucket. Use this rather than 'month', which is a calendar month 1-12 and cannot express an offset from the window start."
+              },
+              "month": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12,
+                "description": "Calendar month 1-12, NOT an offset from the window start."
               },
               "value": {
                 "type": "number",
-                "description": "Target value at this period (relative or absolute, see `value_mode`)."
+                "description": "Target value at this point."
+              },
+              "target_value": {
+                "type": "number",
+                "description": "Target value at this point."
+              },
+              "target": {
+                "type": "number",
+                "description": "Target value at this point."
+              },
+              "amount": {
+                "type": "number",
+                "description": "Target value at this point."
               }
             }
           }

@@ -253,6 +253,11 @@ def _parse_relationship(raw: Union[str, Dict[str, Any]]) -> Relationship:
         parent_time=raw.get("parent_time"),
         child_time=raw.get("child_time"),
         child_time_table=raw.get("child_time_table"),
+        # The engine has honoured filters since the Logic Gap fix
+        # (simulator._get_valid_parent_ids); only this loader never passed them
+        # on, so a YAML schema could not restrict a child to a subset of its
+        # parents and had to generate a row per parent and filter downstream.
+        filters=raw.get("filters") or None,
     )
 
 

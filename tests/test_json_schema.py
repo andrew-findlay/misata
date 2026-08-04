@@ -167,3 +167,121 @@ class TestTableNestedDirectivesValidate:
         }
         errors = list(Draft202012Validator(schema).iter_errors(doc))
         assert errors == [], "\n".join(str(e) for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# The published schema must accept everything the loader accepts
+#
+# 0.9.5 taught `_parse_relationship` the long spelling and four extra fields,
+# but the JSON Schema kept `additionalProperties: false` over the short one, so
+# it rejected the exact form the release added — and the scaffold ships a
+# `yaml-language-server: $schema=` header pointing at it, which means an editor
+# underlines valid config. `misata lint` passed the whole time, because lint
+# runs the feasibility check and never consults this file.
+# ---------------------------------------------------------------------------
+
+
+def _errors(doc):
+    return sorted(
+        Draft202012Validator(misata.json_schema()).iter_errors(doc),
+        key=lambda e: list(e.absolute_path),
+    )
+
+
+def _minimal(**extra):
+    doc = {
+        "name": "T",
+        "tables": {
+            "parents": {"rows": 10, "columns": {"id": {"type": "int"}}},
+            "children": {
+                "rows": 10,
+                "columns": {"parent_id": {"type": "int"}, "amount": {"type": "float"}},
+            },
+        },
+    }
+    doc.update(extra)
+    return doc
+
+
+@pytest.mark.parametrize(
+    "relationship",
+    [
+        pytest.param({"parent": "parents", "child": "children"}, id="short"),
+        pytest.param({"parent_table": "parents", "child_table": "children"}, id="long"),
+        pytest.param(
+            {
+                "parent_table": "parents", "parent_key": "id",
+                "child_table": "children", "child_key": "parent_id",
+                "temporal": True, "min_children": 1,
+            },
+            id="long-with-min-children",
+        ),
+        pytest.param(
+            {
+                "parent_table": "parents", "child_table": "children",
+                "filters": {"status": "active"},
+            },
+            id="filters-scalar",
+        ),
+        pytest.param(
+            {
+                "parent_table": "parents", "child_table": "children",
+                "filters": {"status": ["shipped", "completed"]},
+            },
+            id="filters-membership",
+        ),
+        pytest.param(
+            {
+                "parent_table": "parents", "child_table": "children",
+                "partition_by": ["tenant_id"],
+            },
+            id="partition-by",
+        ),
+        pytest.param(
+            {
+                "parent_table": "parents", "child_table": "children",
+                "parent_time": "created_at", "child_time": "order_date",
+                "child_time_table": "orders",
+            },
+            id="temporal-eligibility",
+        ),
+    ],
+)
+def test_schema_accepts_every_relationship_form_the_loader_does(relationship):
+    assert _errors(_minimal(relationships=[relationship])) == []
+
+
+def test_schema_still_requires_a_parent_and_a_child():
+    """The permissiveness above must not extend to a relationship naming neither."""
+    assert _errors(_minimal(relationships=[{"parent_key": "id"}])) != []
+
+
+@pytest.mark.parametrize(
+    "point_keys",
+    [
+        pytest.param(("period", "value"), id="documented"),
+        pytest.param(("date", "target_value"), id="date-and-target_value"),
+        pytest.param(("date", "value"), id="date-and-value"),
+        pytest.param(("period", "amount"), id="period-and-amount"),
+    ],
+)
+def test_schema_accepts_every_curve_point_spelling_the_engine_does(point_keys):
+    """fact_engine reads TARGET_KEYS = (target_value, value, target, amount).
+
+    The schema documented `value` alone and required `period`, so a curve using
+    `date` — which is the only way to name a bucket outside 1-12, since `month`
+    is a calendar month — was reported invalid while generating perfectly.
+    """
+    name_key, value_key = point_keys
+    name = "2024-01-01" if name_key == "date" else "2024-01"
+    doc = _minimal(
+        outcome_curves=[{
+            "table": "children",
+            "column": "amount",
+            "curve_points": [
+                {name_key: name, value_key: 100},
+                {name_key: "2024-02-01" if name_key == "date" else "2024-02", value_key: 200},
+            ],
+        }]
+    )
+    assert _errors(doc) == []

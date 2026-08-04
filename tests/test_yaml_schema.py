@@ -506,3 +506,58 @@ class TestAPrimaryKeyIsUniqueOnEveryPath:
         dict_col = next(c for c in dict_cfg.columns["customers"]
                         if c.name == "customer_id")
         assert yaml_col.unique == dict_col.unique is True
+
+
+def test_relationship_filters_survive_the_yaml_loader():
+    """`filters` was the last Relationship field the YAML loader dropped.
+
+    The engine has honoured it since the Logic Gap fix
+    (simulator._get_valid_parent_ids), so a schema could declare a restriction,
+    see it silently discarded, and get children spread over every parent. The
+    only workaround was to generate a row per parent and filter downstream.
+    """
+    from misata.yaml_schema import _parse_relationship
+
+    rel = _parse_relationship({
+        "parent_table": "accounts",
+        "parent_key": "account_id",
+        "child_table": "stripe_customer",
+        "child_key": "account_id",
+        "filters": {"tier": "self_serve"},
+    })
+    assert rel.filters == {"tier": "self_serve"}
+
+
+def test_relationship_filters_restrict_the_parent_pool():
+    """End to end: no child may reference a parent the filter excludes."""
+    from misata.schema import Column, Relationship, SchemaConfig, Table
+    from misata.simulator import DataSimulator
+
+    config = SchemaConfig(
+        name="Filters",
+        seed=42,
+        tables=[Table(name="accounts", row_count=200), Table(name="customers", row_count=150)],
+        columns={
+            "accounts": [
+                Column(name="account_id", type="int", unique=True,
+                       distribution_params={"distribution": "uniform", "min": 1, "max": 10_000}),
+                Column(name="tier", type="categorical",
+                       distribution_params={"choices": ["self_serve", "enterprise"],
+                                            "probabilities": [0.8, 0.2]}),
+            ],
+            "customers": [
+                Column(name="id", type="int", unique=True,
+                       distribution_params={"distribution": "uniform", "min": 1, "max": 10_000}),
+                Column(name="account_id", type="foreign_key"),
+            ],
+        },
+        relationships=[
+            Relationship(parent_table="accounts", parent_key="account_id",
+                         child_table="customers", child_key="account_id",
+                         filters={"tier": "self_serve"}),
+        ],
+    )
+    out = dict(DataSimulator(config).generate_all())
+    tier = dict(zip(out["accounts"]["account_id"], out["accounts"]["tier"]))
+    referenced = {tier.get(a) for a in out["customers"]["account_id"]}
+    assert referenced == {"self_serve"}, f"filter leaked: {referenced}"
