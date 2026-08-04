@@ -698,7 +698,10 @@ class RealisticTextGenerator:
                     from misata.locales.registry import LocaleRegistry
                     pack = LocaleRegistry.global_instance().get_pack(self.locale)
                     suffix = pack.company_suffixes
-                    return np.array([f"{faker.company().split()[0]} {np.random.choice(suffix)}" for _ in range(size)])
+                    # self.rng, not np.random: the global state is unseeded, so
+                    # this alone made "Wilson Ltd" come back as "Wilson PLC" on
+                    # the next run of an identical schema.
+                    return np.array([f"{faker.company().split()[0]} {self.rng.choice(suffix)}" for _ in range(size)])
                 except Exception:
                     return np.array([faker.company() for _ in range(size)])
             company_names = self._vocabulary("company_name", [])
