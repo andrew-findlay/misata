@@ -259,6 +259,9 @@ class DataSimulator:
         # (table, column) -> values already emitted for a unique text column,
         # so uniqueness holds across batches rather than within one.
         self._unique_text_seen: Dict[tuple, set] = {}
+        # Narrows _apply_formula_columns to a subset. Only set while recomputing
+        # the formulas a lifecycle invalidated; None means "every formula".
+        self._formula_column_filter: Optional[set] = None
         self.text_gen = TextGenerator(seed=config.seed)
         self.batch_size = batch_size
         self.smart_mode = smart_mode
@@ -5685,6 +5688,64 @@ class DataSimulator:
             _null_column(df, col.name, mask)
         return df
 
+    def _lifecycle_owned_columns(self, spec: Any) -> set:
+        """The columns a lifecycle decides: its state column and state timestamps."""
+        owned = {spec.state_column}
+        for state in (getattr(spec, "states", None) or []):
+            ts = getattr(state, "timestamp", None)
+            if ts:
+                owned.add(ts)
+        return owned
+
+    def _reapply_lifecycle_formulas(
+        self,
+        df: pd.DataFrame,
+        table_name: str,
+        spec: Any,
+    ) -> pd.DataFrame:
+        """Recompute formulas that read a column the lifecycle just rewrote.
+
+        Formulas are evaluated per batch, during generation. A lifecycle runs
+        once, after every batch of its table exists, because rewriting the state
+        column changes which parents a filtered relationship considers eligible.
+        So a formula on the same table reading that state column saw the initial
+        categorical draw and never the lifecycle's verdict — and the two disagree
+        for most rows, since the draw is independent of the state machine's
+        allocation.
+
+        Only formulas that actually reference an owned column are recomputed.
+        Re-running all of them would undo any later pass that deliberately
+        adjusted a formula column — an exact outcome curve is the obvious case,
+        and it holds a promise the formula does not know about.
+        """
+        columns = self.config.get_columns(table_name)
+        owned = self._lifecycle_owned_columns(spec)
+
+        dependent = []
+        for col in columns:
+            formula = col.distribution_params.get("formula")
+            if not formula or col.name in owned:
+                continue
+            # A bare name match is deliberately generous: a formula mentioning
+            # the state column in any form depends on it, and recomputing one
+            # that did not need it costs a column write.
+            if any(re.search(rf"\b{re.escape(name)}\b", str(formula)) for name in owned):
+                dependent.append(col)
+
+        if not dependent:
+            return df
+
+        original = {c.name: c for c in columns}
+        subset = [original[c.name] for c in dependent]
+        try:
+            # Evaluate only the dependent columns, by narrowing what
+            # _apply_formula_columns can see.
+            self._formula_column_filter = {c.name for c in subset}
+            df = self._apply_formula_columns(df, table_name)
+        finally:
+            self._formula_column_filter = None
+        return df
+
     def _apply_formula_columns(self, df: pd.DataFrame, table_name: str) -> pd.DataFrame:
         """Apply formula-based derived columns using context for lookups."""
         try:
@@ -5694,6 +5755,12 @@ class DataSimulator:
 
         columns = self.config.get_columns(table_name)
         formula_cols = [c for c in columns if c.distribution_params.get("formula")]
+
+        # Set only by _reapply_lifecycle_formulas, which recomputes the formulas
+        # that read a lifecycle-owned column and must leave the rest alone.
+        only = getattr(self, "_formula_column_filter", None)
+        if only is not None:
+            formula_cols = [c for c in formula_cols if c.name in only]
 
         if not formula_cols:
             return df
@@ -5992,6 +6059,11 @@ class DataSimulator:
                                     type("_One", (), {"lifecycles": [_spec]})(),
                                     self.rng,
                                 )
+                            # A formula that reads what the lifecycle just
+                            # decided has to be recomputed, or it keeps the
+                            # answer it got from the categorical draw.
+                            buffered[table_name] = self._reapply_lifecycle_formulas(
+                                buffered[table_name], table_name, _spec)
                         self._refresh_context(table_name, buffered[table_name])
             else:
                 # Stream immediately — no post-pass involvement

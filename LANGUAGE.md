@@ -144,7 +144,11 @@ passed through, which is the thing a per-pair rule cannot express.
 **Owns.** `state_column` and every declared state timestamp.
 
 **Costs.** Buffers the table. Runs during that table's own generation, before
-children, so a relationship filtering on the state sees final values.
+children, so a relationship filtering on the state sees final values. Because it
+runs after the table's batches — and therefore after their formulas — any formula
+reading the state column or a state timestamp is recomputed once the machine has
+decided. Formulas that do not read those columns are left alone, so a later pass
+that owns a column keeps it.
 
 **Refuses.** Two lifecycles on one state column. Weights on states no transition
 reaches. A `when_then` rule contradicting the machine.
