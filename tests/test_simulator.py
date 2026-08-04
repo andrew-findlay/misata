@@ -167,17 +167,17 @@ class TestDataSimulator:
         assert sub_plan_ids.issubset(plan_ids)
     
     def test_reproducibility(self, simple_schema):
-        """Test that same seed produces same NUMERIC data."""
+        """Test that the same seed produces the same data, text included."""
         sim1 = DataSimulator(simple_schema)
         sim2 = DataSimulator(simple_schema)
-        
+
         data1 = self.generate_and_collect(sim1)
         data2 = self.generate_and_collect(sim2)
-        
-        # Numeric columns should be identical (mimesis text isn't fully seedable)
-        pd.testing.assert_series_equal(data1["users"]["id"], data2["users"]["id"])
-        pd.testing.assert_series_equal(data1["users"]["age"], data2["users"]["age"])
-        pd.testing.assert_series_equal(data1["users"]["active"], data2["users"]["active"])
+
+        # Text used to be excluded here — Faker was never seeded, so names and
+        # emails moved between runs. See tests/test_text_reproducibility.py.
+        for column in ("id", "age", "active", "email"):
+            pd.testing.assert_series_equal(data1["users"][column], data2["users"][column])
 
     
     def test_topological_sort(self, schema_with_fk):

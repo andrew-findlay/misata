@@ -305,6 +305,19 @@ class RealisticTextGenerator:
         from misata.microtext import MicrotextGenerator
         self.microtext = MicrotextGenerator(self.rng)
 
+    def _faker_seed(self) -> int:
+        """A seed for Faker that does not disturb this generator's own stream.
+
+        Spawning from the SeedSequence is deterministic in the original seed and
+        leaves the parent's value stream untouched — it only advances a spawn
+        counter — so seeding Faker cannot shift any numeric column.
+        """
+        try:
+            child = self.rng.bit_generator.seed_seq.spawn(1)[0]
+            return int(child.generate_state(1, dtype="uint32")[0])
+        except Exception:
+            return 42
+
     def _get_faker(self):
         if self._faker is None:
             try:
@@ -316,6 +329,14 @@ class RealisticTextGenerator:
                     self._faker = Faker(self.locale)
                 except Exception:
                     self._faker = None
+            # Faker keeps its own Random, and nothing else seeds it. Left alone,
+            # a schema with a declared seed still produced different names on
+            # every run while every other column was reproducible.
+            if self._faker is not None:
+                try:
+                    self._faker.seed_instance(self._faker_seed())
+                except Exception:
+                    pass
         return self._faker
 
     _MEDICAL_DOMAINS = ("health", "hospital", "medical", "clinic", "pharma", "care")
@@ -604,7 +625,10 @@ class RealisticTextGenerator:
                     from misata.locales.registry import LocaleRegistry
                     pack = LocaleRegistry.global_instance().get_pack(self.locale)
                     suffix = pack.company_suffixes
-                    return np.array([f"{faker.company().split()[0]} {np.random.choice(suffix)}" for _ in range(size)])
+                    # self.rng, not np.random: the global state is unseeded, so
+                    # this alone made "Wilson Ltd" come back as "Wilson PLC" on
+                    # the next run of an identical schema.
+                    return np.array([f"{faker.company().split()[0]} {self.rng.choice(suffix)}" for _ in range(size)])
                 except Exception:
                     return np.array([faker.company() for _ in range(size)])
             company_names = self._vocabulary("company_name", [])
