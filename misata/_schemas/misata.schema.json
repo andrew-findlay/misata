@@ -1834,6 +1834,48 @@
             "child_time_table": {
               "type": "string",
               "description": "Table holding the child's moment, when the child has no date of its own."
+            },
+            "rows_per_parent": {
+              "type": "object",
+              "description": "The child's row count is a duration, not a number: one row per period between two of the parent's own columns. The child's declared `rows` is ignored. Produces a ragged panel — every parent contributes a different number of rows.",
+              "required": [
+                "from_column"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "from_column": {
+                  "type": "string",
+                  "description": "Parent column the periods start at, inclusive."
+                },
+                "to_column": {
+                  "type": "string",
+                  "description": "Parent column the periods end at, inclusive."
+                },
+                "grain": {
+                  "type": "string",
+                  "enum": [
+                    "day",
+                    "week",
+                    "month",
+                    "quarter",
+                    "year"
+                  ],
+                  "description": "Step size. Defaults to 'day'."
+                },
+                "date_column": {
+                  "type": "string",
+                  "description": "Child column the step's date is written to. Defaults to 'date'."
+                },
+                "default_to": {
+                  "type": "string",
+                  "description": "Closes an open-ended period, e.g. the analysis window end. A row with a null to_column and no default_to contributes nothing."
+                },
+                "max_periods": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Backstop against one parent's dates being implausibly far apart. Defaults to 100000."
+                }
+              }
             }
           }
         }

@@ -6,7 +6,7 @@ including tables, columns, relationships, and scenario events.
 """
 
 import warnings
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -189,6 +189,76 @@ class Relationship(BaseModel):
     # min_children=1 on orders→order_items guarantees coverage. Only honoured
     # when the child row_count can actually cover the parents; the shortfall
     # warns rather than silently inventing extra rows.
+    rows_per_parent: Optional["RowsPerParent"] = None  # the child's row count is
+    # a duration, not a number. See RowsPerParent.
+
+
+class RowsPerParent(BaseModel):
+    """One child row per period between two of the parent's own columns.
+
+    Some tables have no row count to declare. "One row per subscription per day
+    it was active" is not a number — it is the sum over parents of a duration,
+    and it changes whenever the parents do. Declaring `rows: 1500000` states a
+    consequence and gets it wrong the moment anything upstream moves; the
+    resulting table is also a *ragged* panel, because every parent contributes a
+    different number of rows.
+
+    Declaring it instead:
+
+        Relationship(
+            parent_table="subscriptions", child_table="usage_daily",
+            parent_key="account_id", child_key="account_id",
+            rows_per_parent=RowsPerParent(
+                from_column="started_at", to_column="ended_at",
+                grain="day", date_column="usage_date",
+            ),
+        )
+
+    **Guarantees.** For every parent row, exactly one child row per `grain` step
+    from `from_column` to `to_column` inclusive, carrying that parent's key and
+    the step's own date in `date_column`. The child's declared `rows:` is
+    ignored and reported. Steps are contiguous and ordered per parent, which is
+    what makes the result a panel a window function can be trusted over.
+
+    **Owns.** The child's row count, its `child_key`, and `date_column`.
+
+    **Costs.** The row count is discovered rather than declared, so it cannot be
+    known before the parent exists. A parent whose `to_column` precedes its
+    `from_column` contributes nothing.
+
+    **Refuses.** A grain it does not know, or a `from_column`/`to_column` that is
+    not on the parent.
+
+    Attributes:
+        from_column: Parent column the periods start at, inclusive.
+        to_column: Parent column the periods end at, inclusive. When null on a
+            row, `default_to` closes it.
+        grain: Step size — day, week, month, quarter or year.
+        date_column: Child column the step's date is written to.
+        default_to: Closes an open-ended period, e.g. the analysis window end.
+            A row with a null `to_column` and no `default_to` contributes
+            nothing.
+        max_periods: Backstop against a parent whose dates are implausibly far
+            apart producing millions of rows on its own.
+    """
+
+    from_column: str
+    to_column: Optional[str] = None
+    grain: str = "day"
+    date_column: str = "date"
+    default_to: Optional[str] = None
+    max_periods: int = 100_000
+
+    GRAINS: ClassVar[tuple] = ("day", "week", "month", "quarter", "year")
+
+    @field_validator("grain")
+    @classmethod
+    def _known_grain(cls, v: str) -> str:
+        if v not in cls.GRAINS:
+            raise ValueError(
+                f"rows_per_parent.grain must be one of {', '.join(cls.GRAINS)}; got {v!r}"
+            )
+        return v
 
 
 class Constraint(BaseModel):

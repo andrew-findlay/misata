@@ -173,6 +173,49 @@ declared relationship, never guessed.
 exist in real data, and a zero-item order poisons everything downstream of it.
 **Refuses** when the child table cannot cover the parents.
 
+### `rows_per_parent` — a row count that is a duration
+
+```python
+Relationship(
+    parent_table="subscriptions", child_table="usage_daily",
+    parent_key="account_id", child_key="account_id",
+    rows_per_parent=RowsPerParent(
+        from_column="started_on", to_column="ended_on",
+        grain="day", date_column="usage_date",
+        default_to="2026-06-30",     # closes a period still open
+    ),
+)
+```
+
+Some tables have no row count to state. "One row per subscription per day it was
+active" is the sum over parents of a duration, it moves whenever the parents do,
+and it is **ragged** — every parent contributes a different number of rows.
+`rows: 1500000` states a consequence rather than the rule, and is wrong as soon
+as anything upstream changes.
+
+**Guarantees.** For every parent, exactly one child row per `grain` step from
+`from_column` to `to_column` inclusive, carrying that parent's key and the step's
+own date. Per parent the steps are complete, contiguous and ordered, which is
+what makes `row_number() over (partition by … order by …)` over the result mean
+something. Calendar grains land on period starts, so two parents that began
+mid-month still agree on the month.
+
+**Owns.** The child's row count, its `child_key`, and `date_column`. Nothing
+else: every other column generates against the discovered row count as usual.
+
+**Costs.** The row count is discovered, not declared, so it cannot be known
+before the parent exists. The key and date are assigned last, after causality and
+`time_grids`, because either would otherwise put a hole in the panel — so a
+declared clock does not apply to `date_column`.
+
+**Refuses.** An unknown `grain`. Two `rows_per_parent` declarations for one
+child, which is a row count asked to be two different durations. A
+`from_column`/`to_column` absent from the parent, a parent that is empty, or a
+span that yields nothing all **warn and fall back** to the declared `rows:`,
+because a table of the wrong size that says so beats no table at all.
+
+**Note.** A declared `rows:` on the child is ignored and reported. Remove it.
+
 ### temporal FK eligibility — a parent that already existed
 
 ```python

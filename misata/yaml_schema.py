@@ -51,6 +51,7 @@ from misata.schema import (
     RateCurve,
     RealismConfig,
     Relationship,
+    RowsPerParent,
     ScenarioEvent,
     SchemaConfig,
     Table,
@@ -258,6 +259,32 @@ def _parse_relationship(raw: Union[str, Dict[str, Any]]) -> Relationship:
         # on, so a YAML schema could not restrict a child to a subset of its
         # parents and had to generate a row per parent and filter downstream.
         filters=raw.get("filters") or None,
+        rows_per_parent=_parse_rows_per_parent(raw.get("rows_per_parent")),
+    )
+
+
+def _parse_rows_per_parent(raw: Optional[Dict[str, Any]]) -> Optional["RowsPerParent"]:
+    """A child whose row count is a duration rather than a number."""
+    if not raw:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError(
+            "rows_per_parent must be a mapping with at least from_column, e.g. "
+            "{from_column: started_at, to_column: ended_at, grain: day, "
+            f"date_column: usage_date}}; got {type(raw).__name__}"
+        )
+    if not raw.get("from_column"):
+        raise ValueError(
+            "rows_per_parent needs from_column — the parent column its periods "
+            f"start at. Got keys: {sorted(raw)}"
+        )
+    return RowsPerParent(
+        from_column=raw["from_column"],
+        to_column=raw.get("to_column"),
+        grain=str(raw.get("grain", "day")),
+        date_column=raw.get("date_column", "date"),
+        default_to=raw.get("default_to"),
+        max_periods=int(raw.get("max_periods", 100_000)),
     )
 
 
