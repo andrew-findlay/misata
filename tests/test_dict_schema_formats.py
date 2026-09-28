@@ -1282,3 +1282,17 @@ class TestTableScopedEnvelopeDirectivesAreHoisted:
         orders = tables["orders"]
         order_shares = (orders.groupby("channel")["amount"].sum() / orders["amount"].sum()).round(2)
         assert order_shares["online"] == pytest.approx(0.8, abs=0.02)
+
+    def test_plain_dict_direct_generate(self):
+        raw_schema = {
+            "name": "t", "seed": 1,
+            "tables": {
+                "users": {"rows": 10, "columns": {
+                    "id": {"type": "int", "unique": True, "min": 1, "max": 50},
+                }}
+            }
+        }
+        tables = misata.generate_from_schema(raw_schema)
+        assert "users" in tables
+        assert len(tables["users"]) == 10
+

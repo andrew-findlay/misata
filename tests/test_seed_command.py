@@ -545,3 +545,248 @@ class TestUniqueConstraintIntrospection:
         pg = tables["profile_groups"]
         dupes = pg.duplicated(subset=["profile_id", "group_name"]).sum()
         assert dupes == 0, f"{dupes} row(s) violate UNIQUE (profile_id, group_name)"
+
+
+class TestSeedErgonomicsAndResilience:
+    """Verifies that seed ergonomics (auto-detection, password masking) and
+    topological sorting resilience (self-referential & circular FKs) work flawlessly."""
+
+    def test_mask_db_url_redacts_password(self):
+        from misata.db import mask_db_url
+        url = "postgresql://myuser:supersecret@db.example.com:5432/production"
+        masked = mask_db_url(url)
+        assert "supersecret" not in masked
+        assert "myuser:***@db.example.com:5432" in masked
+
+        sqlite_url = "sqlite:///local.db"
+        assert mask_db_url(sqlite_url) == sqlite_url
+
+    def test_topological_sort_handles_self_referential_fks(self):
+        from misata.schema import Column, Relationship, SchemaConfig, Table
+        from misata.db import _topological_sort
+
+        config = SchemaConfig(
+            name="self_ref",
+            tables=[Table(name="employees", row_count=20)],
+            columns={"employees": [
+                Column(name="id", type="int", unique=True),
+                Column(name="manager_id", type="foreign_key", nullable=True),
+            ]},
+            relationships=[Relationship(
+                parent_table="employees", child_table="employees",
+                parent_key="id", child_key="manager_id",
+            )],
+        )
+        sorted_tables = _topological_sort(config)
+        assert sorted_tables == ["employees"]
+
+    def test_topological_sort_breaks_circular_fks_gracefully(self):
+        from misata.schema import Column, Relationship, SchemaConfig, Table
+        from misata.db import _topological_sort
+
+        config = SchemaConfig(
+            name="circular",
+            tables=[
+                Table(name="users", row_count=20),
+                Table(name="organizations", row_count=5),
+            ],
+            columns={
+                "users": [
+                    Column(name="id", type="int", unique=True),
+                    Column(name="org_id", type="foreign_key", nullable=True),
+                ],
+                "organizations": [
+                    Column(name="id", type="int", unique=True),
+                    Column(name="owner_id", type="foreign_key", nullable=True),
+                ],
+            },
+            relationships=[
+                Relationship(parent_table="organizations", child_table="users",
+                             parent_key="id", child_key="org_id"),
+                Relationship(parent_table="users", child_table="organizations",
+                             parent_key="id", child_key="owner_id"),
+            ],
+        )
+        # Must not raise ValueError("Circular dependency detected")
+        sorted_tables = _topological_sort(config)
+        assert len(sorted_tables) == 2
+        assert set(sorted_tables) == {"users", "organizations"}
+
+    def test_find_database_url_from_env(self, monkeypatch):
+        from misata.db import find_database_url
+        monkeypatch.setenv("DATABASE_URL", "sqlite:///test_env.db")
+        detected = find_database_url()
+        assert detected is not None
+        url, source = detected
+        assert url == "sqlite:///test_env.db"
+        assert "DATABASE_URL" in source
+
+    def test_seed_command_auto_detects_database(self, monkeypatch, tmp_path):
+        import sqlite3
+        from click.testing import CliRunner
+        from misata.cli import main
+
+        db_path = tmp_path / "autodetect.db"
+        con = sqlite3.connect(db_path)
+        con.execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT);")
+        con.commit()
+        con.close()
+
+        db_url = f"sqlite:///{db_path}"
+        monkeypatch.setenv("DATABASE_URL", db_url)
+
+        runner = CliRunner()
+        result = runner.invoke(main, ["seed", "--dry-run"])
+        assert result.exit_code == 0
+        assert "Auto-detected database" in result.output
+        assert "items" in result.output
+
+    def test_seed_command_errors_gracefully_when_no_db_detected(self, monkeypatch):
+        from click.testing import CliRunner
+        from misata.cli import main
+
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        monkeypatch.delenv("POSTGRES_URL", raising=False)
+        monkeypatch.delenv("SUPABASE_DB_URL", raising=False)
+        monkeypatch.delenv("SQLITE_URL", raising=False)
+
+        runner = CliRunner()
+        # In a directory with no db files
+        with runner.isolated_filesystem():
+            result = runner.invoke(main, ["seed"])
+            assert result.exit_code == 1
+            assert "No database URL provided or auto-detected" in result.output
+
+
+class TestSeedModernEcosystemAndTypes:
+    """Verifies that modern database types (UUID, JSONB, CHECK constraints) and
+    standalone seed.sql generation work seamlessly."""
+
+    def test_uuid_and_json_generation_and_sqlite_check_enums(self, tmp_path):
+        import json
+        import sqlite3
+        import uuid
+        from misata.introspect import schema_from_db
+        from misata.simulator import DataSimulator
+
+        db_path = tmp_path / "modern.db"
+        con = sqlite3.connect(db_path)
+        con.execute("""
+            CREATE TABLE accounts (
+                id UUID PRIMARY KEY,
+                role TEXT CHECK(role IN ('admin', 'editor', 'viewer')),
+                config JSON,
+                created_at DATETIME
+            );
+        """)
+        con.commit()
+        con.close()
+
+        config = schema_from_db(f"sqlite:///{db_path}", default_rows=25)
+        cols = {c.name: c for c in config.columns["accounts"]}
+        assert cols["role"].type == "categorical"
+        assert set(cols["role"].distribution_params["choices"]) == {"admin", "editor", "viewer"}
+        assert cols["id"].distribution_params.get("text_type") == "uuid"
+        assert cols["config"].distribution_params.get("text_type") == "json"
+
+        sim = DataSimulator(config)
+        tables = {name: df for name, df in sim.generate_all()}
+        acc = tables["accounts"]
+
+        assert len(acc) == 25
+        # Verify UUIDs
+        for uid in acc["id"]:
+            parsed = uuid.UUID(str(uid))
+            assert parsed.version == 4
+        assert acc["id"].is_unique
+
+        # Verify JSON
+        for conf in acc["config"]:
+            data = json.loads(conf)
+            assert isinstance(data, dict)
+
+        # Verify role choices
+        assert set(acc["role"].unique()).issubset({"admin", "editor", "viewer"})
+
+    def test_to_seed_sql_generates_replayable_script(self, tmp_path):
+        import sqlite3
+        import pandas as pd
+        from misata.schema import SchemaConfig, Table, Column, Relationship
+        from misata.export import to_seed_sql
+
+        config = SchemaConfig(
+            name="ecommerce",
+            tables=[
+                Table(name="users", row_count=5),
+                Table(name="orders", row_count=10),
+            ],
+            columns={
+                "users": [
+                    Column(name="id", type="int", unique=True),
+                    Column(name="name", type="text"),
+                ],
+                "orders": [
+                    Column(name="id", type="int", unique=True),
+                    Column(name="user_id", type="foreign_key"),
+                    Column(name="total", type="float"),
+                ],
+            },
+            relationships=[
+                Relationship(parent_table="users", child_table="orders",
+                             parent_key="id", child_key="user_id"),
+            ],
+        )
+
+        users_df = pd.DataFrame({"id": [1, 2, 3], "name": ["Alice", "Bob", "Charlie"]})
+        orders_df = pd.DataFrame({"id": [101, 102], "user_id": [1, 2], "total": [99.5, 45.0]})
+        tables = {"orders": orders_df, "users": users_df}  # purposely reversed in dict
+
+        sql_file = tmp_path / "seed.sql"
+        out_path = to_seed_sql(tables, sql_file, dialect="sqlite", config=config, truncate=True)
+        assert out_path.exists()
+        sql_content = out_path.read_text(encoding="utf-8")
+
+        # Topologically sorted: users must be inserted before orders
+        assert sql_content.find('INSERT INTO "users"') < sql_content.find('INSERT INTO "orders"')
+        assert "BEGIN TRANSACTION;" in sql_content
+        assert 'DELETE FROM "orders";' in sql_content
+        assert "COMMIT;" in sql_content
+
+        # Replay into fresh SQLite DB
+        target_db = tmp_path / "replay.db"
+        con = sqlite3.connect(target_db)
+        con.execute('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);')
+        con.execute('CREATE TABLE orders (id INTEGER PRIMARY KEY, user_id INTEGER REFERENCES users(id), total REAL);')
+        con.executescript(sql_content)
+
+        user_count = con.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        order_count = con.execute("SELECT COUNT(*) FROM orders").fetchone()[0]
+        con.close()
+        assert user_count == 3
+        assert order_count == 2
+
+    def test_seed_command_with_sql_out(self, tmp_path):
+        import sqlite3
+        from click.testing import CliRunner
+        from misata.cli import main
+
+        db_path = tmp_path / "cli_seed.db"
+        con = sqlite3.connect(db_path)
+        con.execute("CREATE TABLE products (id INTEGER PRIMARY KEY, title TEXT);")
+        con.commit()
+        con.close()
+
+        sql_out = tmp_path / "dump.sql"
+        runner = CliRunner()
+        result = runner.invoke(main, [
+            "seed", f"sqlite:///{db_path}",
+            "--rows", "10",
+            "--sql-out", str(sql_out),
+            "--dry-run",
+        ])
+        assert result.exit_code == 0
+        assert "Wrote" in result.output
+        assert sql_out.exists()
+        content = sql_out.read_text(encoding="utf-8")
+        assert 'INSERT INTO "products"' in content
+

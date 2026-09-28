@@ -396,3 +396,75 @@ class TestTheStudioHintIsShownOnceAndNeverGetsInTheWay:
 
         monkeypatch.setattr(cli.Path, "home", staticmethod(explode))
         cli._studio_hint(Boom())  # must return quietly
+
+
+class TestCLISandboxAndMcp:
+    @pytest.fixture
+    def runner(self):
+        from click.testing import CliRunner
+        return CliRunner()
+
+    def test_sandbox_command_basic(self, runner, tmp_path):
+        from misata.cli import main
+        sb_file = tmp_path / "sandbox.db"
+        result = runner.invoke(main, [
+            "sandbox",
+            "--domain", "saas",
+            "--rows", "20",
+            "--db", str(sb_file),
+        ])
+        assert result.exit_code == 0
+        assert "Sandbox Ready!" in result.output
+        assert sb_file.exists()
+
+    def test_sandbox_command_with_sql(self, runner, tmp_path):
+        from misata.cli import main
+        sb_file = tmp_path / "sandbox_query.db"
+        result = runner.invoke(main, [
+            "sandbox",
+            "--domain", "saas",
+            "--rows", "20",
+            "--db", str(sb_file),
+            "--sql", "SELECT COUNT(*) FROM users",
+        ])
+        assert result.exit_code == 0
+        assert "Running query:" in result.output
+        assert "row(s) returned" in result.output
+
+    def test_mcp_status_command(self, runner):
+        from misata.cli import main
+        result = runner.invoke(main, ["mcp", "status"])
+        assert result.exit_code == 0
+        assert "Misata MCP Server is operational" in result.output
+        assert "create_sandbox" in result.output
+
+    def test_mcp_install_command(self, runner):
+        import json
+        from pathlib import Path
+        from misata.cli import main
+        with runner.isolated_filesystem():
+            result = runner.invoke(main, ["mcp", "install", "--client", "cursor", "--scope", "project"])
+            assert result.exit_code == 0
+            assert "Cursor" in result.output
+            cursor_mcp = Path(".cursor/mcp.json")
+            assert cursor_mcp.exists()
+            data = json.loads(cursor_mcp.read_text(encoding="utf-8"))
+            assert "misata" in data["mcpServers"]
+            assert data["mcpServers"]["misata"]["command"] == "misata-mcp"
+
+            # Check rule generation
+            cursor_rule = Path(".cursor/rules/misata.mdc")
+            assert cursor_rule.exists()
+            assert "Misata AI Coding Agent Guidelines" in cursor_rule.read_text()
+
+    def test_mcp_install_all_generates_all_rules(self, runner):
+        from pathlib import Path
+        from misata.cli import main
+        with runner.isolated_filesystem():
+            result = runner.invoke(main, ["mcp", "install", "--client", "all", "--scope", "project"])
+            assert result.exit_code == 0
+            assert Path(".cursor/rules/misata.mdc").exists()
+            assert Path(".windsurfrules").exists()
+            assert Path("CLAUDE.md").exists()
+
+

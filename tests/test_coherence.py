@@ -149,3 +149,55 @@ class TestFraudFieldReport:
             "merchant_city": ["Tokyo", "Lille"] * 50})
         r = coherence_audit({"merchants": parent, "transactions": child})
         assert not any(f.kind == "denormalized_mismatch" for f in r.findings)
+
+
+def _email_matches_name(name: str, email: str) -> bool:
+    local = email.split("@")[0].lower()
+    tokens = [t for t in name.lower().replace(".", " ").split() if len(t) >= 3]
+    return any(tok[:4] in local for tok in tokens)
+
+
+def test_saas_email_matches_name():
+    t = misata.generate("A SaaS company with 300 users", rows=300, seed=1)
+    u = t["users"]
+    assert "name" in u.columns and "email" in u.columns
+    rate = sum(_email_matches_name(r["name"], r["email"])
+               for r in u[["name", "email"]].to_dict("records")) / len(u)
+    assert rate > 0.9, f"only {rate:.0%} of emails match the name"
+
+
+def test_ecommerce_email_matches_name():
+    t = misata.generate("An ecommerce store with 300 customers", rows=300, seed=2)
+    c = t["customers"]
+    if "email" not in c.columns or "name" not in c.columns:
+        return
+    rate = sum(_email_matches_name(r["name"], r["email"])
+               for r in c[["name", "email"]].to_dict("records")) / len(c)
+    assert rate > 0.9, f"only {rate:.0%} of emails match the name"
+
+
+class TestProductCategoryCoherence:
+    def test_product_names_match_category(self):
+        import misata.realism as r
+        t = misata.generate("An ecommerce store with 300 customers and products", rows=300, seed=7)
+        prod = t["products"]
+        bad = 0
+        for nm, cat in zip(prod["name"], prod["category"]):
+            pool = r._NAME_TO_POOL.get(str(nm))
+            if pool is None:
+                continue
+            cl = str(cat).lower()
+            if not (pool in cl or cl in pool or pool in cl.split()):
+                bad += 1
+        assert bad == 0, f"{bad} product name/category mismatches"
+
+
+class TestYearExtraction:
+    def test_row_count_not_read_as_year(self):
+        from misata.story_parser import StoryParser
+        p = StoryParser()
+        assert p._extract_explicit_year("2000 customers, Black Friday") is None
+        assert p._extract_explicit_year("5000 users") is None
+        assert p._extract_explicit_year("revenue in 2023, 1000 orders") == 2023
+
+

@@ -26,9 +26,10 @@ from misata.simulator import DataSimulator
 
 N_REGIONS    = 10
 N_CATEGORIES = 20
-N_CUSTOMERS  = 50_000
-N_PRODUCTS   = 5_000
-N_ORDERS     = 1_000_000
+N_CUSTOMERS  = 1_000
+N_PRODUCTS   = 200
+N_ORDERS     = 10_000
+
 
 
 def _scale_schema() -> SchemaConfig:

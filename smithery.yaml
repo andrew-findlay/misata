@@ -20,8 +20,13 @@ description: >
 
   The division of labour is the point. The agent designs the schema, which is
   what agents are genuinely good at, and the engine guarantees the arithmetic,
-  which is what they are not. Nine tools:
+  which is what they are not. Eleven tools:
 
+    create_sandbox        Create and seed an isolated SQLite sandbox database
+                          for testing, pre-populated with realistic, referentially
+                          intact tables (0 orphan foreign keys).
+    query_sandbox         Execute read-only verification queries against the
+                          sandbox database to test queries and aggregations.
     generate_from_schema  Generate from a schema dict and get back an integrity
                           proof for every relationship, a coherence score, and
                           a domain-validation pass when one is declared. No API

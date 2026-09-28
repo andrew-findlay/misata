@@ -653,13 +653,90 @@ def table_row_counts(db_url: str, tables: Sequence[str]) -> Dict[str, int]:
         conn.close()
 
 
+def mask_db_url(db_url: str) -> str:
+    """Mask the password in a database connection URL for safe logging and display."""
+    try:
+        parsed = urlparse(db_url)
+        if parsed.password:
+            user = parsed.username or ""
+            netloc = f"{user}:***@{parsed.hostname}"
+            if parsed.port:
+                netloc += f":{parsed.port}"
+            return parsed._replace(netloc=netloc).geturl()
+    except Exception:
+        pass
+    return db_url
+
+
+def find_database_url() -> Optional[Tuple[str, str]]:
+    """Auto-detect database URL from environment (.env), prisma schema, or local SQLite files.
+
+    Returns:
+        (db_url, source_description) or None
+    """
+    import os
+    import re
+    from pathlib import Path
+
+    # 1. Try loading .env from current working directory or parents
+    try:
+        import dotenv
+        env_path = dotenv.find_dotenv(usecwd=True)
+        if env_path:
+            dotenv.load_dotenv(env_path)
+    except Exception:
+        pass
+
+    # 2. Check standard environment variables
+    for var in ("DATABASE_URL", "POSTGRES_URL", "SUPABASE_DB_URL", "SQLITE_URL"):
+        val = os.environ.get(var)
+        if val and any(val.startswith(p) for p in ("postgres://", "postgresql://", "sqlite://")):
+            return val, f"{var} in .env"
+
+    # 3. Check for Prisma schema
+    prisma_candidates = [Path("prisma/schema.prisma"), Path("schema.prisma")]
+    for p in prisma_candidates:
+        if p.exists():
+            try:
+                text = p.read_text(encoding="utf-8")
+                url_match = re.search(r'url\s*=\s*(?:env\(["\']([^"\']+)["\']\)|["\']([^"\']+)["\'])', text)
+                if url_match:
+                    env_name, direct_val = url_match.groups()
+                    if env_name and os.environ.get(env_name):
+                        return os.environ[env_name], f"env('{env_name}') in {p}"
+                    elif direct_val:
+                        if direct_val.startswith("file:"):
+                            rel_path = direct_val[5:].lstrip("/")
+                            sqlite_path = (p.parent / rel_path).resolve()
+                            return f"sqlite:///{sqlite_path}", f"sqlite datasource in {p}"
+                        elif direct_val.startswith("postgres://") or direct_val.startswith("postgresql://"):
+                            return direct_val, f"datasource in {p}"
+            except Exception:
+                pass
+
+    # 4. Check for local SQLite database files in common project locations
+    local_sqlite_candidates = [
+        "dev.db", "local.db", "app.db", "development.db",
+        "prisma/dev.db", "db/development.sqlite3", "storage/development.sqlite3",
+    ]
+    for rel in local_sqlite_candidates:
+        f = Path(rel)
+        if f.is_file() and f.stat().st_size > 0:
+            return f"sqlite:///{f.resolve()}", f"local file {rel}"
+
+    return None
+
+
 def _topological_sort(config: SchemaConfig) -> List[str]:
     from collections import defaultdict, deque
 
     graph = defaultdict(list)
     in_degree = {table.name: 0 for table in config.tables}
 
+    # Map relationships, skipping self-referential foreign keys
     for rel in config.relationships:
+        if rel.parent_table == rel.child_table:
+            continue
         graph[rel.parent_table].append(rel.child_table)
         in_degree[rel.child_table] += 1
 
@@ -675,7 +752,25 @@ def _topological_sort(config: SchemaConfig) -> List[str]:
             if in_degree[neighbor] == 0:
                 queue.append(neighbor)
 
+    # If circular dependencies exist across distinct tables, break them gracefully
     if len(sorted_tables) != len(config.tables):
-        raise ValueError("Circular dependency detected in relationships.")
+        remaining = [t.name for t in config.tables if t.name not in sorted_tables]
+        while remaining:
+            best_table = min(remaining, key=lambda t: in_degree.get(t, 0))
+            sorted_tables.append(best_table)
+            remaining.remove(best_table)
+            for neighbor in graph[best_table]:
+                in_degree[neighbor] -= 1
+                if in_degree[neighbor] <= 0 and neighbor in remaining:
+                    queue.append(neighbor)
+            while queue:
+                next_tbl = queue.popleft()
+                if next_tbl in remaining:
+                    sorted_tables.append(next_tbl)
+                    remaining.remove(next_tbl)
+                    for neighbor in graph[next_tbl]:
+                        in_degree[neighbor] -= 1
+                        if in_degree[neighbor] <= 0 and neighbor in remaining:
+                            queue.append(neighbor)
 
     return sorted_tables

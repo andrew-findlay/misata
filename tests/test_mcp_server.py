@@ -734,3 +734,33 @@ class TestTheMCPServerCannotClaimAnUncheckedVerification:
         src = inspect.getsource(server.main)
         assert "_mcp_server.version" in src
         assert "__version__" in src
+
+
+# ---------------------------------------------------------------------------
+# create_sandbox and query_sandbox
+# ---------------------------------------------------------------------------
+
+def test_create_and_query_sandbox(tmp_path):
+    from misata.mcp.server import create_sandbox, query_sandbox
+
+    sandbox_db = tmp_path / "test_sb.db"
+    res = create_sandbox(domain="saas", rows=50, db_path=str(sandbox_db))
+
+    assert res["ok"] is True
+    assert res["integrity_verified"] is True
+    assert sandbox_db.exists()
+    assert "users" in res["tables"]
+    assert res["total_rows"] > 0
+    assert len(res["sample_queries"]) > 0
+
+    # Query sandbox
+    q_res = query_sandbox(query="SELECT * FROM users LIMIT 5", db_path=str(sandbox_db))
+    assert q_res["ok"] is True
+    assert len(q_res["rows"]) == 5
+    assert "id" in q_res["columns"]
+
+    # Reject destructive query
+    bad_res = query_sandbox(query="DROP TABLE users", db_path=str(sandbox_db))
+    assert bad_res["ok"] is False
+    assert bad_res["error"] == "ReadOnlyViolation"
+

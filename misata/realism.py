@@ -25,6 +25,7 @@ from misata.vocab_seeds import (
     JOB_TITLES as _JOB_TITLES_BY_DOMAIN,
     LAST_NAMES,
     PRODUCT_BY_CATEGORY,
+    PRODUCT_DESCRIPTIONS_BY_CATEGORY,
     STATES_BY_COUNTRY,
 )
 
@@ -315,10 +316,7 @@ _CURRENCY_CODES = [
 PRODUCT_NAME_POOLS = PRODUCT_BY_CATEGORY
 
 PRODUCT_DESCRIPTION_TEMPLATES = [
-    "Designed for everyday use with reliable performance and clean design.",
-    "Built for teams that want quality, durability, and fast setup.",
-    "A customer favorite for comfort, performance, and long-term value.",
-    "Combines premium materials with practical features for daily use.",
+    desc for descs in PRODUCT_DESCRIPTIONS_BY_CATEGORY.values() for desc in descs
 ]
 
 
@@ -803,10 +801,7 @@ class RealisticTextGenerator:
                 for f, l in zip(first, last)
             ])
         if semantic == "address":
-            numbers = self.rng.integers(10, 9999, size=size)
-            streets = self.rng.choice(["Main", "Oak", "Maple", "Cedar", "Sunset", "Lake"], size=size)
-            suffixes = self.rng.choice(["St", "Ave", "Blvd", "Ln", "Rd"], size=size)
-            return np.array([f"{n} {street} {suffix}" for n, street, suffix in zip(numbers, streets, suffixes)])
+            return self.microtext.addresses(size)
         if semantic == "phone_number":
             return self._generate_phone_number(size=size)
         if semantic == "national_id":
@@ -908,6 +903,34 @@ class RealisticTextGenerator:
         if semantic == "med_frequency":
             from misata.vocab_seeds import MED_FREQUENCIES
             return self.rng.choice(MED_FREQUENCIES, size=size)
+        if semantic in ("ticket_subject", "support_subject"):
+            return self.microtext.ticket_subjects(size)
+        if semantic in ("support_ticket", "ticket_body", "issue_body"):
+            return self.microtext.ticket_bodies(size, context=_prose_context(table_data, size))
+        if semantic in ("resolution_notes", "closing_notes", "internal_notes", "agent_notes", "resolve_notes"):
+            return self.microtext.resolution_notes(size, context=_prose_context(table_data, size))
+        if semantic in ("transaction_memo", "statement_descriptor", "transaction_description"):
+            return self.microtext.transaction_memos(size)
+        if semantic in ("error_message", "log_message", "exception_message"):
+            return self.microtext.error_messages(size, context=_prose_context(table_data, size))
+        if semantic in ("clinical_notes", "doctor_notes", "progress_notes"):
+            return self.microtext.clinical_notes(size, "clinical_notes")
+        if semantic == "chief_complaint":
+            return self.microtext.clinical_notes(size, "chief_complaint")
+        if semantic in ("discharge_instructions", "discharge_summary"):
+            return self.microtext.clinical_notes(size, "discharge_instructions")
+        if semantic in ("delivery_instructions", "shipping_notes", "dropoff_instructions"):
+            return self.microtext.delivery_instructions(size)
+        if semantic in ("return_reason", "refund_reason"):
+            return self.microtext.return_reasons(size)
+        if semantic == "churn_reason":
+            return self.microtext.churn_reasons(size)
+        if semantic in ("audit_reason", "override_reason"):
+            return self.microtext.audit_reasons(size)
+        if semantic in ("customer_feedback", "feedback", "survey_response"):
+            return self.microtext.customer_feedback(size, ratings=self._ratings_from(table_data, size))
+        if semantic in ("note", "notes", "sentence"):
+            return self.microtext.notes(size)
 
         # Unknown semantic token from the caller (LLMs invent text_types like
         # "make" or "model"): re-infer from the column name before falling
@@ -1018,8 +1041,32 @@ class RealisticTextGenerator:
         ):
             return "product_name"
         # A ticket's "title"/"subject" is the one-line issue, not a job.
-        if name in ("title", "subject") and ("ticket" in table or "issue" in table):
+        if name in ("title", "subject") and ("ticket" in table or "issue" in table or "support" in table):
             return "support_ticket"
+        if name in ("ticket_subject", "issue_subject", "case_subject"):
+            return "ticket_subject"
+        if name in ("resolution_notes", "closing_notes", "internal_notes", "agent_notes", "resolve_notes"):
+            return "resolution_notes"
+        if name in ("memo", "statement_descriptor", "transaction_description", "remittance_info", "payment_reference", "wire_reference"):
+            return "transaction_memo"
+        if name in ("error_message", "error_desc", "error_description", "log_message", "stack_trace", "exception_message"):
+            return "error_message"
+        if name in ("chief_complaint", "presenting_complaint"):
+            return "chief_complaint"
+        if name in ("discharge_instructions", "discharge_summary", "post_op_instructions"):
+            return "discharge_instructions"
+        if name in ("clinical_notes", "doctor_notes", "physician_notes", "progress_notes", "nurse_notes"):
+            return "clinical_notes"
+        if name in ("delivery_instructions", "shipping_instructions", "dropoff_instructions", "shipping_notes", "delivery_notes"):
+            return "delivery_instructions"
+        if name in ("return_reason", "refund_reason"):
+            return "return_reason"
+        if name == "churn_reason" or (name == "cancellation_reason" and ("subscription" in table or "customer" in table or "churn" in table)):
+            return "churn_reason"
+        if name in ("audit_reason", "override_reason", "review_reason"):
+            return "audit_reason"
+        if name in ("feedback", "customer_feedback", "survey_response", "nps_comment", "survey_feedback"):
+            return "customer_feedback"
         if name == "title" and any(h in table for h in _EVENT_TABLE_HINTS):
             return "work_title"
         if "genre" in name:
@@ -1088,6 +1135,12 @@ class RealisticTextGenerator:
                 return "surge_reason"
             if "cancel" in name or "cancel" in table:
                 return "cancellation_reason"
+            if "return" in name or "refund" in name:
+                return "return_reason"
+            if "churn" in name:
+                return "churn_reason"
+            if "audit" in name or "override" in name:
+                return "audit_reason"
         if name in ("department", "dept", "division", "business_unit") or name.endswith("_department"):
             return "department"
         if name == "name" and table in ("departments", "department", "wards") and self._is_medical_domain():
@@ -1237,6 +1290,10 @@ class RealisticTextGenerator:
         if name == "caption":
             return "caption"
         if name in ("body", "description", "summary"):
+            if "ticket" in table or "issue" in table or "support" in table:
+                return "support_ticket"
+            if "transaction" in table or "payment" in table or "billing" in table:
+                return "transaction_memo"
             return "product_description"
         # Last resort before assuming this is free-text prose: an unrecognised
         # column name ("geo_group") is far more often a short descriptor on a
@@ -1249,6 +1306,14 @@ class RealisticTextGenerator:
             _topic = _table_topic_semantic(table)
             if _topic:
                 return _topic
+        if any(f in name for f in ("feedback", "survey")):
+            return "customer_feedback"
+        if any(m in name for m in ("memo", "descriptor")):
+            return "transaction_memo"
+        if ("ticket" in table or "support" in table or "issue" in table) and any(n in name for n in _NOTES_LIKE):
+            return "resolution_notes"
+        if any(n in name for n in ("note", "notes", "remark", "remarks", "comment", "comments")):
+            return "notes"
         return "description"
 
     def _generate_caption(self, *, size: int, table_data: Optional[pd.DataFrame] = None) -> np.ndarray:  # noqa: ARG002
@@ -1577,18 +1642,20 @@ class RealisticTextGenerator:
         table_data: Optional[pd.DataFrame],
     ) -> np.ndarray:
         categories = self._series_from_table(table_data, "category", size)
-        values = []
-        for category in categories:
-            normalized = str(category).lower()
-            key = next((pool for pool in PRODUCT_NAME_POOLS if pool in normalized), None)
-            key = key or "electronics"
-            if semantic == "product_name":
+        if semantic == "product_name":
+            values = []
+            for category in categories:
+                normalized = str(category).lower()
+                key = next((pool for pool in PRODUCT_NAME_POOLS if pool in normalized), None)
+                key = key or "electronics"
                 product_names = self._vocabulary("product_name", PRODUCT_NAME_POOLS[key])
                 values.append(self.rng.choice(product_names))
-            else:
-                product_descriptions = self._vocabulary("product_description", PRODUCT_DESCRIPTION_TEMPLATES)
-                values.append(self.rng.choice(product_descriptions))
-        return np.array(values)
+            return np.array(values)
+        else:
+            custom_descriptions = self._vocabulary("product_description", [])
+            if custom_descriptions and custom_descriptions != PRODUCT_DESCRIPTION_TEMPLATES:
+                return np.array([self.rng.choice(custom_descriptions) for _ in range(size)])
+            return self.microtext.product_descriptions(size, category=categories)
 
     def _series_from_table(self, table_data: Optional[pd.DataFrame], column: str, size: int) -> np.ndarray:
         if table_data is not None and column in table_data.columns and len(table_data[column]) >= size:
@@ -3184,3 +3251,100 @@ def _apply_status_end_date(df: pd.DataFrame, columns: set[str], rng: np.random.G
             end.loc[inactive_mask] = start.loc[inactive_mask] + deltas
 
         df["end_date"] = end
+
+
+# ─── TEXT ENRICHMENT API (2026 Expansion) ───────────────────────────────────
+
+def enrich_text(
+    data: Union[pd.Series, pd.DataFrame, Sequence, np.ndarray],
+    *,
+    column_name: Optional[str] = None,
+    table_name: Optional[str] = None,
+    text_type: Optional[str] = None,
+    domain: Optional[str] = None,
+    locale: str = "en_US",
+    seed: Optional[int] = None,
+    rng: Optional[np.random.Generator] = None,
+) -> Union[pd.Series, pd.DataFrame, np.ndarray]:
+    """Enrich textual columns or values with realistic domain-authentic text.
+
+    Can be applied to a pandas Series, a 1D sequence/array of strings, or an entire
+    pandas DataFrame. When applied to a DataFrame, it enriches text/object
+    columns matching recognizable semantic textual patterns (or a targeted
+    column if ``column_name`` is specified).
+
+    Args:
+        data: A pandas Series, DataFrame, numpy array, or list of values.
+        column_name: Optional column name hint to guide semantic detection.
+        table_name: Optional table name hint to guide domain context.
+        text_type: Explicit text type (e.g. 'ticket_subject', 'resolution_notes',
+            'product_description', 'transaction_memo', 'error_message',
+            'clinical_notes', 'chief_complaint', 'discharge_instructions',
+            'delivery_instructions', 'customer_feedback', 'churn_reason',
+            'return_reason', 'audit_reason', 'address').
+        domain: Optional domain hint (e.g. 'medical', 'finance', 'ecommerce', 'saas').
+        locale: Target locale string (default 'en_US').
+        seed: Reproducible integer random seed.
+        rng: Optional pre-configured numpy random Generator.
+
+    Returns:
+        Enriched data matching the input type (Series, DataFrame, or ndarray).
+    """
+    if rng is None:
+        rng = np.random.default_rng(seed if seed is not None else 42)
+    gen = RealisticTextGenerator(rng=rng, domain=domain, locale=locale)
+
+    if isinstance(data, pd.DataFrame):
+        df = data.copy()
+        if column_name and column_name in df.columns:
+            sem = text_type or gen._infer_semantic(column_name, table_name or "table")
+            df[column_name] = gen.generate(
+                column_name=column_name,
+                table_name=table_name or "table",
+                size=len(df),
+                semantic_type=sem,
+                table_data=df,
+                semantic_declared=bool(text_type),
+            )
+        else:
+            for col in df.columns:
+                if _is_text_dtype(df[col]):
+                    sem = text_type or gen._infer_semantic(col, table_name or "table")
+                    # Preserve standard categorical keys and non-prose columns unless explicit
+                    if not text_type and sem in ("first_name", "last_name", "company_name", "city", "country", "id"):
+                        continue
+                    df[col] = gen.generate(
+                        column_name=col,
+                        table_name=table_name or "table",
+                        size=len(df),
+                        semantic_type=sem,
+                        table_data=df,
+                        semantic_declared=bool(text_type),
+                    )
+        return df
+
+    if isinstance(data, pd.Series):
+        col = column_name or (str(data.name) if data.name else "description")
+        sem = text_type or gen._infer_semantic(col, table_name or "table")
+        res = gen.generate(
+            column_name=col,
+            table_name=table_name or "table",
+            size=len(data),
+            semantic_type=sem,
+            semantic_declared=bool(text_type),
+        )
+        return pd.Series(res, index=data.index, name=data.name)
+
+    # Sequence / ndarray
+    size = len(data)
+    col = column_name or "description"
+    sem = text_type or gen._infer_semantic(col, table_name or "table")
+    res = gen.generate(
+        column_name=col,
+        table_name=table_name or "table",
+        size=size,
+        semantic_type=sem,
+        semantic_declared=bool(text_type),
+    )
+    return res if isinstance(data, np.ndarray) else list(res)
+

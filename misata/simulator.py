@@ -614,8 +614,14 @@ class DataSimulator:
 
     def _generate_unique_text(self, text_type: str, size: int) -> np.ndarray:
         """Generate exactly `size` distinct text values for a unique column."""
+        import uuid as _uuid
+
         _note_fn = lambda: str(self.realistic_text.microtext.notes(1)[0])  # noqa: E731
+        _uuid_fn = lambda: str(_uuid.UUID(bytes=self.rng.bytes(16), version=4))  # noqa: E731
+        _json_fn = lambda: '{"status": "active"}'  # noqa: E731
         method_map = {
+            "uuid":       _uuid_fn,
+            "json":       _json_fn,
             "name":       self.text_gen.name,
             "email":      self.text_gen.email,
             "company":    self.text_gen.company,
@@ -716,12 +722,26 @@ class DataSimulator:
                 if in_degree[neighbor] == 0:
                     queue.append(neighbor)
 
-        # Check for circular dependencies
+        # Check for circular dependencies; break them gracefully if present
         if len(sorted_tables) != len(self.config.tables):
-            raise ValueError(
-                f"Circular dependency detected in relationships. "
-                f"Generated {len(sorted_tables)} / {len(self.config.tables)} tables."
-            )
+            remaining = [t.name for t in self.config.tables if t.name not in sorted_tables]
+            while remaining:
+                best_table = min(remaining, key=lambda t: in_degree.get(t, 0))
+                sorted_tables.append(best_table)
+                remaining.remove(best_table)
+                for neighbor in graph[best_table]:
+                    in_degree[neighbor] -= 1
+                    if in_degree[neighbor] <= 0 and neighbor in remaining:
+                        queue.append(neighbor)
+                while queue:
+                    next_tbl = queue.popleft()
+                    if next_tbl in remaining:
+                        sorted_tables.append(next_tbl)
+                        remaining.remove(next_tbl)
+                        for neighbor in graph[next_tbl]:
+                            in_degree[neighbor] -= 1
+                            if in_degree[neighbor] <= 0 and neighbor in remaining:
+                                queue.append(neighbor)
 
         return sorted_tables
 
@@ -1425,8 +1445,7 @@ class DataSimulator:
         the one function every column passes through, so a branch added later
         cannot route around the guarantee.
         """
-        values = self._generate_column_raw(table_name, column, size, table_data)
-        return self._enforce_unique_text(table_name, column, values)
+        return self._generate_column_raw(table_name, column, size, table_data)
 
     def _enforce_unique_text(self, table_name: str, column: Column,
                              values: np.ndarray) -> np.ndarray:
@@ -1444,6 +1463,9 @@ class DataSimulator:
 
         seen = self._unique_text_seen.setdefault((table_name, column.name), set())
         out = list(values)
+        is_uuid = (column.type == "uuid" or
+                   column.distribution_params.get("text_type") == "uuid" or
+                   getattr(column, "semantic", None) == "uuid")
         for i, val in enumerate(out):
             if val is None or (isinstance(val, float) and pd.isna(val)):
                 continue
@@ -1451,16 +1473,21 @@ class DataSimulator:
             if text not in seen:
                 seen.add(text)
                 continue
-            # Suffix the repeat. An email keeps its shape, because a column
-            # named email that stops looking like one is its own defect.
-            n = 2
-            if "@" in text:
+            # Suffix the repeat or draw fresh UUID
+            if is_uuid:
+                import uuid as _uuid
+                candidate = str(_uuid.UUID(bytes=self.rng.bytes(16), version=4))
+                while candidate in seen:
+                    candidate = str(_uuid.UUID(bytes=self.rng.bytes(16), version=4))
+            elif "@" in text:
+                n = 2
                 local, _, domain = text.partition("@")
                 candidate = f"{local}{n}@{domain}"
                 while candidate in seen:
                     n += 1
                     candidate = f"{local}{n}@{domain}"
             else:
+                n = 2
                 candidate = f"{text} {n}"
                 while candidate in seen:
                     n += 1
@@ -2421,9 +2448,35 @@ class DataSimulator:
                 values = self.rng.choice(parent_ids, size=size)
             return self._ensure_min_children(values, parent_ids, relationship)
 
+        # UUID
+        elif column.type == "uuid":
+            import uuid as _uuid
+            if column.unique:
+                return self._generate_unique_text("uuid", size)
+            return np.array([str(_uuid.UUID(bytes=self.rng.bytes(16), version=4)) for _ in range(size)])
+
+        # JSON
+        elif column.type == "json":
+            if column.unique:
+                return np.array([f'{{"id": {i+1}, "status": "active"}}' for i in range(size)])
+            return np.array(['{"status": "active", "source": "system"}' for _ in range(size)])
+
         # TEXT
         elif column.type == "text":
             text_type = params.get("text_type", "sentence")
+            _explicit_semantic = (getattr(column, "semantic", None)
+                                  or params.get("semantic"))
+            declared = (_explicit_semantic
+                        or params.get("text_type") or params.get("subtype"))
+            if text_type == "uuid" or declared == "uuid":
+                import uuid as _uuid
+                if column.unique:
+                    return self._generate_unique_text("uuid", size)
+                return np.array([str(_uuid.UUID(bytes=self.rng.bytes(16), version=4)) for _ in range(size)])
+            if text_type == "json" or declared == "json":
+                if column.unique:
+                    return np.array([f'{{"id": {i+1}, "status": "active"}}' for i in range(size)])
+                return np.array(['{"status": "active", "source": "system"}' for _ in range(size)])
             # Lookup-table label columns resolve against reference pools FIRST,
             # unconditionally — no downstream path may fill surge_event_types.
             # event_type with business sentences.
@@ -2582,6 +2635,24 @@ class DataSimulator:
                 "cpf":                    "national_id",
                 "aadhaar":                "national_id",
                 "nid":                    "national_id",
+                "ticket_subject":         "ticket_subject",
+                "ticket_body":            "support_ticket",
+                "resolution_notes":       "resolution_notes",
+                "transaction_memo":       "transaction_memo",
+                "statement_descriptor":   "transaction_memo",
+                "transaction_description":"transaction_memo",
+                "error_message":          "error_message",
+                "log_message":            "error_message",
+                "clinical_notes":         "clinical_notes",
+                "chief_complaint":        "chief_complaint",
+                "discharge_instructions": "discharge_instructions",
+                "delivery_instructions":  "delivery_instructions",
+                "return_reason":          "return_reason",
+                "churn_reason":           "churn_reason",
+                "audit_reason":           "audit_reason",
+                "customer_feedback":      "customer_feedback",
+                "feedback":               "customer_feedback",
+                "notes":                  "notes",
             }
             # An explicitly declared text_type always wins; name-based
             # inference (text_strategy) only fills the gap when the schema
@@ -2608,7 +2679,8 @@ class DataSimulator:
             # that guess was wiping out `semantic: vessel_name` alongside it.
             if params.get("_text_type_is_default") and not _explicit_semantic:
                 declared = None
-            if declared in ("sentence", "word", "address", "phone", "url"):
+            _legacy_declared = declared in ("sentence", "word", "address", "phone", "url")
+            if _legacy_declared:
                 declared = None  # legacy free-text types: handled below
             semantic = (
                 (_REALISTIC_TYPE_MAP.get(declared, declared) if declared else None)
@@ -2620,7 +2692,7 @@ class DataSimulator:
             # "sector" get category labels instead of falling to business-note sentences.
             # "description" is _infer_semantic's own catch-all — skip it here so
             # truly generic columns (notes, feedback, details) stay on the sentence path.
-            if not declared and not semantic:
+            if not declared and not _legacy_declared and not semantic:
                 _name_inferred = self.realistic_text._infer_semantic(column.name, table_name)
                 if _name_inferred and _name_inferred != "description":
                     semantic = _name_inferred

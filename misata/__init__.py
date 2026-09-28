@@ -24,7 +24,7 @@ Quickstart::
     tables = misata.generate_from_schema(gen.generate_from_story("A fintech fraud dataset"))
 """
 
-__version__ = "0.9.6.59"
+__version__ = "0.9.6.60"
 __author__ = "Muhammed Rasin"
 
 from typing import Any, Dict, Optional
@@ -453,6 +453,49 @@ def generate_more(
     return merged
 
 
+def enrich_text(
+    data: Any,
+    *,
+    column_name: Optional[str] = None,
+    table_name: Optional[str] = None,
+    text_type: Optional[str] = None,
+    domain: Optional[str] = None,
+    locale: str = "en_US",
+    seed: Optional[int] = None,
+    rng: Optional[Any] = None,
+) -> Any:
+    """Enrich textual columns or values with realistic domain-authentic text.
+
+    Args:
+        data: A pandas Series, DataFrame, numpy array, or list of values.
+        column_name: Optional column name hint to guide semantic detection.
+        table_name: Optional table name hint to guide domain context.
+        text_type: Explicit text type (e.g. 'ticket_subject', 'resolution_notes',
+            'product_description', 'transaction_memo', 'error_message',
+            'clinical_notes', 'chief_complaint', 'discharge_instructions',
+            'delivery_instructions', 'customer_feedback', 'churn_reason',
+            'return_reason', 'audit_reason', 'address').
+        domain: Optional domain hint (e.g. 'medical', 'finance', 'ecommerce', 'saas').
+        locale: Target locale string (default 'en_US').
+        seed: Reproducible integer random seed.
+        rng: Optional pre-configured numpy random Generator.
+
+    Returns:
+        Enriched data matching the input type (Series, DataFrame, or ndarray).
+    """
+    from misata.realism import enrich_text as _enrich_text
+    return _enrich_text(
+        data,
+        column_name=column_name,
+        table_name=table_name,
+        text_type=text_type,
+        domain=domain,
+        locale=locale,
+        seed=seed,
+        rng=rng,
+    )
+
+
 def generate_diff(
     schema: "SchemaConfig",
     existing_dir: "Union[str, Path]",
@@ -636,7 +679,7 @@ from misata.exceptions import (
     ConfigurationError,
     ExportError,
 )
-from misata.export import to_parquet, to_duckdb, to_jsonl, to_sql, to_arrow
+from misata.export import to_parquet, to_duckdb, to_jsonl, to_sql, to_arrow, to_seed_sql
 from misata.compat import from_dict_schema, verify_integrity, IntegrityReport
 from misata.validator import validate as validate_domain, ValidationReport
 from misata.smart_values import SmartValueGenerator
@@ -865,6 +908,8 @@ __all__ = [
     "add_noise",
     "Customizer",
     "ColumnOverride",
+    # Text realism & enrichment
+    "enrich_text",
     # Quality
     "DataQualityChecker",
     "check_quality",

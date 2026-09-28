@@ -250,6 +250,137 @@ def to_sql(
     return written
 
 
+def to_seed_sql(
+    tables: Dict[str, Any],
+    output_path: Union[str, Path],
+    *,
+    dialect: str = "postgresql",
+    config: Optional[Any] = None,
+    truncate: bool = False,
+) -> Path:
+    """Export all tables into a single, topologically sorted SQL seed file.
+
+    Ideal for seeding via `psql < seed.sql` or `sqlite3 app.db < seed.sql` in CI,
+    Docker entrypoints, or local development without Python dependencies.
+
+    Args:
+        tables:      Dict mapping table name -> pd.DataFrame.
+        output_path: Path to the output .sql file (e.g. ``./seed.sql``).
+        dialect:     SQL dialect: ``postgresql`` (default), ``sqlite``, ``mysql``, or ``ansi``.
+        config:      Optional SchemaConfig to preserve foreign-key topological order.
+        truncate:    If True, prepends TRUNCATE/DELETE commands to wipe tables before inserting.
+
+    Returns:
+        Path of the generated seed.sql file.
+    """
+    output_path = Path(output_path)
+    if output_path.parent:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    dialect_clean = dialect.lower()
+    if dialect_clean in ("postgres", "postgresql"):
+        dialect_clean = "postgresql"
+    elif dialect_clean == "sqlite":
+        dialect_clean = "sqlite"
+
+    def _quote(name: str) -> str:
+        if dialect_clean == "mysql":
+            return f"`{name.replace('`', '``')}`"
+        return f'"{name.replace(chr(34), chr(34)+chr(34))}"'
+
+    # Determine table ordering
+    ordered_names: list[str] = []
+    if config:
+        from misata.db import _topological_sort
+        topo = _topological_sort(config)
+        for t in topo:
+            if t in tables and t not in ordered_names:
+                ordered_names.append(t)
+    for t in tables:
+        if t not in ordered_names:
+            ordered_names.append(t)
+
+    lines = [
+        "-- -------------------------------------------------------------",
+        "-- Misata Generated Seed Script",
+        f"-- Dialect: {dialect_clean}",
+        f"-- Tables: {len(ordered_names)} ({', '.join(ordered_names)})",
+        "-- -------------------------------------------------------------",
+        "",
+    ]
+
+    # Transaction start
+    if dialect_clean == "sqlite":
+        lines.append("BEGIN TRANSACTION;")
+    else:
+        lines.append("BEGIN;")
+    lines.append("")
+
+    # Truncate if requested (children first, i.e., reversed order)
+    if truncate:
+        lines.append("-- Truncate tables before inserting")
+        if dialect_clean == "postgresql":
+            table_list = ", ".join(_quote(t) for t in reversed(ordered_names))
+            lines.append(f"TRUNCATE TABLE {table_list} CASCADE;")
+        else:
+            for t in reversed(ordered_names):
+                lines.append(f"DELETE FROM {_quote(t)};")
+        lines.append("")
+
+    import datetime as _dt
+    import pandas as _pd
+
+    def _val_to_sql(v) -> str:
+        if v is None or v is _pd.NA:
+            return "NULL"
+        if isinstance(v, float) and v != v:  # NaN
+            return "NULL"
+        if isinstance(v, bool):
+            if dialect_clean == "sqlite":
+                return "1" if v else "0"
+            return "TRUE" if v else "FALSE"
+        if isinstance(v, int):
+            return str(v)
+        if isinstance(v, float):
+            return repr(v)
+        if isinstance(v, _dt.datetime):
+            ts = v.replace(tzinfo=None) if v.tzinfo else v
+            if dialect_clean == "postgresql":
+                return f"TIMESTAMP '{ts.isoformat(sep=' ', timespec='seconds')}'"
+            return f"'{ts.isoformat(sep=' ', timespec='seconds')}'"
+        if isinstance(v, _dt.date):
+            if dialect_clean == "postgresql":
+                return f"DATE '{v.isoformat()}'"
+            return f"'{v.isoformat()}'"
+        s = str(v)
+        escaped = s.replace("'", "''")
+        return f"'{escaped}'"
+
+    for table_name in ordered_names:
+        df = tables[table_name]
+        if df.empty:
+            continue
+        lines.append(f"-- Table: {table_name} ({len(df):,} rows)")
+        cols_sql = ", ".join(_quote(c) for c in df.columns)
+        chunk_size = 500
+        for start in range(0, len(df), chunk_size):
+            chunk = df.iloc[start : start + chunk_size]
+            row_strs = []
+            for _, row in chunk.iterrows():
+                vals = ", ".join(_val_to_sql(v) for v in row)
+                row_strs.append(f"  ({vals})")
+            if row_strs:
+                lines.append(f"INSERT INTO {_quote(table_name)} ({cols_sql}) VALUES")
+                lines.append(",\n".join(row_strs) + ";")
+        lines.append("")
+
+    lines.append("COMMIT;")
+    lines.append("")
+
+    output_path.write_text("\n".join(lines), encoding="utf-8")
+    return output_path
+
+
 # ---------------------------------------------------------------------------
 # Apache Arrow IPC export (#12)
 # ---------------------------------------------------------------------------

@@ -398,3 +398,25 @@ def test_llm_refinement_end_to_end_with_mock():
         schema = gen.generate_from_story(FRIEND_PROMPT)
     sent = {c.name: c for c in schema.columns["product_reviews"]}["sentiment"]
     assert sent.distribution_params["depends_on"] == "rating"
+
+
+def test_date_shaped_names_in_spec():
+    from misata.spec_prompt import parse_spec
+    spec = """
+    Table 1: accounts
+    Rows: exactly 20
+    Columns:
+      account_id
+      signed_up_on
+
+    Table 2: notes
+    Rows: exactly 20
+    Columns:
+      note_id
+      account_id
+    """
+    schema, _ = parse_spec(spec)
+    declared = next(c for c in schema.columns["accounts"] if c.name == "signed_up_on")
+    assert declared.type == "date"
+
+

@@ -311,3 +311,12 @@ class TestInteractions:
         out = apply_lifecycle(pd.DataFrame(), _order_lifecycle(),
                               np.random.default_rng(1))
         assert out.empty
+
+    def test_workflow_engine_event_stream_monotonic(self):
+        from misata.workflows import WorkflowEngine
+        engine = WorkflowEngine()
+        events = engine.generate_event_stream(entity_ids=[1, 2], workflow_name="order", start_date="2024-01-01")
+        assert not events.empty
+        for _, group in events.groupby("entity_id"):
+            assert group["timestamp"].is_monotonic_increasing
+

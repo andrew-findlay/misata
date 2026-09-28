@@ -842,3 +842,61 @@ class TestVocabularySeeds:
         cloth_pool = set(PRODUCT_BY_CATEGORY["clothing"])
         assert products[0] in elec_pool
         assert products[1] in cloth_pool
+
+
+def test_cross_table_depends_on_uses_parent_context_without_stdout(capsys) -> None:
+    config = SchemaConfig(
+        name="Depends On",
+        seed=42,
+        tables=[
+            Table(
+                name="plans",
+                is_reference=True,
+                inline_data=[
+                    {"id": 1, "name": "Free"},
+                    {"id": 2, "name": "Enterprise"},
+                ],
+            ),
+            Table(name="subscriptions", row_count=200),
+        ],
+        columns={
+            "subscriptions": [
+                Column(name="id", type="int", distribution_params={"min": 1, "max": 200}, unique=True),
+                Column(name="plan_id", type="foreign_key", distribution_params={}),
+                Column(
+                    name="mrr",
+                    type="float",
+                    distribution_params={
+                        "depends_on": "plan_id.name",
+                        "mapping": {
+                            "Free": {"mean": 0, "std": 1},
+                            "Enterprise": {"mean": 1000, "std": 1},
+                        },
+                        "default": {"mean": 250, "std": 1},
+                    },
+                ),
+            ]
+        },
+        relationships=[
+            Relationship(
+                parent_table="plans",
+                child_table="subscriptions",
+                parent_key="id",
+                child_key="plan_id",
+            )
+        ],
+    )
+
+    batches = []
+    for table_name, batch in DataSimulator(config, batch_size=200).generate_all():
+        if table_name == "subscriptions":
+            batches.append(batch)
+    subscriptions = pd.concat(batches, ignore_index=True)
+    captured = capsys.readouterr()
+    assert captured.out == ""
+
+    free_mean = subscriptions.loc[subscriptions["plan_id"] == 1, "mrr"].mean()
+    enterprise_mean = subscriptions.loc[subscriptions["plan_id"] == 2, "mrr"].mean()
+    assert enterprise_mean > 900
+    assert free_mean < 100
+

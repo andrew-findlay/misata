@@ -1135,3 +1135,287 @@ MED_FREQUENCIES = [
     "Every 8 hours", "Every 12 hours", "As needed", "At bedtime",
     "With meals", "Weekly",
 ]
+
+# ---------------------------------------------------------------------------
+# Enriched Textual Realism Pools (2026 Expansion)
+# ---------------------------------------------------------------------------
+
+RETURN_REASONS: List[str] = [
+    "Defective or does not power on",
+    "Item does not match website pictures or description",
+    "Wrong size / fit too small",
+    "Wrong size / fit too large",
+    "Arrived damaged or broken in transit",
+    "Missing key parts or accessories",
+    "Arrived later than estimated delivery date",
+    "Found better price from another merchant",
+    "Ordered incorrect model or variant by mistake",
+    "Changed mind / item no longer needed",
+    "Poor build quality / materials felt cheap",
+    "Incompatible with existing equipment",
+]
+
+CHURN_REASONS: List[str] = [
+    "Switched to alternative competitor platform",
+    "Budget cuts and company-wide software consolidation",
+    "Missing critical integrations with internal tech stack",
+    "Product complexity and steep learning curve for team",
+    "Low internal user adoption and seat utilization",
+    "Missing advanced reporting and audit export features",
+    "Pricing tier too expensive for current volume",
+    "Company acquired or undergoing operational restructuring",
+    "Underlying project cancelled or business pivoted",
+    "Dissatisfied with customer support response times",
+    "Lack of custom API endpoints and webhook reliability",
+    "Downsized team headcount; reduced licensing needs",
+]
+
+AUDIT_REASONS: List[str] = [
+    "Quarterly SOC2 Type II compliance sampling",
+    "Automated anomaly detection triggered security review",
+    "Manual approval threshold override by department head",
+    "Identity KYC verification mismatch on submitted documents",
+    "High-value transaction flagged for AML review",
+    "Role privilege escalation to superadmin verified",
+    "Customer personal data erasure request under GDPR/CCPA",
+    "Annual external financial statement reconciliation audit",
+    "Multiple failed authentication attempts from untrusted IP",
+    "Production database schema change authorization check",
+    "Vendor risk assessment renewal and vendor compliance audit",
+    "Routine credential rotation and inactive account deprovisioning",
+]
+
+TICKET_SUBJECTS: List[str] = [
+    "Unable to authenticate via Okta SAML SSO",
+    "Password reset email link expired immediately",
+    "Session terminates unexpectedly after 5 minutes of inactivity",
+    "MFA push notification not delivering to authenticator app",
+    "Duplicate charge observed on monthly subscription invoice",
+    "Need updated VAT invoice with corporate tax ID",
+    "Credit card renewal payment failed with code 204",
+    "Requesting credit memo for unused enterprise seats",
+    "Webhook delivery failure returning HTTP 500 error",
+    "Rate limit 429 errors encountered on /v2/orders endpoint",
+    "Malformed JSON payload returned from batch export API",
+    "API key regeneration caused temporary authorization outage",
+    "CSV export generates empty file for selected date range",
+    "Search filter parameters reset when navigating to page 2",
+    "File upload fails silently for documents larger than 10MB",
+    "Analytics dashboard charts fail to render in Safari",
+    "Slow database query timeouts on customer overview table",
+    "Scheduled email reports taking over 15 minutes to generate",
+    "Intermittent 504 Gateway Timeout on checkout page",
+    "Mobile app crashes during push notification tap",
+    "Deleted team member still appearing in permission groups",
+    "Discount promo code not applying discount at final step",
+    "Need custom domain SSL certificate re-provisioned",
+    "Slack integration bot stopped posting incident alerts",
+    "Unable to edit shipping address after order confirmation",
+]
+
+RESOLUTION_NOTES: List[str] = [
+    "Investigated root cause to an expired OAuth refresh token. Regenerated client credentials, verified successful sync, and confirmed resolution with customer.",
+    "Identified database lock contention on invoice ledger table. Applied migration index and reprocessed stuck batch records successfully.",
+    "Processed full refund of charge to customer's original payment method (AuthRef #83921). Updated billing cycle to prevent recurrence.",
+    "Fixed CSS flexbox layout bug affecting Safari browser rendering. Tested across desktop and mobile, deployed hotfix to production.",
+    "Flushed stale Redis cache cluster on proxy nodes. Verified p95 latency returned to baseline (<120ms) and closed incident.",
+    "Customer updated billing address on file. Re-attempted payment authorization and transaction succeeded without further error.",
+    "Updated role permissions in organization admin panel to grant analyst read access. Confirmed access restored.",
+    "Re-queued 18 failed webhook events from dead-letter queue. Upstream receiver confirmed receipt of all payloads.",
+    "Re-issued TLS certificate on custom edge domain. Validated SSL handshake across global edge locations.",
+    "Identified malformed UTF-8 character in CSV ingestion stream. Added sanitizer pass to parser pipeline.",
+    "Walked user through clearing browser session storage and re-authenticating with MFA hardware key.",
+    "Adjusted rate limit tier from 60 req/min to 300 req/min for enterprise tier customer. Verified no further 429 errors.",
+    "Escalated bug to mobile engineering team (ticket MOB-4912). Temporary workaround provided to customer.",
+    "Replaced damaged hardware unit under standard warranty. Tracking number provided to customer.",
+    "Restored accidentally archived project from point-in-time snapshot. Customer verified all records intact.",
+]
+
+TRANSACTION_MEMOS: List[str] = [
+    "SQ *BLUE BOTTLE COFFEE SAN FRANCISCO CA",
+    "AMZN MKTP US*8K9J21 AMZN.COM/BILL WA",
+    "UBER *TRIP HELP.UBER.COM CA",
+    "TARGET T-2418 MINNEAPOLIS MN",
+    "STRIPE *GITHUB INC SAN FRANCISCO CA",
+    "WHOLEFDS MKT 10294 AUSTIN TX",
+    "APPLE.COM/BILL 866-712-7753 CA",
+    "NETFLIX.COM 866-579-7172 CA",
+    "SHELL OIL 574492019 DALLAS TX",
+    "TRADER JOE'S #542 PASADENA CA",
+    "STARBUCKS STORE 08492 SEATTLE WA",
+    "DELTA AIR 00628391024 ATLANTA GA",
+    "ACH DIRECT DEP ACME CORP PAYROLL",
+    "WIRE OUT REF: 849201 ESCROW HOLDINGS",
+    "BILL PAY UTILITIES ELECTRIC & GAS",
+    "IRS TREAS 310 TAX REFUND",
+    "ATM WITHDRAWAL #4820 1ST NATIONAL BANK",
+    "ZELLE TRANSFER FROM J SMITH",
+    "INTEREST PAYMENT - CHECKING ACCT",
+    "WAL-MART #1582 BENTONVILLE AR",
+    "CVS PHARMACY #0492 BOSTON MA",
+    "LYFT *RIDE 09-24 SAN FRANCISCO CA",
+    "AWS EMEA AWS.AMAZON.CO LU",
+    "GOOGLE *CLOUD_01824 MOUNTAIN VIEW CA",
+    "COSTCO WHSE #0482 ISSAQUAH WA",
+    "HOME DEPOT #6812 ATLANTA GA",
+    "FEDEX 794820198421 MEMPHIS TN",
+    "USPS POST OFFICE 02138 CAMBRIDGE MA",
+]
+
+SYSTEM_ERROR_MESSAGES: List[str] = [
+    "ConnectionRefusedError: Connection to db-primary.internal:5432 timed out after 30000ms",
+    "HTTP 401 Unauthorized: Authorization header missing or bearer token expired",
+    "HTTP 403 Forbidden: Insufficient permissions to access resource 'organizations/org_4921/billing'",
+    "HTTP 404 Not Found: Resource '/api/v1/workspaces/ws_9812/members' does not exist",
+    "HTTP 429 Too Many Requests: Rate limit exceeded (limit: 120 req/min, current: 168)",
+    "HTTP 502 Bad Gateway: Upstream service 'auth-worker-02' unreachable or unhealthy",
+    "HTTP 504 Gateway Timeout: Upstream server took longer than 60.0s to respond",
+    "PayloadTooLargeError: Request body size 15.4MB exceeds maximum allowed size of 10.0MB",
+    "IntegrityError: Duplicate key value violates unique constraint 'idx_accounts_subdomain'",
+    "InvalidSignature: HMAC-SHA256 signature verification failed for incoming webhook payload",
+    "StripeCardError: Your card was declined due to insufficient funds (code: card_declined)",
+    "S3StorageError: AccessDenied on bucket 'prod-analytics-exports' for key 'export_491.csv'",
+    "DeadlockDetected: Transaction (Process 4921) was deadlocked on lock resources with process 4928",
+    "ValidationError: Field 'shipping_postal_code' failed regex format '^\\d{5}(-\\d{4})?$' for country 'US'",
+    "JSONDecodeError: Expecting ',' delimiter: line 14 column 28 (char 412)",
+    "CircuitBreakerOpenException: Service 'payment-gateway-eu' circuit breaker open due to high failure rate",
+    "OutOfMemoryError: Java heap space during batch transformation in SparkExecutor-04",
+    "KafkaProduceError: RecordBatch expired before acknowledgment from broker 10.0.12.4:9092",
+    "DNSTimeoutException: Failed to resolve hostname 'api.partner-vendor.com' within 5000ms",
+]
+
+CHIEF_COMPLAINTS: List[str] = [
+    "Patient presents with persistent cough, mild wheezing, and low-grade fever for 4 days.",
+    "Complains of sharp lower right quadrant abdominal pain starting 12 hours ago, rated 7/10.",
+    "Follow-up consultation for type 2 diabetes management and blood glucose log review.",
+    "Severe throbbing unilateral headache with photophobia and nausea lasting 36 hours.",
+    "Routine annual physical examination and preventative lipid panel screening.",
+    "Complains of gradual bilateral knee stiffness and pain aggravated by climbing stairs.",
+    "Post-operative check following laparoscopic cholecystectomy 10 days ago. Incisions healing well.",
+    "Presents with acute lower back pain radiating down left leg following heavy lifting.",
+    "Complains of progressive fatigue, shortness of breath on mild exertion, and dizziness.",
+    "Follow-up for essential hypertension with recent home blood pressure readings averaging 148/92.",
+    "Presents with pruritic erythematous rash across bilateral forearms following outdoor gardening.",
+    "Complains of sore throat, difficulty swallowing, and cervical lymphadenopathy for 3 days.",
+]
+
+DISCHARGE_INSTRUCTIONS: List[str] = [
+    "Continue prescribed antibiotic course for full 7 days even if symptoms resolve completely. Take with food.",
+    "Avoid vigorous physical activity, heavy lifting (>10 lbs), and strenuous exercise for the next 2 weeks.",
+    "Follow low-sodium, heart-healthy dietary guidelines and log daily morning blood pressure readings.",
+    "Schedule follow-up visit with primary care physician in 14 days for incision check and lab review.",
+    "Seek immediate emergency medical attention if temperature exceeds 101.5F, severe shortness of breath, or chest pain occurs.",
+    "Keep dressing clean and dry. May shower after 48 hours; do not submerge wound in bath or pool.",
+    "Resume regular home medications tomorrow morning. Discontinue temporary anticoagulant as previously directed.",
+    "Elevate affected extremity above heart level when resting to reduce peripheral edema.",
+    "Drink plenty of oral fluids (at least 2 liters daily) and maintain light walking as tolerated.",
+    "Return to clinic immediately if redness, increased swelling, or purulent drainage develops around wound site.",
+]
+
+CLINICAL_NOTES: List[str] = [
+    "Patient alert and oriented x3. Vital signs stable within normal limits. Lungs clear to auscultation bilaterally. Heart regular rate and rhythm without murmurs. Plan: continue current medical regimen, repeat labs in 3 months.",
+    "Physical exam reveals mild tenderness in right upper quadrant without rebound or guarding. Bowel sounds present. Laboratory evaluation unremarkable. Patient advised on dietary modifications and symptom monitoring.",
+    "Neurological examination intact. Cranial nerves II-XII grossly normal. Deep tendon reflexes 2+ symmetrical. Gait steady. Prescribed triptan therapy for acute migraine episodes and counseled on trigger avoidance.",
+    "Bilateral breath sounds clear. No wheezes, rales, or rhonchi. Oxygen saturation 98% on room air. Peak flow improved post-nebulizer treatment. Inhaler technique reviewed and reinforced.",
+    "Surgical incision sites clean, intact, with no erythema, warmth, or purulent exudate. Sutures removed without complication. Healing appropriately for postoperative day 10.",
+    "Cardiovascular exam: S1 and S2 audible, no S3/S4. Peripheral pulses 2+ bilaterally, no lower extremity edema. EKG demonstrates normal sinus rhythm. Adjusted antihypertensive dosing with 4-week follow-up.",
+    "Skin exam reveals well-demarcated maculopapular rash on bilateral arms. No mucosal involvement. Topical corticosteroid prescribed with instructions for twice daily application for 7 days.",
+    "Musculoskeletal exam shows restricted range of motion of lumbar spine with paraspinal muscle spasm. Straight leg raise negative bilaterally. Initiated physical therapy referral and short course of NSAIDs.",
+]
+
+DELIVERY_INSTRUCTIONS: List[str] = [
+    "Please leave the package on the front porch behind the decorative planter.",
+    "Building gate code is #4921. Take elevator to 3rd floor and leave outside unit 304.",
+    "Please ring doorbell upon delivery. Do not leave unattended in the lobby.",
+    "Deliver to front reception desk between 9:00 AM and 5:00 PM on weekdays only.",
+    "Side door entrance near driveway. Please do not block the garage door.",
+    "Beware of friendly dog in the fenced yard. Gate latch is on the inside.",
+    "Leave package inside the screened porch. No signature required.",
+    "Package contains fragile items; please handle with care and keep upright.",
+    "Drop off at package locker room in building basement; notify resident via app.",
+    "If no one answers, please leave behind the pillar next to the entryway.",
+    "Security guard at main entrance will accept packages and sign on resident's behalf.",
+    "Please knock firmly on front door before leaving package on doormat.",
+]
+
+CUSTOMER_FEEDBACK: List[str] = [
+    "The user interface is remarkably clean and intuitive. Onboarding our 15-person team took under an hour.",
+    "Customer support resolved my billing issue within 20 minutes on live chat. Truly impressive service.",
+    "Solid core functionality, though the mobile web experience has noticeable performance lag on larger datasets.",
+    "The automated reporting saves our analytics team roughly 4 hours every Monday morning. Worth every penny.",
+    "Documentation could use more real-world code examples for custom webhook payload handling.",
+    "A great value compared to enterprise competitors that charge 3x more for nearly identical features.",
+    "Very pleased with the speed of data exports and the accuracy of the underlying analytics models.",
+    "Setup was smooth, but configuring fine-grained permissions for guest users felt slightly unintuitive.",
+    "Reliable platform that has maintained 100% uptime for our team throughout the last two quarters.",
+    "Would love to see direct integrations with Slack and Notion on the upcoming product roadmap.",
+    "The product exceeded our expectations during our 14-day trial period; upgrading to enterprise was an easy decision.",
+    "Clean design, responsive customer care, and thoughtful feature updates rolled out every two weeks.",
+]
+
+PRODUCT_DESCRIPTIONS_BY_CATEGORY: Dict[str, List[str]] = {
+    "electronics": [
+        "Features high-performance active noise cancellation with up to 30 hours of battery life on a single charge. Engineered with aerospace-grade aluminum and sweat-resistant nanocoating for premium daily use.",
+        "Equipped with ultra-low latency wireless connectivity, rapid USB-C fast charging, and custom-tuned neodymium acoustic drivers for immersive high-fidelity audio.",
+        "Compact and lightweight design with high-resolution OLED display, intuitive touch controls, and seamless multi-device Bluetooth 5.3 pairing across phone, tablet, and laptop.",
+        "Engineered for creators and power users with dual thunderbolt ports, efficient thermal cooling architecture, and an anodized aluminum chassis built to endure heavy workloads.",
+        "Smart intelligent sensors automatically adjust settings in real time, delivering optimal energy efficiency and effortless everyday convenience.",
+    ],
+    "clothing": [
+        "Crafted from 100% certified organic combed cotton with reinforced double-needle stitching for lasting durability. Features a tailored athletic fit with breathable all-day comfort.",
+        "Engineered with 4-way stretch moisture-wicking fabric and an anti-chafing flatlock seam construction. Designed for peak athletic performance and everyday casual wear.",
+        "Timeless relaxed silhouette cut from premium heavyweight French terry. Pre-shrunk fabric ensures shape retention through repeated machine washes.",
+        "Weatherproof outer shell with breathable micro-porous membrane and lightweight thermal insulation. Keeps you dry and comfortable across changing seasons.",
+        "Versatile modern wardrobe staple tailored for effortless layering from workday commutes to casual weekend outings.",
+    ],
+    "home": [
+        "Manufactured from professional-grade 18/10 stainless steel with an encapsulated aluminum core for rapid, even heat distribution. Ergonomic stay-cool handles ensure secure handling.",
+        "Space-saving modular design with durable BPA-free silicone components. Dishwasher safe, microwave safe, and engineered for effortless everyday food prep.",
+        "Crafted from sustainable solid acacia wood with a food-safe mineral oil finish. Naturally antimicrobial and gentle on fine cutlery edges.",
+        "Energy-efficient modern design that blends seamlessly into any contemporary living space while providing quiet, dependable performance.",
+        "Heavy-duty construction engineered to withstand daily family use, backed by a comprehensive 5-year manufacturer warranty.",
+    ],
+    "beauty": [
+        "Formulated with pure botanical hyaluronic acid, vitamin C, and organic cold-pressed jojoba oil. Delivers deep, non-greasy hydration suitable for all skin types.",
+        "Dermatologist-tested, fragrance-free formula clinically proven to restore moisture barrier resilience within 48 hours. 100% cruelty-free and vegan.",
+        "Nourishing antioxidant-rich botanical complex that revitalizes dull skin, promoting a healthy radiant glow without clogging pores.",
+        "Gentle everyday cleanser that effectively removes impurities and makeup while maintaining the skin's natural pH and lipid balance.",
+    ],
+    "industrial": [
+        "Heavy-duty alloy steel construction with rust-resistant powder-coat finish, rated for loads up to 500 lbs. Includes precision hardware and clear step-by-step assembly guide.",
+        "Commercial-grade ergonomic design with adjustable lumbar support, 3D armrests, and breathable high-tensile mesh backrest for all-day seated comfort.",
+        "Precision-machined tolerances with corrosion-resistant zinc plating, engineered to meet strict industrial safety and performance standards.",
+    ],
+    "software": [
+        "Enterprise-grade cloud platform featuring automated role-based access control, SOC2 compliance, and sub-second query latency across distributed datasets.",
+        "Developer-friendly REST and GraphQL APIs with comprehensive webhook event streaming, automated schema migrations, and 99.99% guaranteed uptime SLA.",
+        "Intuitive collaborative workspace designed to streamline cross-functional workflows, automate repetitive tasks, and provide actionable real-time insights.",
+    ],
+    "generic": [
+        "Designed for everyday reliability with premium materials, thoughtful ergonomics, and long-term durability.",
+        "Engineered to deliver exceptional performance and lasting value, backed by a comprehensive satisfaction guarantee.",
+        "Combines modern aesthetics with practical versatility, crafted to integrate effortlessly into your daily routine.",
+        "Built to rigorous quality standards with customer-tested functionality and dependable day-in, day-out reliability.",
+    ],
+}
+
+STREET_NAMES: List[str] = [
+    "Main", "Oak", "Maple", "Cedar", "Sunset", "Lake", "Peachtree", "Lexington",
+    "Michigan", "Market", "Oak Ridge", "Pinecrest", "Grand", "Broadway", "Elmwood",
+    "Montgomery", "Washington", "Jefferson", "Lincoln", "Madison", "Park", "Highland",
+    "Fairview", "Maplewood", "Willow", "Spring", "Valley", "River", "Chestnut",
+    "Walnut", "Pine", "Beacon", "Commonwealth", "Mission", "Folsom", "Kearny",
+    "Piedmont", "Canal", "Hudson", "Greenwich", "Bleecker", "Houston", "Crosby",
+    "Mercer", "Franklin", "Lafayette", "Vanderbilt", "Madison", "Park Avenue",
+    "Columbus", "Amsterdam", "Claremont", "Riverside", "West End", "Central",
+    "Industrial", "Commerce", "Technology", "Innovation", "Enterprise", "Corporate",
+]
+
+SECONDARY_UNITS: List[str] = [
+    "Apt 2B", "Apt 4F", "Apt 101", "Apt 304", "Apt 512",
+    "Suite 100", "Suite 200", "Suite 350", "Suite 400", "Suite 520",
+    "Unit 12", "Unit 24", "Unit 108", "Unit 205", "Unit 310",
+    "Floor 2", "Floor 3", "Floor 4", "Floor 5",
+    "Bldg A", "Bldg B", "Bldg 3", "Ste 150", "Ste 250",
+]
+

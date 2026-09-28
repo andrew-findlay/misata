@@ -237,8 +237,18 @@ def enrich_introspected_schema(config: SchemaConfig) -> None:
 
             # ── TEXT COLUMNS: Infer text_type and domain_hint ──
             if col.type == "text":
+                if params.get("text_type") in ("uuid", "json"):
+                    continue
+                # UUID
+                if name_lower in ("id", "uuid") or name_lower.endswith("_uuid") or (name_lower.endswith("_id") and col.unique):
+                    params["text_type"] = "uuid"
+                    continue
+                # JSON
+                elif name_lower in ("metadata", "settings", "config", "payload", "attributes", "properties", "extra", "preferences"):
+                    params["text_type"] = "json"
+                    continue
                 # Email
-                if "email" in name_lower:
+                elif "email" in name_lower:
                     params["text_type"] = "email"
                     continue
                 # Phone
@@ -592,6 +602,23 @@ def _sqlite_introspect(conn, tables: List[str]):
                 # for this, it had simply never been emitted from introspection.
                 composite.append([m[2] for m in sorted(members)])
 
+        # Check constraints from CREATE TABLE statement in sqlite_master
+        check_choices: Dict[str, List[str]] = {}
+        try:
+            ddl_row = conn.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name = ?",
+                (table,),
+            ).fetchone()
+            if ddl_row and ddl_row[0]:
+                import re
+                for m in re.finditer(r"CHECK\s*\(\s*([a-zA-Z0-9_\"`]+)\s+IN\s*\(([^)]+)\)\s*\)", ddl_row[0], re.IGNORECASE):
+                    col_name = m.group(1).strip('"`[] ')
+                    choices = [c.strip().strip("'\" ") for c in m.group(2).split(",")]
+                    if choices:
+                        check_choices[col_name] = choices
+        except Exception:
+            pass
+
         cur = conn.execute(f'PRAGMA table_info("{table}")')
         cols: List[Column] = []
         for row in cur.fetchall():
@@ -599,12 +626,24 @@ def _sqlite_introspect(conn, tables: List[str]):
             sql_type = row[2] or ""
             nullable = row[3] == 0
             is_pk = row[5] == 1 or name in unique_cols
-            col_type = _map_sql_type(sql_type)
+            sql_type_lower = sql_type.lower()
+            params: dict = {}
+            if name in check_choices:
+                col_type = "categorical"
+                params["choices"] = check_choices[name]
+            elif "uuid" in sql_type_lower:
+                col_type = "text"
+                params["text_type"] = "uuid"
+            elif "json" in sql_type_lower:
+                col_type = "text"
+                params["text_type"] = "json"
+            else:
+                col_type = _map_sql_type(sql_type)
             cols.append(
                 Column(
                     name=name,
                     type=col_type,
-                    distribution_params={},
+                    distribution_params=params,
                     nullable=nullable,
                     unique=bool(is_pk),
                 )
@@ -652,8 +691,18 @@ def _postgres_introspect(conn, tables: List[str]):
     # parent table name -> (schema, referenced column) for FKs that leave `public`
     external: Dict[str, Tuple[str, str]] = {}
 
+    enum_sql = """
+        SELECT
+            t.typname AS enum_name,
+            e.enumlabel AS enum_value
+        FROM pg_type t
+        JOIN pg_enum e ON t.oid = e.enumtypid
+        JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+        WHERE n.nspname = 'public'
+        ORDER BY t.typname, e.enumsortorder
+    """
     col_sql = """
-        SELECT column_name, data_type, is_nullable
+        SELECT column_name, data_type, is_nullable, udt_name
         FROM information_schema.columns
         WHERE table_schema = 'public' AND table_name = %s
         ORDER BY ordinal_position
@@ -718,6 +767,15 @@ def _postgres_introspect(conn, tables: List[str]):
           AND tc.table_name = %s
     """
 
+    enum_defs: Dict[str, List[str]] = {}
+    with conn.cursor() as cur:
+        try:
+            cur.execute(enum_sql)
+            for enum_name, enum_val in cur.fetchall():
+                enum_defs.setdefault(enum_name, []).append(enum_val)
+        except Exception:
+            conn.rollback()
+
     with conn.cursor() as cur:
         for table in tables:
             cur.execute(pk_sql, (table,))
@@ -737,13 +795,24 @@ def _postgres_introspect(conn, tables: List[str]):
 
             cur.execute(col_sql, (table,))
             cols: List[Column] = []
-            for name, data_type, is_nullable in cur.fetchall():
-                col_type = _map_sql_type(data_type)
+            for name, data_type, is_nullable, udt_name in cur.fetchall():
+                params: dict = {}
+                if udt_name in enum_defs:
+                    col_type = "categorical"
+                    params["choices"] = enum_defs[udt_name]
+                elif data_type == "uuid":
+                    col_type = "text"
+                    params["text_type"] = "uuid"
+                elif data_type in ("json", "jsonb"):
+                    col_type = "text"
+                    params["text_type"] = "json"
+                else:
+                    col_type = _map_sql_type(data_type)
                 cols.append(
                     Column(
                         name=name,
                         type=col_type,
-                        distribution_params={},
+                        distribution_params=params,
                         nullable=is_nullable == "YES",
                         unique=name in pk_cols,
                     )

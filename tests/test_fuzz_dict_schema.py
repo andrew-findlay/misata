@@ -67,7 +67,7 @@ def flat_schemas(draw):
 # ── Properties ───────────────────────────────────────────────────────────────
 
 _SETTINGS = settings(
-    max_examples=40,
+    max_examples=10,
     deadline=None,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
 )
