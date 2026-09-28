@@ -2679,15 +2679,26 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#wire-it-into-your-ai-assistant" class="md-nav__link">
+  <a href="#automatic-installation-cursor-windsurf-claude" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Wire it into your AI assistant
+        Automatic Installation (Cursor, Windsurf, Claude)
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Wire it into your AI assistant">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wire-it-manually-into-your-ai-assistant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wire it manually into your AI assistant
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Wire it manually into your AI assistant">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3120,15 +3131,26 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#wire-it-into-your-ai-assistant" class="md-nav__link">
+  <a href="#automatic-installation-cursor-windsurf-claude" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Wire it into your AI assistant
+        Automatic Installation (Cursor, Windsurf, Claude)
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Wire it into your AI assistant">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wire-it-manually-into-your-ai-assistant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wire it manually into your AI assistant
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Wire it manually into your AI assistant">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3428,28 +3450,18 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>which<span class="w"> </span>misata-mcp<span class="w">   </span><span class="c1"># → /path/to/venv/bin/misata-mcp</span>
 </code></pre></div>
 <hr />
-<h2 id="wire-it-into-your-ai-assistant">Wire it into your AI assistant</h2>
+<h2 id="automatic-installation-cursor-windsurf-claude">Automatic Installation (Cursor, Windsurf, Claude)</h2>
+<p>Configure your editor and generate project agent rules in one command:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>misata<span class="w"> </span>mcp<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span>all
+</code></pre></div>
+<p>This automatically configures <code>.cursor/mcp.json</code>, <code>~/.codeium/windsurf/mcp_config.json</code>, and <code>claude_desktop_config.json</code>, plus sets up <code>.cursor/rules/misata.mdc</code> so your AI agent knows to use Misata automatically.</p>
+<p>For <strong>Claude Code CLI</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>claude<span class="w"> </span>mcp<span class="w"> </span>add<span class="w"> </span>misata<span class="w"> </span>misata-mcp
+</code></pre></div></p>
+<hr />
+<h2 id="wire-it-manually-into-your-ai-assistant">Wire it manually into your AI assistant</h2>
 <h3 id="claude-desktop">Claude Desktop</h3>
 <p>Edit <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> on macOS, or <code>%APPDATA%\Claude\claude_desktop_config.json</code> on Windows:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">"mcpServers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">"misata"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">      </span><span class="nt">"command"</span><span class="p">:</span><span class="w"> </span><span class="s2">"misata-mcp"</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">}</span>
-</code></pre></div>
-<p>Restart Claude Desktop. Misata will appear in the tools list, look for the plug icon in the input area.</p>
-<h3 id="cursor">Cursor</h3>
-<p>Open <strong>Settings → MCP</strong> (or <code>.cursor/mcp.json</code>) and add:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">"misata"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">"command"</span><span class="p">:</span><span class="w"> </span><span class="s2">"misata-mcp"</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="p">}</span>
-</code></pre></div>
-<h3 id="windsurf">Windsurf</h3>
-<p>Add to <code>~/.codeium/windsurf/mcp_config.json</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">"mcpServers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">"misata"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -3458,11 +3470,30 @@
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="p">}</span>
 <a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="p">}</span>
 </code></pre></div>
+<p>Restart Claude Desktop. Misata will appear in the tools list, look for the plug icon in the input area.</p>
+<h3 id="cursor">Cursor</h3>
+<p>Open <strong>Settings → MCP</strong> (or <code>.cursor/mcp.json</code>) and add:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">"misata"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">"command"</span><span class="p">:</span><span class="w"> </span><span class="s2">"misata-mcp"</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="windsurf">Windsurf</h3>
+<p>Add to <code>~/.codeium/windsurf/mcp_config.json</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">"mcpServers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nt">"misata"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">      </span><span class="nt">"command"</span><span class="p">:</span><span class="w"> </span><span class="s2">"misata-mcp"</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="p">}</span>
+</code></pre></div>
 <h3 id="zed-continue-other-editors">Zed / Continue / other editors</h3>
 <p>The command is always <code>misata-mcp</code>. Refer to your editor's MCP documentation for the exact config file path. The pattern is identical across all clients.</p>
 <hr />
 <h2 id="what-the-agent-can-do">What the agent can do</h2>
-<p>The server exposes nine tools:</p>
+<p>The server exposes eleven tools:</p>
 <table>
 <thead>
 <tr>
@@ -3471,6 +3502,14 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: left;"><code>create_sandbox</code></td>
+<td style="text-align: left;"><strong>Instant Sandbox Oracle.</strong> Spins up an isolated SQLite test database seeded with realistic relational data (zero FK orphans) for testing queries and features</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>query_sandbox</code></td>
+<td style="text-align: left;"><strong>Query Oracle.</strong> Executes read-only SQL queries against the sandbox so the agent can test and verify code directly</td>
+</tr>
 <tr>
 <td style="text-align: left;"><code>generate_from_schema</code></td>
 <td style="text-align: left;"><strong>Primary.</strong> The agent designs a schema dict (any domain); Misata generates CSVs and returns an integrity proof (per-relationship orphan counts, exact roll-ups, seeded reproducibility), a coherence score, and — when a <code>__domain__</code> is declared — a domain-validation pass</td>
@@ -3515,6 +3554,12 @@
 <h2 id="prompts-to-try">Prompts to try</h2>
 <p>Paste any of these into your assistant. Each one is chosen to push a
 different part of the engine.</p>
+<p><strong>Instant Sandbox Oracle (Isolated test database &amp; SQL testing)</strong></p>
+<blockquote>
+<p>"Spin up an e-commerce sandbox database with 200 orders and test my cohort retention query against it."</p>
+<p>"Create an isolated SaaS sandbox database with 100 users, subscriptions, and payments, and verify that no subscriptions are orphaned."</p>
+<p>"Spin up a fintech sandbox from the story 'A banking app with accounts, transfers, and fraud flags' and run a query finding all flagged transfers over $5,000."</p>
+</blockquote>
 <p><strong>One sentence, let the parser design it</strong></p>
 <blockquote>
 <p>"Generate a fintech fraud dataset with 10k customers and a 2% fraud rate."</p>
@@ -3614,126 +3659,126 @@ pick <code>truncate</code> (destructive) or <code>append</code>.</p>
 <p>Returns a list of all 18 domain objects, each with <code>name</code>, <code>keywords</code>, and <code>sample_story</code>.</p>
 <p><strong>Input:</strong> none</p>
 <p><strong>Output:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">"domains"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="p">{</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"saas"</span><span class="p">,</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="nt">"keywords"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"saas"</span><span class="p">,</span><span class="w"> </span><span class="s2">"subscription"</span><span class="p">,</span><span class="w"> </span><span class="s2">"mrr"</span><span class="p">,</span><span class="w"> </span><span class="s2">"arr"</span><span class="p">,</span><span class="w"> </span><span class="s2">"churn"</span><span class="p">],</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">      </span><span class="nt">"sample_story"</span><span class="p">:</span><span class="w"> </span><span class="s2">"A SaaS startup with 5k users, 20% monthly churn, MRR $50k"</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">    </span><span class="p">},</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="err">...</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">  </span><span class="p">]</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">"domains"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="p">{</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"saas"</span><span class="p">,</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">      </span><span class="nt">"keywords"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"saas"</span><span class="p">,</span><span class="w"> </span><span class="s2">"subscription"</span><span class="p">,</span><span class="w"> </span><span class="s2">"mrr"</span><span class="p">,</span><span class="w"> </span><span class="s2">"arr"</span><span class="p">,</span><span class="w"> </span><span class="s2">"churn"</span><span class="p">],</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">      </span><span class="nt">"sample_story"</span><span class="p">:</span><span class="w"> </span><span class="s2">"A SaaS startup with 5k users, 20% monthly churn, MRR $50k"</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">    </span><span class="p">},</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">    </span><span class="err">...</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">  </span><span class="p">]</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="p">}</span>
 </code></pre></div></p>
 <hr />
 <h3 id="preview_story"><code>preview_story</code></h3>
 <p>Parses a story and returns domain detection, scale, locale, and table layout, no rows generated.</p>
 <p><strong>Input:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">"story"</span><span class="p">:</span><span class="w"> </span><span class="s2">"A fintech startup with 10k customers, 3% fraud rate"</span><span class="p">,</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="p">}</span>
-</code></pre></div></p>
-<p><strong>Output:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">"domain"</span><span class="p">:</span><span class="w"> </span><span class="s2">"fintech"</span><span class="p">,</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">"domain_confidence"</span><span class="p">:</span><span class="w"> </span><span class="s2">"high"</span><span class="p">,</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">"matched_keywords"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"fintech"</span><span class="p">,</span><span class="w"> </span><span class="s2">"fraud"</span><span class="p">],</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">"scale_params"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"users"</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">},</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span><span class="nt">"locale"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span><span class="nt">"table_preview"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">    </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"customers"</span><span class="p">,</span><span class="w">     </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">,</span><span class="w"> </span><span class="nt">"columns"</span><span class="p">:</span><span class="w"> </span><span class="mi">9</span><span class="p">},</span>
-<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">    </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"accounts"</span><span class="p">,</span><span class="w">      </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">,</span><span class="w"> </span><span class="nt">"columns"</span><span class="p">:</span><span class="w"> </span><span class="mi">6</span><span class="p">},</span>
-<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">    </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"transactions"</span><span class="p">,</span><span class="w">  </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">80000</span><span class="p">,</span><span class="w"> </span><span class="nt">"columns"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">}</span>
-<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">  </span><span class="p">],</span>
-<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="w">  </span><span class="nt">"total_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">100000</span><span class="p">,</span>
-<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="w">  </span><span class="nt">"temporal_events"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="w">  </span><span class="nt">"warnings"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
-<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a><span class="p">}</span>
-</code></pre></div></p>
-<hr />
-<h3 id="inspect_schema"><code>inspect_schema</code></h3>
-<p>Returns the full parsed schema as structured data, including table names, column definitions, and FK relationships.</p>
-<p><strong>Input:</strong>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">"story"</span><span class="p">:</span><span class="w"> </span><span class="s2">"A SaaS company with 5k users"</span><span class="p">,</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">"story"</span><span class="p">:</span><span class="w"> </span><span class="s2">"A fintech startup with 10k customers, 3% fraud rate"</span><span class="p">,</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span>
 <a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="p">}</span>
 </code></pre></div></p>
 <p><strong>Output:</strong>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">{</span>
 <a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">"tables"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="p">{</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"users"</span><span class="p">,</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">      </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span><span class="p">,</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">      </span><span class="nt">"columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">        </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"user_id"</span><span class="p">,</span><span class="w">    </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"int"</span><span class="p">,</span><span class="w">         </span><span class="nt">"unique"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">},</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">        </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"email"</span><span class="p">,</span><span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"email"</span><span class="p">},</span>
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">        </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"plan"</span><span class="p">,</span><span class="w">       </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"categorical"</span><span class="p">,</span><span class="w"> </span><span class="nt">"values"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"free"</span><span class="p">,</span><span class="w"> </span><span class="s2">"pro"</span><span class="p">,</span><span class="w"> </span><span class="s2">"enterprise"</span><span class="p">]},</span>
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">        </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"created_at"</span><span class="p">,</span><span class="w"> </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"datetime"</span><span class="p">}</span>
-<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">      </span><span class="p">]</span>
-<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">    </span><span class="p">},</span>
-<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">    </span><span class="err">...</span>
-<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="w">  </span><span class="p">],</span>
-<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="w">  </span><span class="nt">"relationships"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="w">    </span><span class="p">{</span><span class="nt">"from"</span><span class="p">:</span><span class="w"> </span><span class="s2">"subscriptions.user_id"</span><span class="p">,</span><span class="w"> </span><span class="nt">"to"</span><span class="p">:</span><span class="w"> </span><span class="s2">"users.user_id"</span><span class="p">}</span>
-<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="w">  </span><span class="p">],</span>
-<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="w">  </span><span class="nt">"outcome_curves"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a><span class="w">    </span><span class="p">{</span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"subscriptions"</span><span class="p">,</span><span class="w"> </span><span class="nt">"column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"mrr"</span><span class="p">,</span><span class="w"> </span><span class="nt">"curve_points"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">]}</span>
-<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="w">  </span><span class="p">]</span>
-<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a><span class="p">}</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">"domain"</span><span class="p">:</span><span class="w"> </span><span class="s2">"fintech"</span><span class="p">,</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="nt">"domain_confidence"</span><span class="p">:</span><span class="w"> </span><span class="s2">"high"</span><span class="p">,</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span><span class="nt">"matched_keywords"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"fintech"</span><span class="p">,</span><span class="w"> </span><span class="s2">"fraud"</span><span class="p">],</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span><span class="nt">"scale_params"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"users"</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">},</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span><span class="nt">"locale"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span><span class="nt">"table_preview"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">    </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"customers"</span><span class="p">,</span><span class="w">     </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">,</span><span class="w"> </span><span class="nt">"columns"</span><span class="p">:</span><span class="w"> </span><span class="mi">9</span><span class="p">},</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">    </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"accounts"</span><span class="p">,</span><span class="w">      </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">,</span><span class="w"> </span><span class="nt">"columns"</span><span class="p">:</span><span class="w"> </span><span class="mi">6</span><span class="p">},</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">    </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"transactions"</span><span class="p">,</span><span class="w">  </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">80000</span><span class="p">,</span><span class="w"> </span><span class="nt">"columns"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">}</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">  </span><span class="nt">"total_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">100000</span><span class="p">,</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">  </span><span class="nt">"temporal_events"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="w">  </span><span class="nt">"warnings"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="p">}</span>
+</code></pre></div></p>
+<hr />
+<h3 id="inspect_schema"><code>inspect_schema</code></h3>
+<p>Returns the full parsed schema as structured data, including table names, column definitions, and FK relationships.</p>
+<p><strong>Input:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="p">{</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">"story"</span><span class="p">:</span><span class="w"> </span><span class="s2">"A SaaS company with 5k users"</span><span class="p">,</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Output:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="p">{</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="nt">"tables"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="p">{</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"users"</span><span class="p">,</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">      </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span><span class="p">,</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">      </span><span class="nt">"columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">        </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"user_id"</span><span class="p">,</span><span class="w">    </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"int"</span><span class="p">,</span><span class="w">         </span><span class="nt">"unique"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">},</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">        </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"email"</span><span class="p">,</span><span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"email"</span><span class="p">},</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">        </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"plan"</span><span class="p">,</span><span class="w">       </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"categorical"</span><span class="p">,</span><span class="w"> </span><span class="nt">"values"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"free"</span><span class="p">,</span><span class="w"> </span><span class="s2">"pro"</span><span class="p">,</span><span class="w"> </span><span class="s2">"enterprise"</span><span class="p">]},</span>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">        </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"created_at"</span><span class="p">,</span><span class="w"> </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"datetime"</span><span class="p">}</span>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">      </span><span class="p">]</span>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">    </span><span class="p">},</span>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">    </span><span class="err">...</span>
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">  </span><span class="nt">"relationships"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="w">    </span><span class="p">{</span><span class="nt">"from"</span><span class="p">:</span><span class="w"> </span><span class="s2">"subscriptions.user_id"</span><span class="p">,</span><span class="w"> </span><span class="nt">"to"</span><span class="p">:</span><span class="w"> </span><span class="s2">"users.user_id"</span><span class="p">}</span>
+<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="w">  </span><span class="nt">"outcome_curves"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a><span class="w">    </span><span class="p">{</span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"subscriptions"</span><span class="p">,</span><span class="w"> </span><span class="nt">"column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"mrr"</span><span class="p">,</span><span class="w"> </span><span class="nt">"curve_points"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">]}</span>
+<a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a><span class="w">  </span><span class="p">]</span>
+<a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a><span class="p">}</span>
 </code></pre></div></p>
 <hr />
 <h3 id="generate_from_schema"><code>generate_from_schema</code></h3>
 <p>The primary tool: the agent supplies a schema dict it designed itself, Misata generates the data and proves the integrity. Supports per-table row counts, the full distribution set, derived columns (<code>formula</code>, including cross-table <code>@parent.column</code> references), exact roll-ups, FK declarations, and pattern-based codes.</p>
 <p><strong>Input:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="p">{</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">"schema"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nt">"customers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">      </span><span class="nt">"__rows__"</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span><span class="p">,</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">      </span><span class="nt">"id"</span><span class="p">:</span><span class="w">             </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"integer"</span><span class="p">,</span><span class="w"> </span><span class="nt">"primary_key"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">},</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w">           </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="p">},</span>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">      </span><span class="nt">"lifetime_value"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"rollup"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"from_table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders"</span><span class="p">,</span><span class="w"> </span><span class="nt">"fk"</span><span class="p">:</span><span class="w"> </span><span class="s2">"customer_id"</span><span class="p">,</span>
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">                                    </span><span class="nt">"agg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sum"</span><span class="p">,</span><span class="w"> </span><span class="nt">"column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"total"</span><span class="p">}}</span>
-<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">    </span><span class="p">},</span>
-<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">    </span><span class="nt">"orders"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">      </span><span class="nt">"__rows__"</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span><span class="p">,</span>
-<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">      </span><span class="nt">"id"</span><span class="p">:</span><span class="w">          </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"integer"</span><span class="p">,</span><span class="w"> </span><span class="nt">"primary_key"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">},</span>
-<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="w">      </span><span class="nt">"customer_id"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"integer"</span><span class="p">,</span><span class="w"> </span><span class="nt">"foreign_key"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"customers"</span><span class="p">,</span><span class="w"> </span><span class="nt">"column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"id"</span><span class="p">}},</span>
-<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="w">      </span><span class="nt">"quantity"</span><span class="p">:</span><span class="w">    </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"integer"</span><span class="p">,</span><span class="w"> </span><span class="nt">"min"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"max"</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">},</span>
-<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="w">      </span><span class="nt">"unit_price"</span><span class="p">:</span><span class="w">  </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"float"</span><span class="p">,</span><span class="w"> </span><span class="nt">"distribution"</span><span class="p">:</span><span class="w"> </span><span class="s2">"lognormal"</span><span class="p">,</span><span class="w"> </span><span class="nt">"mean"</span><span class="p">:</span><span class="w"> </span><span class="mi">40</span><span class="p">,</span><span class="w"> </span><span class="nt">"std"</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span><span class="p">},</span>
-<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a><span class="w">      </span><span class="nt">"total"</span><span class="p">:</span><span class="w">       </span><span class="p">{</span><span class="nt">"formula"</span><span class="p">:</span><span class="w"> </span><span class="s2">"quantity * unit_price"</span><span class="p">},</span>
-<a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a><span class="w">      </span><span class="nt">"placed_at"</span><span class="p">:</span><span class="w">   </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"datetime"</span><span class="p">}</span>
-<a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a><span class="w">  </span><span class="p">},</span>
-<a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a><span class="w">  </span><span class="nt">"seed"</span><span class="p">:</span><span class="w"> </span><span class="mi">7</span>
-<a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="p">{</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">"schema"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">    </span><span class="nt">"customers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">      </span><span class="nt">"__rows__"</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span><span class="p">,</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">      </span><span class="nt">"id"</span><span class="p">:</span><span class="w">             </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"integer"</span><span class="p">,</span><span class="w"> </span><span class="nt">"primary_key"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">},</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w">           </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="p">},</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">      </span><span class="nt">"lifetime_value"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"rollup"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"from_table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders"</span><span class="p">,</span><span class="w"> </span><span class="nt">"fk"</span><span class="p">:</span><span class="w"> </span><span class="s2">"customer_id"</span><span class="p">,</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">                                    </span><span class="nt">"agg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sum"</span><span class="p">,</span><span class="w"> </span><span class="nt">"column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"total"</span><span class="p">}}</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">    </span><span class="p">},</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">    </span><span class="nt">"orders"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="w">      </span><span class="nt">"__rows__"</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span><span class="p">,</span>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="w">      </span><span class="nt">"id"</span><span class="p">:</span><span class="w">          </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"integer"</span><span class="p">,</span><span class="w"> </span><span class="nt">"primary_key"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">},</span>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a><span class="w">      </span><span class="nt">"customer_id"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"integer"</span><span class="p">,</span><span class="w"> </span><span class="nt">"foreign_key"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"customers"</span><span class="p">,</span><span class="w"> </span><span class="nt">"column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"id"</span><span class="p">}},</span>
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a><span class="w">      </span><span class="nt">"quantity"</span><span class="p">:</span><span class="w">    </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"integer"</span><span class="p">,</span><span class="w"> </span><span class="nt">"min"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"max"</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">},</span>
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a><span class="w">      </span><span class="nt">"unit_price"</span><span class="p">:</span><span class="w">  </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"float"</span><span class="p">,</span><span class="w"> </span><span class="nt">"distribution"</span><span class="p">:</span><span class="w"> </span><span class="s2">"lognormal"</span><span class="p">,</span><span class="w"> </span><span class="nt">"mean"</span><span class="p">:</span><span class="w"> </span><span class="mi">40</span><span class="p">,</span><span class="w"> </span><span class="nt">"std"</span><span class="p">:</span><span class="w"> </span><span class="mi">25</span><span class="p">},</span>
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a><span class="w">      </span><span class="nt">"total"</span><span class="p">:</span><span class="w">       </span><span class="p">{</span><span class="nt">"formula"</span><span class="p">:</span><span class="w"> </span><span class="s2">"quantity * unit_price"</span><span class="p">},</span>
+<a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a><span class="w">      </span><span class="nt">"placed_at"</span><span class="p">:</span><span class="w">   </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"datetime"</span><span class="p">}</span>
+<a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-12-19" name="__codelineno-12-19" href="#__codelineno-12-19"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-12-20" name="__codelineno-12-20" href="#__codelineno-12-20"></a><span class="w">  </span><span class="nt">"seed"</span><span class="p">:</span><span class="w"> </span><span class="mi">7</span>
+<a id="__codelineno-12-21" name="__codelineno-12-21" href="#__codelineno-12-21"></a><span class="p">}</span>
 </code></pre></div></p>
 <p><strong>Output:</strong> the same file/preview envelope as <code>generate_dataset</code>, plus an
 integrity proof, a coherence score, and — when the schema declares a
 <code>__domain__</code> — a domain-validation pass:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="p">{</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">"integrity"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="nt">"verified"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"verified"</span><span class="p">,</span>
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="nt">"declared"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">    </span><span class="nt">"checked"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">    </span><span class="nt">"relationships"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">      </span><span class="p">{</span><span class="nt">"relationship"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders.customer_id → customers.id"</span><span class="p">,</span><span class="w"> </span><span class="nt">"intact"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">"orphans"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">}</span>
-<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">    </span><span class="p">]</span>
-<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">  </span><span class="p">},</span>
-<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">  </span><span class="nt">"coherence"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">    </span><span class="nt">"available"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">    </span><span class="nt">"score"</span><span class="p">:</span><span class="w"> </span><span class="mf">96.0</span><span class="p">,</span>
-<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">    </span><span class="nt">"clean"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">    </span><span class="nt">"summary"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Coherence: clean — no reader-visible contradictions."</span><span class="p">,</span>
-<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">    </span><span class="nt">"findings"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="w">    </span><span class="nt">"findings_truncated"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
-<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">{</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">"integrity"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="nt">"verified"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"verified"</span><span class="p">,</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="nt">"declared"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">    </span><span class="nt">"checked"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">    </span><span class="nt">"relationships"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">      </span><span class="p">{</span><span class="nt">"relationship"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders.customer_id → customers.id"</span><span class="p">,</span><span class="w"> </span><span class="nt">"intact"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">"orphans"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">}</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">    </span><span class="p">]</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="w">  </span><span class="nt">"coherence"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="w">    </span><span class="nt">"available"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="w">    </span><span class="nt">"score"</span><span class="p">:</span><span class="w"> </span><span class="mf">96.0</span><span class="p">,</span>
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="w">    </span><span class="nt">"clean"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a><span class="w">    </span><span class="nt">"summary"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Coherence: clean — no reader-visible contradictions."</span><span class="p">,</span>
+<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a><span class="w">    </span><span class="nt">"findings"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a><span class="w">    </span><span class="nt">"findings_truncated"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+<a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a><span class="p">}</span>
 </code></pre></div></p>
 <p>The agent can tell you: <em>"Generated and verified: 0 orphaned foreign keys, every
 customer's <code>lifetime_value</code> reconciles exactly with their orders, and the data
@@ -3746,30 +3791,30 @@ the schema and regenerate.</p>
 <h3 id="generate_dataset"><code>generate_dataset</code></h3>
 <p>Generates a full dataset and writes one CSV per table to <code>output_dir</code> (defaults to a temp directory).</p>
 <p><strong>Input:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="p">{</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">"story"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Ecommerce store — 5k customers, Black Friday spike, Q1 slump"</span><span class="p">,</span>
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span><span class="p">,</span>
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="nt">"seed"</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
-<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">  </span><span class="nt">"output_dir"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/misata_out"</span>
-<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="p">{</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span><span class="nt">"story"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Ecommerce store — 5k customers, Black Friday spike, Q1 slump"</span><span class="p">,</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span><span class="p">,</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span><span class="nt">"seed"</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">  </span><span class="nt">"output_dir"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/misata_out"</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="p">}</span>
 </code></pre></div></p>
 <p><strong>Output:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">{</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="nt">"output_dir"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/misata_out"</span><span class="p">,</span>
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span><span class="nt">"files"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="p">{</span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"customers"</span><span class="p">,</span><span class="w">   </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/misata_out/customers.csv"</span><span class="p">,</span><span class="w">   </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span><span class="p">},</span>
-<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">    </span><span class="p">{</span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"products"</span><span class="p">,</span><span class="w">    </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/misata_out/products.csv"</span><span class="p">,</span><span class="w">    </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">},</span>
-<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">    </span><span class="p">{</span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders"</span><span class="p">,</span><span class="w">      </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/misata_out/orders.csv"</span><span class="p">,</span><span class="w">      </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">15000</span><span class="p">},</span>
-<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">    </span><span class="p">{</span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"order_items"</span><span class="p">,</span><span class="w"> </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/misata_out/order_items.csv"</span><span class="p">,</span><span class="w"> </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">45000</span><span class="p">}</span>
-<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">  </span><span class="p">],</span>
-<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="w">  </span><span class="nt">"preview"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="w">    </span><span class="nt">"customers"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="w">      </span><span class="p">{</span><span class="nt">"customer_id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"email"</span><span class="p">:</span><span class="w"> </span><span class="s2">"alice@example.com"</span><span class="p">,</span><span class="w"> </span><span class="nt">"country"</span><span class="p">:</span><span class="w"> </span><span class="s2">"US"</span><span class="p">,</span><span class="w"> </span><span class="err">...</span><span class="p">},</span>
-<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="w">      </span><span class="err">...</span>
-<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="w">    </span><span class="p">]</span>
-<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="p">{</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="nt">"output_dir"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/misata_out"</span><span class="p">,</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span><span class="nt">"files"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">    </span><span class="p">{</span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"customers"</span><span class="p">,</span><span class="w">   </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/misata_out/customers.csv"</span><span class="p">,</span><span class="w">   </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span><span class="p">},</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">    </span><span class="p">{</span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"products"</span><span class="p">,</span><span class="w">    </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/misata_out/products.csv"</span><span class="p">,</span><span class="w">    </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">},</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">    </span><span class="p">{</span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders"</span><span class="p">,</span><span class="w">      </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/misata_out/orders.csv"</span><span class="p">,</span><span class="w">      </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">15000</span><span class="p">},</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">    </span><span class="p">{</span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"order_items"</span><span class="p">,</span><span class="w"> </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/misata_out/order_items.csv"</span><span class="p">,</span><span class="w"> </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">45000</span><span class="p">}</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">  </span><span class="nt">"preview"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="w">    </span><span class="nt">"customers"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a><span class="w">      </span><span class="p">{</span><span class="nt">"customer_id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"email"</span><span class="p">:</span><span class="w"> </span><span class="s2">"alice@example.com"</span><span class="p">,</span><span class="w"> </span><span class="nt">"country"</span><span class="p">:</span><span class="w"> </span><span class="s2">"US"</span><span class="p">,</span><span class="w"> </span><span class="err">...</span><span class="p">},</span>
+<a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a><span class="w">      </span><span class="err">...</span>
+<a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a><span class="w">    </span><span class="p">]</span>
+<a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-15-16" name="__codelineno-15-16" href="#__codelineno-15-16"></a><span class="p">}</span>
 </code></pre></div></p>
 <p>The agent can tell you: <em>"Generated 65,200 rows across 4 tables. Files are at <code>/tmp/misata_out/</code>. Here's a preview of the customers table…"</em></p>
 <p>Every <code>files</code> entry also carries a <code>sample</code> of the first few rows, and the
@@ -3781,23 +3826,23 @@ response carries a <code>coherence</code> block identical in shape to
 to 100. Works on anything: a folder Misata just wrote, a folder a person built
 by hand, another tool's output.</p>
 <p><strong>Input:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"dataset_dir"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/misata_out"</span><span class="p">,</span><span class="w"> </span><span class="nt">"top_findings"</span><span class="p">:</span><span class="w"> </span><span class="mi">20</span><span class="w"> </span><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"dataset_dir"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/misata_out"</span><span class="p">,</span><span class="w"> </span><span class="nt">"top_findings"</span><span class="p">:</span><span class="w"> </span><span class="mi">20</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div></p>
 <p><strong>Output:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="p">{</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="nt">"score"</span><span class="p">:</span><span class="w"> </span><span class="mf">71.0</span><span class="p">,</span>
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span><span class="nt">"clean"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">  </span><span class="nt">"summary"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Coherence: 3 findings (1 high, 2 medium)."</span><span class="p">,</span>
-<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">  </span><span class="nt">"tables_audited"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"customers"</span><span class="p">,</span><span class="w"> </span><span class="s2">"orders"</span><span class="p">,</span><span class="w"> </span><span class="s2">"order_items"</span><span class="p">],</span>
-<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">  </span><span class="nt">"findings"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">    </span><span class="p">{</span><span class="nt">"severity"</span><span class="p">:</span><span class="w"> </span><span class="s2">"high"</span><span class="p">,</span><span class="w"> </span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders"</span><span class="p">,</span><span class="w"> </span><span class="nt">"column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"shipped_at"</span><span class="p">,</span>
-<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">     </span><span class="nt">"finding"</span><span class="p">:</span><span class="w"> </span><span class="s2">"312 rows shipped before they were ordered"</span><span class="p">},</span>
-<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">    </span><span class="p">{</span><span class="nt">"severity"</span><span class="p">:</span><span class="w"> </span><span class="s2">"medium"</span><span class="p">,</span><span class="w"> </span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders"</span><span class="p">,</span><span class="w"> </span><span class="nt">"column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"total"</span><span class="p">,</span>
-<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="w">     </span><span class="nt">"finding"</span><span class="p">:</span><span class="w"> </span><span class="s2">"total does not equal quantity * unit_price for 88 rows"</span><span class="p">}</span>
-<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a><span class="w">  </span><span class="p">],</span>
-<a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a><span class="w">  </span><span class="nt">"findings_truncated"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
-<a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="p">{</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span><span class="nt">"score"</span><span class="p">:</span><span class="w"> </span><span class="mf">71.0</span><span class="p">,</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span><span class="nt">"clean"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">  </span><span class="nt">"summary"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Coherence: 3 findings (1 high, 2 medium)."</span><span class="p">,</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">  </span><span class="nt">"tables_audited"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"customers"</span><span class="p">,</span><span class="w"> </span><span class="s2">"orders"</span><span class="p">,</span><span class="w"> </span><span class="s2">"order_items"</span><span class="p">],</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="w">  </span><span class="nt">"findings"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="w">    </span><span class="p">{</span><span class="nt">"severity"</span><span class="p">:</span><span class="w"> </span><span class="s2">"high"</span><span class="p">,</span><span class="w"> </span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders"</span><span class="p">,</span><span class="w"> </span><span class="nt">"column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"shipped_at"</span><span class="p">,</span>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="w">     </span><span class="nt">"finding"</span><span class="p">:</span><span class="w"> </span><span class="s2">"312 rows shipped before they were ordered"</span><span class="p">},</span>
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="w">    </span><span class="p">{</span><span class="nt">"severity"</span><span class="p">:</span><span class="w"> </span><span class="s2">"medium"</span><span class="p">,</span><span class="w"> </span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders"</span><span class="p">,</span><span class="w"> </span><span class="nt">"column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"total"</span><span class="p">,</span>
+<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a><span class="w">     </span><span class="nt">"finding"</span><span class="p">:</span><span class="w"> </span><span class="s2">"total does not equal quantity * unit_price for 88 rows"</span><span class="p">}</span>
+<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a><span class="w">  </span><span class="nt">"findings_truncated"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
+<a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a><span class="p">}</span>
 </code></pre></div></p>
 <p>Checks include: timestamps that run backwards, derived columns that do not
 reconcile with their inputs, geographic fields that disagree (city / state /
@@ -3807,22 +3852,22 @@ postcode / country), near-constant columns, filler text, out-of-scale numerics.<
 <p>Checks a folder of CSVs for values that are physiologically or financially
 impossible for a stated domain.</p>
 <p><strong>Input:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"dataset_dir"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/trial_export"</span><span class="p">,</span><span class="w"> </span><span class="nt">"domain"</span><span class="p">:</span><span class="w"> </span><span class="s2">"clinical"</span><span class="w"> </span><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"dataset_dir"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/trial_export"</span><span class="p">,</span><span class="w"> </span><span class="nt">"domain"</span><span class="p">:</span><span class="w"> </span><span class="s2">"clinical"</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div></p>
 <p><code>domain</code> must be one of <code>clinical_trial</code>, <code>clinical</code>, <code>financial</code>, <code>fintech</code> —
 an unknown domain is refused, not silently passed.</p>
 <p><strong>Output:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="p">{</span>
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span><span class="nt">"domain"</span><span class="p">:</span><span class="w"> </span><span class="s2">"clinical"</span><span class="p">,</span>
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span><span class="nt">"passed"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">  </span><span class="nt">"summary"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1 error, 2 warnings."</span><span class="p">,</span>
-<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">  </span><span class="nt">"errors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="w">    </span><span class="p">{</span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"visits"</span><span class="p">,</span><span class="w"> </span><span class="nt">"column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"hba1c"</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"4 values outside 4-14%"</span><span class="p">}</span>
-<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="w">  </span><span class="p">],</span>
-<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="w">  </span><span class="nt">"warnings"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="w">  </span><span class="nt">"tables_checked"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"patients"</span><span class="p">,</span><span class="w"> </span><span class="s2">"visits"</span><span class="p">]</span>
-<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="p">{</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">  </span><span class="nt">"domain"</span><span class="p">:</span><span class="w"> </span><span class="s2">"clinical"</span><span class="p">,</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">  </span><span class="nt">"passed"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">  </span><span class="nt">"summary"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1 error, 2 warnings."</span><span class="p">,</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">  </span><span class="nt">"errors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="w">    </span><span class="p">{</span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"visits"</span><span class="p">,</span><span class="w"> </span><span class="nt">"column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"hba1c"</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"4 values outside 4-14%"</span><span class="p">}</span>
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="w">  </span><span class="nt">"warnings"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="w">  </span><span class="nt">"tables_checked"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"patients"</span><span class="p">,</span><span class="w"> </span><span class="s2">"visits"</span><span class="p">]</span>
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="p">}</span>
 </code></pre></div></p>
 <p>Built-in ranges — clinical: HbA1c 4-14%, BMI 10-80, systolic BP 60-260, age
 0-130, glucose 2-40, cholesterol 1-20, hemoglobin 3-25. Financial: price &gt;= 0,
@@ -3832,21 +3877,21 @@ discount 0-1, rate -1 to 100.</p>
 <p>Fills a live Postgres or SQLite database with data read from its own schema.
 <strong>Plans by default</strong> — nothing is written until a second call with <code>apply=true</code>.</p>
 <p><strong>Input (plan):</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"db_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"postgresql://localhost/myapp_dev"</span><span class="p">,</span><span class="w"> </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span><span class="w"> </span><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"db_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"postgresql://localhost/myapp_dev"</span><span class="p">,</span><span class="w"> </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div></p>
 <p><strong>Output (plan):</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="p">{</span>
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">  </span><span class="nt">"applied"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">  </span><span class="nt">"insert_order"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"accounts"</span><span class="p">,</span><span class="w"> </span><span class="s2">"users"</span><span class="p">,</span><span class="w"> </span><span class="s2">"invoices"</span><span class="p">],</span>
-<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">  </span><span class="nt">"foreign_keys"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
-<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">  </span><span class="nt">"tables"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="w">    </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"accounts"</span><span class="p">,</span><span class="w"> </span><span class="nt">"existing_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">"will_insert"</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">},</span>
-<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="w">    </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"users"</span><span class="p">,</span><span class="w">    </span><span class="nt">"existing_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">"will_insert"</span><span class="p">:</span><span class="w"> </span><span class="mi">1240</span><span class="p">},</span>
-<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="w">    </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"invoices"</span><span class="p">,</span><span class="w"> </span><span class="nt">"existing_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">"will_insert"</span><span class="p">:</span><span class="w"> </span><span class="mi">4800</span><span class="p">}</span>
-<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="w">  </span><span class="p">],</span>
-<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="w">  </span><span class="nt">"note"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Plan only, nothing was written. To write, call again with apply=true."</span>
-<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="p">{</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">  </span><span class="nt">"applied"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">  </span><span class="nt">"insert_order"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"accounts"</span><span class="p">,</span><span class="w"> </span><span class="s2">"users"</span><span class="p">,</span><span class="w"> </span><span class="s2">"invoices"</span><span class="p">],</span>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">  </span><span class="nt">"foreign_keys"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="w">  </span><span class="nt">"tables"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a><span class="w">    </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"accounts"</span><span class="p">,</span><span class="w"> </span><span class="nt">"existing_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">"will_insert"</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">},</span>
+<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a><span class="w">    </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"users"</span><span class="p">,</span><span class="w">    </span><span class="nt">"existing_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">"will_insert"</span><span class="p">:</span><span class="w"> </span><span class="mi">1240</span><span class="p">},</span>
+<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a><span class="w">    </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"invoices"</span><span class="p">,</span><span class="w"> </span><span class="nt">"existing_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">"will_insert"</span><span class="p">:</span><span class="w"> </span><span class="mi">4800</span><span class="p">}</span>
+<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a><span class="w">  </span><span class="nt">"note"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Plan only, nothing was written. To write, call again with apply=true."</span>
+<a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a><span class="p">}</span>
 </code></pre></div></p>
 <p>Then <code>{ "db_url": "...", "apply": true }</code> performs the insert (parents before
 children) and queries the database back to confirm every foreign key resolves.
@@ -3860,72 +3905,72 @@ semantic (FK consistency, formula references, distribution params), then
 feasibility (declarations that each parse but cannot all hold at once — shares
 that sum past 1.0, a period total below the sum of its parts).</p>
 <p><strong>Input:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="p">{</span>
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">  </span><span class="nt">"yaml_text"</span><span class="p">:</span><span class="w"> </span><span class="s2">"tables:\n  users:\n    rows: 1000\n    columns:\n      ..."</span>
-<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="p">{</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="w">  </span><span class="nt">"yaml_text"</span><span class="p">:</span><span class="w"> </span><span class="s2">"tables:\n  users:\n    rows: 1000\n    columns:\n      ..."</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="p">}</span>
 </code></pre></div></p>
 <p><strong>Output (valid):</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="p">{</span>
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">  </span><span class="nt">"valid"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">  </span><span class="nt">"errors"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">  </span><span class="nt">"warnings"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
-<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="p">{</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">  </span><span class="nt">"valid"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">  </span><span class="nt">"errors"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="w">  </span><span class="nt">"warnings"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="p">}</span>
 </code></pre></div></p>
 <p><strong>Output (invalid):</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="p">{</span>
-<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="w">  </span><span class="nt">"valid"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="w">  </span><span class="nt">"errors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="w">    </span><span class="s2">"tables[0].columns[2]: 'distribution' must be one of: uniform, normal, lognormal, ..."</span><span class="p">,</span>
-<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="w">    </span><span class="s2">"tables[1].columns[0]: formula references column 'gross_pay' which is not defined in this table"</span>
-<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a><span class="w">  </span><span class="p">],</span>
-<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a><span class="w">  </span><span class="nt">"warnings"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a><span class="w">    </span><span class="s2">"tables[0]: no primary key column — consider adding a unique int column"</span>
-<a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a><span class="w">  </span><span class="p">]</span>
-<a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="p">{</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">  </span><span class="nt">"valid"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">  </span><span class="nt">"errors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="w">    </span><span class="s2">"tables[0].columns[2]: 'distribution' must be one of: uniform, normal, lognormal, ..."</span><span class="p">,</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="w">    </span><span class="s2">"tables[1].columns[0]: formula references column 'gross_pay' which is not defined in this table"</span>
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a><span class="w">  </span><span class="nt">"warnings"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a><span class="w">    </span><span class="s2">"tables[0]: no primary key column — consider adding a unique int column"</span>
+<a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a><span class="w">  </span><span class="p">]</span>
+<a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a><span class="p">}</span>
 </code></pre></div></p>
 <hr />
 <h2 id="error-handling">Error handling</h2>
 <p>All nine tools return a consistent <code>{"ok": true/false, ...}</code> envelope. When something goes wrong the agent receives a structured error instead of a Python traceback, and can take corrective action:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="p">{</span>
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ValueError"</span><span class="p">,</span>
-<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">  </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"No domain could be detected from the story."</span><span class="p">,</span>
-<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="w">  </span><span class="nt">"suggestion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Name the domain explicitly — e.g. add 'fintech', 'saas', or 'ecommerce' to your story."</span>
-<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="p">{</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ValueError"</span><span class="p">,</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="w">  </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"No domain could be detected from the story."</span><span class="p">,</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="w">  </span><span class="nt">"suggestion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Name the domain explicitly — e.g. add 'fintech', 'saas', or 'ecommerce' to your story."</span>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="p">}</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="p">{</span>
-<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"OSError"</span><span class="p">,</span>
-<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">  </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"[Errno 13] Permission denied: '/protected/output'"</span><span class="p">,</span>
-<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="w">  </span><span class="nt">"suggestion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Check that the output_dir path exists and is writable, or omit it to use a temp directory."</span>
-<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="p">{</span>
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"OSError"</span><span class="p">,</span>
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="w">  </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"[Errno 13] Permission denied: '/protected/output'"</span><span class="p">,</span>
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="w">  </span><span class="nt">"suggestion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Check that the output_dir path exists and is writable, or omit it to use a temp directory."</span>
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a><span class="p">}</span>
 </code></pre></div>
 <p>The agent can read the <code>suggestion</code> field and reformulate its next call without surfacing raw Python errors to the user.</p>
 <hr />
 <h2 id="how-it-works">How it works</h2>
 <p>The server is a thin protocol shim over Misata's existing public API. Each tool maps to library functions you could call yourself:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>list_domains          →  StoryParser.DOMAIN_KEYWORDS
-<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>preview_story          →  misata.preview()
-<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>inspect_schema         →  misata.parse()
-<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>generate_dataset       →  misata.generate() + coherence_audit() + to_csv()
-<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>generate_from_schema   →  misata.from_dict_schema() + generate_from_schema()
-<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>                          + verify_integrity() + coherence_audit()
-<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a>audit_dataset          →  misata.coherence_audit()
-<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>validate_domain        →  misata.validate_domain()
-<a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a>validate_yaml          →  json_schema() + validate_schema() + check_feasibility()
-<a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a>seed_database          →  misata.introspect + misata.db.seed_database()
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>list_domains          →  StoryParser.DOMAIN_KEYWORDS
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>preview_story          →  misata.preview()
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>inspect_schema         →  misata.parse()
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>generate_dataset       →  misata.generate() + coherence_audit() + to_csv()
+<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a>generate_from_schema   →  misata.from_dict_schema() + generate_from_schema()
+<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a>                          + verify_integrity() + coherence_audit()
+<a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a>audit_dataset          →  misata.coherence_audit()
+<a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a>validate_domain        →  misata.validate_domain()
+<a id="__codelineno-27-9" name="__codelineno-27-9" href="#__codelineno-27-9"></a>validate_yaml          →  json_schema() + validate_schema() + check_feasibility()
+<a id="__codelineno-27-10" name="__codelineno-27-10" href="#__codelineno-27-10"></a>seed_database          →  misata.introspect + misata.db.seed_database()
 </code></pre></div>
 <p>Because the MCP server is bundled inside the <code>misata</code> package itself, not a separate distribution, the server and library are always in sync. Update Misata, the MCP server updates automatically.</p>
 <hr />
 <h2 id="running-standalone-debugging">Running standalone / debugging</h2>
 <p>You don't normally need to run <code>misata-mcp</code> directly, your AI assistant launches it as a subprocess via stdio. For debugging:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>misata-mcp
-<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="c1"># Runs on stdio; send JSON-RPC requests on stdin, responses on stdout.</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>misata-mcp
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="c1"># Runs on stdio; send JSON-RPC requests on stdin, responses on stdout.</span>
 </code></pre></div>
 <p>The easiest way to explore the tools interactively is the <a href="https://github.com/modelcontextprotocol/inspector">MCP Inspector</a>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>npx<span class="w"> </span>@modelcontextprotocol/inspector<span class="w"> </span>misata-mcp
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>npx<span class="w"> </span>@modelcontextprotocol/inspector<span class="w"> </span>misata-mcp
 </code></pre></div>
 <p>This opens a web UI where you can call each tool, inspect inputs and outputs, and iterate on prompts. Useful when writing system prompts that use Misata tools.</p>
 <hr />

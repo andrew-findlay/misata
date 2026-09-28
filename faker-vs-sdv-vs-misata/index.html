@@ -2775,10 +2775,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#faker-row-level-fake-data-no-relationships" class="md-nav__link">
+  <a href="#faker-row-level-mock-data-from-2012" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Faker: row-level fake data, no relationships
+        Faker: row-level mock data from 2012
       
     </span>
   </a>
@@ -2969,100 +2969,129 @@ the difference with working code so you can pick the right one in under five min
 <td>Multi-table relational output</td>
 <td>✗</td>
 <td>✓ (limited)</td>
-<td>✓</td>
+<td><strong>✓ (Topological DAG)</strong></td>
 </tr>
 <tr>
 <td>Referential integrity (FK)</td>
-<td>Manual</td>
+<td>Manual (broken)</td>
 <td>✓</td>
-<td>✓</td>
+<td><strong>✓ (0 orphan keys guaranteed)</strong></td>
+</tr>
+<tr>
+<td>Cross-column coherence (dates, math, geo)</td>
+<td>✗</td>
+<td>Partial</td>
+<td><strong>✓ (Provable causality)</strong></td>
+</tr>
+<tr>
+<td>Text column realism</td>
+<td>✗ (Lorem Ipsum / canned)</td>
+<td>✗ (Static tokens)</td>
+<td><strong>✓ (15+ domain microtext pools)</strong></td>
+</tr>
+<tr>
+<td>Vectorized speed</td>
+<td>~10k rows/s</td>
+<td>~5k rows/s</td>
+<td><strong>500k – 16M rows/s (100x+ faster)</strong></td>
+</tr>
+<tr>
+<td>Direct text enrichment (<code>enrich_text</code>)</td>
+<td>✗</td>
+<td>✗</td>
+<td><strong>✓ (Series, DF, or array)</strong></td>
 </tr>
 <tr>
 <td>Plain-English story → schema</td>
 <td>✗</td>
 <td>✗</td>
-<td>✓</td>
+<td><strong>✓</strong></td>
 </tr>
 <tr>
 <td>Exact aggregate targets (MRR, fraud rate)</td>
 <td>✗</td>
 <td>✗</td>
-<td>✓</td>
+<td><strong>✓ ($0.00 error)</strong></td>
 </tr>
 <tr>
 <td>No real data required</td>
 <td>✓</td>
 <td>✗ (needs training data)</td>
-<td>✓</td>
+<td><strong>✓</strong></td>
 </tr>
 <tr>
 <td>Domain-realistic distributions</td>
 <td>Partial</td>
 <td>✓</td>
-<td>✓</td>
+<td><strong>✓</strong></td>
 </tr>
 <tr>
-<td>Database seeding (SQLAlchemy)</td>
+<td>Database seeding (SQLAlchemy / Postgres)</td>
 <td>Manual</td>
 <td>✗</td>
-<td>✓</td>
+<td><strong>✓ (Instant sandbox)</strong></td>
 </tr>
 <tr>
 <td>Outcome curves / scenario events</td>
 <td>✗</td>
 <td>✗</td>
-<td>✓</td>
+<td><strong>✓</strong></td>
 </tr>
 <tr>
 <td>LLM-powered schema generation</td>
 <td>✗</td>
 <td>✗</td>
-<td>✓</td>
+<td><strong>✓</strong></td>
 </tr>
 <tr>
 <td>Reproducible seed</td>
 <td>✓</td>
 <td>✓</td>
-<td>✓</td>
+<td><strong>✓ (Deterministic)</strong></td>
 </tr>
 <tr>
 <td>Install size</td>
 <td>Small</td>
 <td>Large (~1 GB w/ deps)</td>
-<td>Medium</td>
+<td><strong>Medium</strong></td>
 </tr>
 </tbody>
 </table>
 <hr />
-<h2 id="faker-row-level-fake-data-no-relationships">Faker: row-level fake data, no relationships</h2>
-<p>Faker is excellent for generating standalone fake values. It has hundreds of
-providers covering names, addresses, credit card numbers, and more.</p>
+<h2 id="faker-row-level-mock-data-from-2012">Faker: row-level mock data from 2012</h2>
+<p>Faker was built over a decade ago for single-attribute unit test mocks (<code>fake.name()</code>, <code>fake.email()</code>). It was never designed for relational databases, analytics pipelines, AI agent evaluation, or realistic domain applications.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">faker</span><span class="w"> </span><span class="kn">import</span> <span class="n">Faker</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">fake</span> <span class="o">=</span> <span class="n">Faker</span><span class="p">()</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># One row of user data — fast and simple</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># One row of isolated user data</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">fake</span><span class="o">.</span><span class="n">name</span><span class="p">())</span>         <span class="c1"># "Patricia Mueller"</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">fake</span><span class="o">.</span><span class="n">email</span><span class="p">())</span>        <span class="c1"># "tricia23@example.net"</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">fake</span><span class="o">.</span><span class="n">credit_card_number</span><span class="p">())</span>  <span class="c1"># "4532015112830366"</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">fake</span><span class="o">.</span><span class="n">text</span><span class="p">())</span>         <span class="c1"># "Lorem ipsum dolor sit amet consectetur..."</span>
 </code></pre></div>
-<p><strong>Where Faker falls short:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Building a customers → orders relationship by hand</span>
+<p><strong>Where Faker fails catastrophically in 2026:</strong></p>
+<ol>
+<li>
+<p><strong>Relational Blindness &amp; Orphan Keys</strong>: Faker generates values one by one in Python loops. It has no topological ordering, no foreign key graphs, and no multi-table coordination.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># The painful Faker loop — manual glue code with frequent orphan keys:</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">customers</span> <span class="o">=</span> <span class="p">[{</span><span class="s2">"id"</span><span class="p">:</span> <span class="n">i</span><span class="p">,</span> <span class="s2">"email"</span><span class="p">:</span> <span class="n">fake</span><span class="o">.</span><span class="n">email</span><span class="p">()}</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1000</span><span class="p">)]</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># You must manually wire FK integrity yourself — nothing enforces it</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">orders</span> <span class="o">=</span> <span class="p">[</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="p">{</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="s2">"order_id"</span><span class="p">:</span> <span class="n">j</span><span class="p">,</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="s2">"customer_id"</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">999</span><span class="p">),</span>  <span class="c1"># could reference a non-existent id</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="s2">"amount"</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">500</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="p">}</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5000</span><span class="p">)</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="p">]</span>
-</code></pre></div>
-<p>There is no referential integrity, no distribution control, and no concept of
-business constraints. Every relationship you need, you build by hand.</p>
-<p><strong>Use Faker when:</strong> you need fake names, addresses, or values for a single table
-in a test fixture or form demo.</p>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">orders</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="p">{</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="s2">"order_id"</span><span class="p">:</span> <span class="n">j</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="s2">"customer_id"</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">999</span><span class="p">),</span>  <span class="c1"># Fragile: no guarantee of integrity</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="s2">"amount"</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">500</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="p">}</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5000</span><span class="p">)</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="p">]</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Cross-Column Incoherence</strong>: Faker does not know that a user's email should match their name, their city must belong to their country, or their salary should match their job title.</p>
+</li>
+<li><strong>Temporal Paradoxes &amp; Math Errors</strong>: Faker will gladly set <code>order_date</code> after <code>shipped_date</code>, or generate line items whose sum does not equal <code>total_amount</code>.</li>
+<li><strong>"Lorem Ipsum" Text</strong>: When asked for a product description, customer support ticket, medical note, or error message, Faker generates Latin gibberish that renders modern analytics, demos, and AI evaluation useless.</li>
+<li><strong>Slow Python Loops</strong>: Faker averages 5,000–15,000 values/second. Misata's vectorized NumPy engine generates 500,000 to 16,000,000 rows/second.</li>
+</ol>
+<p><strong>The modern replacement:</strong> Use Misata. If you just need to enrich an existing DataFrame or Series with domain text, call <code>misata.enrich_text(df)</code>. If you need multi-table datasets, call <code>misata.generate(...)</code>.</p>
 <hr />
 <h2 id="sdv-synthetic-data-vault-statistical-models-from-real-data">SDV (Synthetic Data Vault): statistical models from real data</h2>
 <p>SDV learns statistical patterns from your actual data and generates synthetic rows
