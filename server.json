@@ -1,27 +1,23 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.rasinmuhammed/misata",
-  "title": "Misata: verified synthetic data",
-  "description": "Realistic multi-table test and demo data: keys that join, exact totals and rates, proof included.",
+  "title": "Misata: synthetic data library",
+  "description": "Local, offline: multi-table synthetic data with joins that hold and exact totals. Seeds databases.",
   "repository": {
     "url": "https://github.com/rasinmuhammed/misata",
     "source": "github"
   },
-  "websiteUrl": "https://www.misata.studio/mcp",
+  "websiteUrl": "https://www.misata.studio/docs",
   "icons": [
     {
       "src": "https://www.misata.studio/logo.png",
       "mimeType": "image/png",
-      "sizes": ["1024x1024"]
+      "sizes": [
+        "1024x1024"
+      ]
     }
   ],
   "version": "0.9.6.60",
-  "remotes": [
-    {
-      "type": "streamable-http",
-      "url": "https://api.misata.studio/mcp"
-    }
-  ],
   "packages": [
     {
       "registryType": "pypi",
