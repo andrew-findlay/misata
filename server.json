@@ -1,17 +1,32 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.rasinmuhammed/misata",
-  "description": "Multi-table synthetic data with FK integrity and exact declared aggregates. No real data.",
+  "title": "Misata: verified synthetic data",
+  "description": "Realistic multi-table test and demo data: keys that join, exact totals and rates, proof included.",
   "repository": {
     "url": "https://github.com/rasinmuhammed/misata",
     "source": "github"
   },
-  "version": "0.8.7.2",
+  "websiteUrl": "https://www.misata.studio/mcp",
+  "icons": [
+    {
+      "src": "https://www.misata.studio/logo.png",
+      "mimeType": "image/png",
+      "sizes": ["1024x1024"]
+    }
+  ],
+  "version": "0.9.6.60",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.misata.studio/mcp"
+    }
+  ],
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "misata",
-      "version": "0.8.7.2",
+      "version": "0.9.6.60",
       "transport": {
         "type": "stdio"
       },
