@@ -345,6 +345,14 @@ class RealisticTextGenerator:
         # first, last) — never independent samples that produce "Pablo, Female"
         # or "Wei Gonzalez".
         self._person_frames: dict = {}
+        # Row-level scenario frames (one latent product or support issue per
+        # row) shared by every column that renders it. Keyed by table and the
+        # values of the columns that condition it, so a batch's name and
+        # description read the same frame.
+        self._scenario_frames: dict = {}
+        # Attributes of each row's FK parent (a review's product name, a
+        # ticket's product), set by the simulator around a text column.
+        self.parent_context: Optional[dict] = None
         from misata.microtext import MicrotextGenerator
         self.microtext = MicrotextGenerator(self.rng)
 
@@ -701,9 +709,19 @@ class RealisticTextGenerator:
                     return np.array([f"{faker.company().split()[0]} {np.random.choice(suffix)}" for _ in range(size)])
                 except Exception:
                     return np.array([faker.company() for _ in range(size)])
-            company_names = self._vocabulary("company_name", [])
+            company_names = self._user_vocab("company_name")
             if company_names:
-                return self.rng.choice(company_names, size=size)
+                from misata.scenarios import zipf_choice
+                return zipf_choice(self.rng, company_names, size, key=f"{table_name}.{column_name}")
+            # The built-in default list is 28 names drawn evenly; the company
+            # lexicon composes thousands with a realistic repeat rate.
+            try:
+                from misata.lexicon import Lexicon, get_spec
+                spec = get_spec("company_name")
+                if spec is not None:
+                    return Lexicon(spec, self.rng).draw(size)
+            except Exception:
+                pass
             return np.array(
                 [
                     f"{self.rng.choice(COMPANY_PREFIXES)} {self.rng.choice(COMPANY_ROOTS)} {self.rng.choice(COMPANY_SUFFIXES)}"
@@ -728,7 +746,18 @@ class RealisticTextGenerator:
                     return np.array([faker.job() for _ in range(size)])
                 except Exception:
                     pass
-            return self.rng.choice(self._vocabulary("job_title", JOB_TITLES), size=size)
+            from misata.scenarios import job_titles, zipf_choice
+            user = self._user_vocab("job_title")
+            if user:
+                return zipf_choice(self.rng, user, size, s=0.9, key=f"{table_name}.{column_name}")
+            # A store's or a hospital's own staff have the domain's jobs; its
+            # customers, users and contacts have everyone's.
+            domain_list = self._vocabulary("job_title", JOB_TITLES)
+            staff = any(h in table_name.lower() for h in
+                        ("employee", "staff", "worker", "personnel", "team_member", "agent"))
+            if staff and domain_list and list(domain_list) != list(JOB_TITLES):
+                return zipf_choice(self.rng, domain_list, size, s=0.9, key=f"{table_name}.{column_name}")
+            return job_titles(self.rng, size, key=f"{table_name}.{column_name}")
         if semantic == "country":
             if self.locale != "en_US":
                 try:
@@ -737,7 +766,13 @@ class RealisticTextGenerator:
                     return np.array([pack.country_name] * size)
                 except Exception:
                     pass
-            return self.rng.choice(self._vocabulary("country", COUNTRIES), size=size)
+            from misata.scenarios import zipf_choice
+            user = self._user_vocab("country")
+            if user:
+                return zipf_choice(self.rng, user, size, s=1.1, key=f"{table_name}.{column_name}")
+            # Customers concentrate in a home market with a tail abroad; the
+            # default list is in rough order of that share.
+            return zipf_choice(self.rng, COUNTRIES, size, s=1.3, q=1.0, ranked=True)
         if semantic == "state":
             if faker:
                 try:
@@ -767,17 +802,23 @@ class RealisticTextGenerator:
                     _row_countries = table_data[_country_col].astype(str).values
                     _known = [c for c in set(_row_countries) if c in COUNTRY_CITIES]
                     if _known:
-                        return np.array([
-                            self.rng.choice(COUNTRY_CITIES.get(
-                                country, COUNTRY_CITIES["United States"]))
-                            for country in _row_countries
-                        ])
-            # Use locale pack top_cities list when available (real, population-ranked)
+                        return _cities_for_countries(self.rng, _row_countries)
+            user = self._user_vocab("city")
+            if user:
+                from misata.scenarios import zipf_choice
+                return zipf_choice(self.rng, user, size, s=0.9, key=f"{table_name}.{column_name}")
+            # Population-ranked: big cities hold more of the rows. en_US uses
+            # the 50-city US geography map (the same one the address, state and
+            # zip repairs read), other locales their pack's top cities.
             try:
+                from misata.scenarios import zipf_choice
+                if self.locale == "en_US":
+                    from misata.vocab_seeds import US_CITY_GEO
+                    return zipf_choice(self.rng, list(US_CITY_GEO), size, s=0.95, q=1.5, ranked=True)
                 from misata.locales.registry import LocaleRegistry
                 pack = LocaleRegistry.global_instance().get_pack(self.locale)
                 if pack.top_cities:
-                    return self.rng.choice(pack.top_cities, size=size)
+                    return zipf_choice(self.rng, pack.top_cities, size, s=0.95, q=1.5, ranked=True)
             except Exception:
                 pass
             if faker:
@@ -801,7 +842,7 @@ class RealisticTextGenerator:
                 for f, l in zip(first, last)
             ])
         if semantic == "address":
-            return self.microtext.addresses(size)
+            return self._generate_address(size=size, table_data=table_data)
         if semantic == "phone_number":
             return self._generate_phone_number(size=size)
         if semantic == "national_id":
@@ -820,9 +861,29 @@ class RealisticTextGenerator:
             patches = self.rng.integers(0, 10, size)
             return np.array([f"{a}.{b}.{c}" for a, b, c in zip(majors, minors, patches)])
         if semantic in {"product_name", "product_description"}:
-            return self._generate_product_text(size=size, semantic=semantic, table_data=table_data)
+            return self._generate_product_text(size=size, semantic=semantic, table_data=table_data,
+                                               table_name=table_name)
         if semantic == "bio":
-            return self._generate_bio(size=size)
+            from misata.scenarios import bios
+            return bios(self.rng, size,
+                        jobs=self._row_values(table_data, ("job_title", "title", "role", "occupation"), size),
+                        cities=self._row_values(table_data, ("city", "location", "home_city"), size),
+                        companies=self._row_values(table_data, ("company", "company_name", "employer"), size))
+        if semantic == "brand":
+            from misata.scenarios import brands, family_for_category
+            cats = self._row_values(table_data, ("category", "product_category"), size)
+            fams = [family_for_category(c) for c in cats] if cats is not None else None
+            user = self._user_vocab("brand")
+            if user:
+                from misata.scenarios import zipf_choice
+                return zipf_choice(self.rng, user, size, key=f"{table_name}.{column_name}")
+            return brands(self.rng, size, fams, key=f"{table_name}.{column_name}")
+        if semantic == "product_category":
+            from misata.scenarios import PRODUCT_FAMILIES, _DEFAULT_FAMILY_MIX
+            keys, w = zip(*_DEFAULT_FAMILY_MIX)
+            w = np.array(w) / sum(w)
+            labels = np.array([PRODUCT_FAMILIES[k].label for k in keys], dtype=object)
+            return labels[self.rng.choice(len(keys), size=size, p=w)]
         if semantic == "caption":
             return self._generate_caption(size=size, table_data=table_data)
         if semantic == "comment_body":
@@ -843,8 +904,6 @@ class RealisticTextGenerator:
             return self._generate_short_review_title(size=size, table_data=table_data)
         if semantic == "review":
             return self._generate_review(size=size, table_data=table_data)
-        if semantic == "support_ticket":
-            return self._generate_support_ticket(size=size)
         if semantic == "email_body":
             return self._generate_email_body(size=size)
         if semantic == "genre":
@@ -904,11 +963,13 @@ class RealisticTextGenerator:
             from misata.vocab_seeds import MED_FREQUENCIES
             return self.rng.choice(MED_FREQUENCIES, size=size)
         if semantic in ("ticket_subject", "support_subject"):
-            return self.microtext.ticket_subjects(size)
+            return np.array(self._ticket_frame(table_name, size, table_data).subject, dtype=object)
         if semantic in ("support_ticket", "ticket_body", "issue_body"):
-            return self.microtext.ticket_bodies(size, context=_prose_context(table_data, size))
+            from misata.scenarios import render_ticket_descriptions
+            return render_ticket_descriptions(self.rng, self._ticket_frame(table_name, size, table_data))
         if semantic in ("resolution_notes", "closing_notes", "internal_notes", "agent_notes", "resolve_notes"):
-            return self.microtext.resolution_notes(size, context=_prose_context(table_data, size))
+            from misata.scenarios import render_ticket_resolutions
+            return render_ticket_resolutions(self.rng, self._ticket_frame(table_name, size, table_data))
         if semantic in ("transaction_memo", "statement_descriptor", "transaction_description"):
             return self.microtext.transaction_memos(size)
         if semantic in ("error_message", "log_message", "exception_message"):
@@ -1041,8 +1102,16 @@ class RealisticTextGenerator:
         ):
             return "product_name"
         # A ticket's "title"/"subject" is the one-line issue, not a job.
-        if name in ("title", "subject") and ("ticket" in table or "issue" in table or "support" in table):
-            return "support_ticket"
+        if name in ("title", "subject", "summary", "ticket_title") and (
+                "ticket" in table or "issue" in table or "support" in table or "case" in table):
+            return "ticket_subject"
+        if name in ("review_title", "review_headline", "review_summary"):
+            return "short_review_title"
+        if name in ("address", "street_address", "address_line1", "address_line_1",
+                    "address1", "street", "street_line", "shipping_address",
+                    "billing_address", "home_address", "mailing_address",
+                    "delivery_address"):
+            return "address"
         if name in ("ticket_subject", "issue_subject", "case_subject"):
             return "ticket_subject"
         if name in ("resolution_notes", "closing_notes", "internal_notes", "agent_notes", "resolve_notes"):
@@ -1130,6 +1199,12 @@ class RealisticTextGenerator:
             return "vehicle_model"
         if name == "make" and _is_vehicle_table:
             return "vehicle_make"
+        if name in ("manufacturer", "make") and _is_vehicle_table:
+            return "vehicle_make"
+        # A brand is a short maker's name. It matched no rule before and fell
+        # to the free-text sampler, which filled it with business-note prose.
+        if name in ("brand", "brand_name", "manufacturer", "make", "label_brand"):
+            return "brand"
         if "reason" in name:
             if "surge" in name or "surge" in table:
                 return "surge_reason"
@@ -1147,8 +1222,21 @@ class RealisticTextGenerator:
             return "department"
         if name in ("location", "office_location", "branch_location", "site_location"):
             return "city"
-        if "job" in name or "role" in name or "title" in name:
+        if "job" in name or "role" in name or "occupation" in name or "designation" in name:
             return "job_title"
+        if "title" in name:
+            # Only a person's title is a job. A listing's, post's or course's
+            # title is the thing's name.
+            _person_tbl = any(p in table for p in _PERSON_TABLE_HINTS) or any(
+                h in table for h in ("job", "position", "vacanc", "posting", "candidate",
+                                     "applicant", "hire", "staff"))
+            if name in ("title", "job_title", "position_title", "role_title") and _person_tbl:
+                return "job_title"
+            if any(h in name for h in ("listing", "product", "item")):
+                return "product_name"
+            if name in ("title",) and any(h in table for h in ("task", "todo", "issue", "bug", "story")):
+                return "ticket_subject"
+            return "work_title"
         if "country" in name:
             return "country"
         if "state" in name or "province" in name or "region" in name:
@@ -1172,10 +1260,11 @@ class RealisticTextGenerator:
             return "mcc_code"
         if name in ("review", "review_text", "review_body"):
             return "review"
-        if name in ("ticket_body", "issue_body", "support_ticket", "description") and (
-            "ticket" in table or "issue" in table or "support" in table
+        if name in ("ticket_body", "issue_body", "support_ticket", "description", "body",
+                    "details", "message", "issue_description", "problem_description") and (
+            "ticket" in table or "issue" in table or "support" in table or "case" in table
         ):
-            return "support_ticket"
+            return "ticket_body"
         if name in ("email_body", "message_body", "message", "body") and (
             "email" in table or "message" in table or "inbox" in table
         ):
@@ -1271,6 +1360,12 @@ class RealisticTextGenerator:
             return "version"
         if name in ("currency", "currency_code", "pay_currency", "invoice_currency"):
             return "currency"
+        # A product's category, when nothing declared one, is a store
+        # department, and the product names follow it.
+        if name in ("category", "product_category", "department", "category_name") and any(
+                h in table for h in ("product", "item", "listing", "catalog", "catalogue",
+                                     "sku", "inventory", "merchandise")):
+            return "product_category"
         # Short categorical-label columns: a free-text status/type/tier should be
         # a label, not a lorem sentence (these usually arrive as enums/inline_data;
         # this is the fallback when they don't).
@@ -1291,7 +1386,7 @@ class RealisticTextGenerator:
             return "caption"
         if name in ("body", "description", "summary"):
             if "ticket" in table or "issue" in table or "support" in table:
-                return "support_ticket"
+                return "ticket_body"
             if "transaction" in table or "payment" in table or "billing" in table:
                 return "transaction_memo"
             return "product_description"
@@ -1348,21 +1443,6 @@ class RealisticTextGenerator:
             results.append(f"{text} {tags}")
         return np.array(results)
 
-    def _generate_bio(self, *, size: int) -> np.ndarray:
-        _ROLES = ["developer", "designer", "founder", "marketer", "photographer",
-                  "writer", "artist", "engineer", "entrepreneur", "creator",
-                  "traveller", "chef", "coach", "consultant", "student"]
-        _VIBES = ["sharing what I love", "living my best life", "making things happen",
-                  "building in public", "exploring the world", "chasing ideas",
-                  "creating every day", "telling stories", "obsessed with details",
-                  "always learning", "turning coffee into code", "dreaming big",
-                  "on a mission", "figuring it all out", "here for the journey"]
-        _EXTRAS = ["", " ✌️", " 🌍", " 🚀", " 💡", " 📸", " 🎨", " ☕", "", ""]
-        roles = self.rng.choice(_ROLES, size=size)
-        vibes = self.rng.choice(_VIBES, size=size)
-        extras = self.rng.choice(_EXTRAS, size=size)
-        return np.array([f"{r.capitalize()} | {v}{e}" for r, v, e in zip(roles, vibes, extras)])
-
     def _generate_latitude(self, *, size: int) -> np.ndarray:
         from misata.vocab_seeds import CITY_GEODATA
         cities = self.rng.choice(len(CITY_GEODATA), size=size)
@@ -1404,44 +1484,17 @@ class RealisticTextGenerator:
         # Sentiment is conditioned on the row's rating: a 1-star review reads
         # angry, a 5-star review reads delighted. Without a rating column the
         # grammar falls back to the J-shaped marginal real review sites show.
+        ctx = _prose_context(table_data, size)
+        pc = self.parent_context or {}
+        if "subject" not in ctx and pc.get("name") is not None:
+            # The reviews table holds only product_id; the product's own name
+            # comes through the foreign key, so a review names what it reviews.
+            from misata.scenarios import subject_from_name
+            names = list(pc["name"])[:size]
+            if len({n for n in names[:500] if n}) >= 5:
+                ctx["subject"] = [subject_from_name(n) if n else "" for n in names]
         return self.microtext.reviews(size, ratings=self._ratings_from(table_data, size),
-                                      context=_prose_context(table_data, size))
-
-    def _generate_support_ticket(self, *, size: int) -> np.ndarray:
-        _ISSUES = [
-            "I'm unable to log into my account after the recent update.",
-            "The payment keeps failing at checkout — tried three different cards.",
-            "My order shows as delivered but I haven't received anything.",
-            "The app crashes every time I try to open the settings page.",
-            "I was charged twice for the same transaction.",
-            "My subscription was cancelled but I'm still being billed.",
-            "I can't upload files larger than 5 MB — getting an error.",
-            "The export feature produces an empty CSV file.",
-            "Two-factor authentication isn't sending the verification code.",
-            "The dashboard isn't loading any data since this morning.",
-            "I need to update my billing address but the form won't save.",
-            "My API key stopped working after I regenerated it.",
-            "The integration with Slack stopped sending notifications.",
-            "I deleted data by mistake — is there a way to recover it?",
-            "The mobile app is showing stale data that won't refresh.",
-        ]
-        _CONTEXT = [
-            "This started happening around 2 days ago.",
-            "I've tried clearing cache and it didn't help.",
-            "This is blocking my team from completing their work.",
-            "I've already tried restarting the app with no success.",
-            "It works fine on desktop but not on mobile.",
-            "I'm on the Pro plan, account ID in my profile.",
-            "Please escalate — this is urgent.",
-            "",
-            "",
-            "",
-        ]
-        issues  = self.rng.choice(_ISSUES,   size=size)
-        context = self.rng.choice(_CONTEXT,  size=size)
-        return np.array([
-            f"{i} {c}".strip() for i, c in zip(issues, context)
-        ])
+                                      context=ctx)
 
     def _generate_email_body(self, *, size: int) -> np.ndarray:
         _GREETINGS = ["Hi", "Hello", "Hey", "Dear team", "Hi there", "Good morning"]
@@ -1640,22 +1693,116 @@ class RealisticTextGenerator:
         size: int,
         semantic: str,
         table_data: Optional[pd.DataFrame],
+        table_name: str = "",
     ) -> np.ndarray:
-        categories = self._series_from_table(table_data, "category", size)
+        """Product names and descriptions from one latent product per row.
+
+        A user's own vocabulary (an asset store, a capsule they wrote) is used
+        as given. Otherwise both columns render the same frame, which follows
+        the row's category: a Toys row gets a toy, and its description talks
+        about that toy rather than about a different product."""
         if semantic == "product_name":
-            values = []
-            for category in categories:
-                normalized = str(category).lower()
-                key = next((pool for pool in PRODUCT_NAME_POOLS if pool in normalized), None)
-                key = key or "electronics"
-                product_names = self._vocabulary("product_name", PRODUCT_NAME_POOLS[key])
-                values.append(self.rng.choice(product_names))
-            return np.array(values)
-        else:
-            custom_descriptions = self._vocabulary("product_description", [])
-            if custom_descriptions and custom_descriptions != PRODUCT_DESCRIPTION_TEMPLATES:
-                return np.array([self.rng.choice(custom_descriptions) for _ in range(size)])
-            return self.microtext.product_descriptions(size, category=categories)
+            user = self._user_vocab("product_name")
+            if user:
+                return self.rng.choice(user, size=size)
+            return np.array(self._product_frame(table_name, size, table_data).name, dtype=object)
+        user = self._user_vocab("product_description")
+        if user:
+            return np.array([self.rng.choice(user) for _ in range(size)])
+        from misata.scenarios import render_product_descriptions
+        frame = self._product_frame(table_name, size, table_data)
+        names = self._row_values(table_data, ("product_name", "name", "title", "item_name"), size)
+        return render_product_descriptions(self.rng, frame, names=names)
+
+    def _user_vocab(self, name: str) -> Optional[list]:
+        """Capsule vocabulary someone actually supplied, else None.
+
+        Built-in defaults sit in the capsule too, tagged ``misata-defaults``.
+        They are a last resort: treating them as data let eight generic
+        sentences outrank the category-aware product grammar."""
+        if self.capsule is None or not self.capsule.vocabularies.get(name):
+            return None
+        provs = self.capsule.provenance.get(name, [])
+        if provs and all(getattr(p, "source_name", "") == "misata-defaults" for p in provs):
+            return None
+        return list(self.capsule.vocabularies[name])
+
+    @staticmethod
+    def _row_values(table_data: Optional[pd.DataFrame], names: Sequence[str],
+                    size: int) -> Optional[list]:
+        """The first of ``names`` present in the row data, as strings."""
+        if table_data is None or getattr(table_data, "empty", True):
+            return None
+        lower = {str(c).lower(): c for c in table_data.columns}
+        for n in names:
+            col = lower.get(n)
+            if col is not None and len(table_data[col]) >= size:
+                return table_data[col].astype(str).tolist()[:size]
+        return None
+
+    def _frame_cache(self, kind: str, table_name: str, size: int, parts) -> tuple:
+        h = zlib.crc32("\x1f".join("|".join(p) if p else "-" for p in parts).encode("utf-8"))
+        key = (kind, table_name, size, h)
+        if len(self._scenario_frames) > 16:
+            self._scenario_frames.clear()
+        return key
+
+    def _product_frame(self, table_name: str, size: int, table_data):
+        from misata.scenarios import draw_products
+        cats = self._row_values(table_data, ("category", "product_category", "department",
+                                             "product_type", "category_name"), size)
+        brand = self._row_values(table_data, ("brand", "brand_name", "manufacturer"), size)
+        key = self._frame_cache("product", table_name, size, [cats, brand])
+        frame = self._scenario_frames.get(key)
+        if frame is None:
+            frame = draw_products(self.rng, size, cats, key=table_name or "products")
+            if brand is not None:
+                # The row's own brand column names the maker; the title agrees.
+                for i, b in enumerate(brand):
+                    if b and b.lower() not in ("nan", "none") and frame.name[i].startswith(frame.brand[i] + " "):
+                        frame.name[i] = b + frame.name[i][len(frame.brand[i]):]
+                    frame.brand[i] = b
+            self._scenario_frames[key] = frame
+        return frame
+
+    def _ticket_frame(self, table_name: str, size: int, table_data):
+        from misata.scenarios import draw_tickets, subject_from_name
+        cats = self._row_values(table_data, ("category", "ticket_category", "issue_type",
+                                             "topic", "type", "ticket_type", "reason"), size)
+        pris = self._row_values(table_data, ("priority", "severity", "urgency"), size)
+        stats = self._row_values(table_data, ("status", "state", "ticket_status"), size)
+        items = None
+        pc = self.parent_context or {}
+        if pc.get("name") is not None:
+            items = [subject_from_name(n) if n else "" for n in list(pc["name"])[:size]]
+        key = self._frame_cache("ticket", table_name, size, [cats, pris, stats, items])
+        frame = self._scenario_frames.get(key)
+        if frame is None:
+            frame = draw_tickets(self.rng, size, categories=cats, priorities=pris,
+                                 statuses=stats, items=items)
+            self._scenario_frames[key] = frame
+        return frame
+
+    def _generate_address(self, *, size: int, table_data) -> np.ndarray:
+        """Street lines in the row's country's format, with the row's city and
+        postcode appended when the table has no columns of its own for them."""
+        from misata.scenarios import street_lines
+        countries = self._row_values(table_data, ("country", "country_name"), size)
+        cities = self._row_values(table_data, ("city",), size)
+        lines = street_lines(self.rng, size, countries)
+        if table_data is not None and cities is not None:
+            return lines
+        if countries is None:
+            from misata.vocab_seeds import US_CITY_GEO
+            from misata.scenarios import zipf_choice
+            cs = zipf_choice(self.rng, list(US_CITY_GEO), size, s=0.95, q=1.5, ranked=True)
+            out = []
+            for line, c in zip(lines, cs):
+                _state, code, z3 = US_CITY_GEO[c]
+                out.append(f"{line}, {c}, {code} {z3}{int(self.rng.integers(0, 100)):02d}")
+            return np.array(out, dtype=object)
+        cs = _cities_for_countries(self.rng, countries)
+        return np.array([f"{line}, {c}" for line, c in zip(lines, cs)], dtype=object)
 
     def _series_from_table(self, table_data: Optional[pd.DataFrame], column: str, size: int) -> np.ndarray:
         if table_data is not None and column in table_data.columns and len(table_data[column]) >= size:
@@ -2053,6 +2200,19 @@ def _fix_time_chains(df: pd.DataFrame, columns: set, rng: np.random.Generator) -
         df[col] = out.dt.strftime("%Y-%m-%d %H:%M:%S") if _is_text_dtype(df[col]) else out.values
 
 
+def _cities_for_countries(rng: np.random.Generator, countries) -> np.ndarray:
+    """A city for each row's country, population-weighted within the country
+    (the per-country lists run largest first). Unknown countries get US cities."""
+    from misata.scenarios import zipf_choice
+    countries = np.asarray([str(c) for c in countries], dtype=object)
+    out = np.empty(len(countries), dtype=object)
+    for c in sorted(set(countries)):
+        idx = np.flatnonzero(countries == c)
+        pool = COUNTRY_CITIES.get(c, COUNTRY_CITIES["United States"])
+        out[idx] = zipf_choice(rng, pool, len(idx), s=0.95, q=1.5, ranked=True)
+    return out
+
+
 def _fix_city_country(df: pd.DataFrame, columns: set, rng: np.random.Generator) -> None:
     """Re-map city values so each row's city belongs to its country.
 
@@ -2083,10 +2243,7 @@ def _fix_city_country(df: pd.DataFrame, columns: set, rng: np.random.Generator) 
     )
     if not incoherent.any():
         return
-    df.loc[incoherent, city_col] = [
-        rng.choice(COUNTRY_CITIES[str(c)])
-        for c in countries[incoherent]
-    ]
+    df.loc[incoherent, city_col] = list(_cities_for_countries(rng, countries[incoherent].values))
 
 
 _LETTERS = "ABCDEFGHJKLMNPRSTUVWXYZ"  # postal-safe (no I/O/Q)
@@ -2339,9 +2496,14 @@ def apply_realism_rules(
     table_name: str = "",
     rng: Optional[np.random.Generator] = None,
     protected: Optional[set] = None,
+    declared: Optional[set] = None,
 ) -> pd.DataFrame:
     """
     Apply cross-column realism rules to a DataFrame.
+
+    ``protected`` columns are never rewritten. ``declared`` columns carry a
+    user-declared vocabulary or distribution (choices, shares): rules may read
+    them and reorder values within them, but never change which values occur.
 
     Order matters: simpler fixes first, computed columns last.
     Pass a seeded ``rng`` to guarantee reproducible fixups.
@@ -2375,6 +2537,7 @@ def apply_realism_rules(
     _fix_age_from_dob(df, columns)
 
     # ── Monetary consistency ──
+    _fix_price_by_category(df, columns, table_name, _rng, (protected or set()) | (declared or set()))
     _fix_cost_less_than_price(df, columns, _rng)
     _fix_discount_cap(df, columns)
     _fix_line_total(df, columns)
@@ -2389,7 +2552,7 @@ def apply_realism_rules(
     _fix_email_from_name(df, columns, _rng)
     _fix_corporate_email(df, columns, _rng)
     _fix_slug_from_name(df, columns)
-    _fix_category_from_product_name(df, columns, table_name)
+    _fix_category_from_product_name(df, columns, table_name, declared)
 
     # ── Geographic consistency ──
     _fix_route_geo(df, columns, _rng)
@@ -2473,13 +2636,41 @@ def _fix_review_sentiment(
     if text_col is None and title_col is None:
         return
 
-    gen = MicrotextGenerator(rng)
-    ratings = df[rating_col].values
+    from misata.microtext import detect_sentiment
+
+    # Only rows whose text disagrees with the rating are rewritten. Review
+    # text generated from the rating already agrees (the simulator generates
+    # it after the rating), and regenerating every row doubled the cost of a
+    # review table for nothing.
+    stars = MicrotextGenerator.normalize_ratings(df[rating_col].values, len(df), rng)
     if text_col is not None:
-        df[text_col] = gen.reviews(len(df), ratings=ratings,
-                                   context=_prose_context(df, len(df)))
+        texts = df[text_col].astype(str).tolist()
+        sentiment = [detect_sentiment(t) for t in texts]
+        bad = np.array([(st >= 4 and se == "negative") or (st <= 2 and se == "positive")
+                        or t in ("", "nan", "None")
+                        for st, se, t in zip(stars, sentiment, texts)], dtype=bool)
+    else:
+        bad = np.zeros(len(df), dtype=bool)
     if title_col is not None:
-        df[title_col] = gen.review_titles(len(df), ratings=ratings)
+        tsent = [detect_sentiment(t) for t in df[title_col].astype(str)]
+        bad_t = np.array([(st >= 4 and se == "negative") or (st <= 2 and se == "positive")
+                          for st, se in zip(stars, tsent)], dtype=bool)
+    else:
+        bad_t = np.zeros(len(df), dtype=bool)
+    rows = np.flatnonzero(bad | bad_t)
+    if not len(rows):
+        return
+    gen = MicrotextGenerator(rng)
+    if text_col is not None and bad.any():
+        r = np.flatnonzero(bad)
+        part = df.iloc[r]
+        vals = df[text_col].astype(object).values.copy()
+        vals[r] = gen.reviews(len(r), ratings=stars[r], context=_prose_context(part, len(r)))
+        df[text_col] = vals
+    if title_col is not None and (bad | bad_t).any():
+        vals = df[title_col].astype(object).values.copy()
+        vals[rows] = gen.review_titles(len(rows), ratings=stars[rows])
+        df[title_col] = vals
 
 
 # ─── GEOGRAPHIC RULES ─────────────────────────────────────────────────────────
@@ -3168,7 +3359,8 @@ def _vary_product_name(base: str, pool: str, key: str) -> str:
     return name
 
 
-def _fix_category_from_product_name(df: pd.DataFrame, columns: set[str], table_name: str = "") -> None:
+def _fix_category_from_product_name(df: pd.DataFrame, columns: set[str], table_name: str = "",
+                                    declared: Optional[set] = None) -> None:
     """Make a product's ``category`` consistent with its ``name``.
 
     Names and categories are generated independently, so a "Portable Bluetooth Speaker"
@@ -3233,8 +3425,11 @@ def _fix_category_from_product_name(df: pd.DataFrame, columns: set[str], table_n
     names = df[name_col].tolist()
     cats = df["category"].tolist()
     name_pools = {_NAME_TO_POOL.get(str(n)) for n in names} - {None}
+    if not name_pools:
+        return  # no built-in base names to reconcile
     cat_pools = {_cat_to_pool(c) for c in cats} - {None}
-    category_authoritative = len(cat_pools) > len(name_pools) and len(cat_pools) >= 2
+    category_authoritative = (len(cat_pools) > len(name_pools) and len(cat_pools) >= 2) or (
+        "category" in (declared or set()))
 
     if category_authoritative:
         for i, cat in enumerate(cats):
@@ -3242,7 +3437,9 @@ def _fix_category_from_product_name(df: pd.DataFrame, columns: set[str], table_n
             if pool is None:
                 continue
             cur_pool = _NAME_TO_POOL.get(str(names[i]))
-            if cur_pool != pool:  # name doesn't belong to its category — regenerate it
+            # Only built-in base names are swapped; a name from the product
+            # scenario or a user's vocabulary already follows the category.
+            if cur_pool is not None and cur_pool != pool:
                 pool_names = PRODUCT_NAME_POOLS[pool]
                 names[i] = pool_names[_stable_index(str(names[i]) + str(i), len(pool_names))]
     else:
@@ -3276,6 +3473,50 @@ def _fix_category_from_product_name(df: pd.DataFrame, columns: set[str], table_n
             names[i] = _vary_product_name(str(nm), pool, f"{nm}|{i}|{table_name}")
     df[name_col] = names
     df["category"] = cats
+
+
+_PRICE_COLS = ("price", "unit_price", "list_price", "retail_price", "base_price")
+
+
+def _fix_price_by_category(df: pd.DataFrame, columns: set[str], table_name: str,
+                           rng: np.random.Generator, protected: set) -> None:
+    """Order prices by category without changing the price distribution.
+
+    Furniture costs more than stationery. Drawn independently, every category
+    had the same mean price. The column's own values are kept and only
+    reassigned between rows, so a declared min, max or shape still holds
+    exactly: rows are ranked by their category's typical price plus noise,
+    and the sorted prices are handed out in that order."""
+    from misata.scenarios import PRODUCT_FAMILIES, family_for_category
+
+    tl = table_name.lower()
+    if not any(t in tl for t in ("product", "item", "listing", "catalog", "sku", "inventory")):
+        return
+    cat_col = next((c for c in ("category", "product_category", "category_name") if c in columns), None)
+    price_col = next((c for c in _PRICE_COLS if c in columns and c not in protected), None)
+    if cat_col is None or price_col is None or len(df) < 20:
+        return
+    fams = [family_for_category(c) for c in df[cat_col].astype(str)]
+    if len({f for f in fams if f}) < 2:
+        return
+    prices = pd.to_numeric(df[price_col], errors="coerce")
+    ok = prices.notna().values
+    if ok.sum() < 20:
+        return
+    # Prices that already depend on the category (capsule price bands, a
+    # declared mapping) are left alone: only an independent draw is reordered.
+    by_cat = pd.Series(np.log(np.clip(prices.values, 1e-6, None))).groupby(
+        df[cat_col].astype(str).values).median()
+    if len(by_cat) >= 2 and (by_cat.max() - by_cat.min()) > np.log(1.8):
+        return
+    med = np.array([np.log(PRODUCT_FAMILIES[f or "generic"].price_median) for f in fams])
+    score = med + rng.normal(0, 0.6, size=len(df))
+    idx = np.flatnonzero(ok)
+    order_rows = idx[np.argsort(score[idx], kind="stable")]
+    sorted_prices = np.sort(prices.values[idx], kind="stable")
+    new = df[price_col].copy()
+    new.iloc[order_rows] = sorted_prices
+    df[price_col] = new.astype(df[price_col].dtype) if df[price_col].dtype.kind in "fi" else new
 
 
 def _fix_slug_from_name(df: pd.DataFrame, columns: set[str]) -> None:

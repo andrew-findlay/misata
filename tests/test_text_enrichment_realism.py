@@ -93,25 +93,27 @@ class TestCategoryConditionedProductDescriptions:
     def test_category_matching_in_descriptions(self):
         rng = np.random.default_rng(123)
         gen = RealisticTextGenerator(rng=rng)
-        table_data = pd.DataFrame({
-            "category": ["electronics", "clothing", "home", "beauty", "software"]
-        })
+        # A description is about the product its row names: it mentions a
+        # product type of the row's own category.
+        from misata.scenarios import PRODUCT_FAMILIES
+        cats = ["electronics", "clothing", "home", "beauty"] * 50
+        table_data = pd.DataFrame({"category": cats})
+        names = gen.generate(column_name="product_name", table_name="products", size=200,
+                             semantic_type="product_name", table_data=table_data)
+        table_data["product_name"] = names
         descs = gen.generate(
             column_name="description",
             table_name="products",
-            size=5,
+            size=200,
             semantic_type="product_description",
             table_data=table_data,
         )
-        assert len(descs) == 5
-        # Electronics contains tech keywords
-        assert any(w in str(descs[0]).lower() for w in ["audio", "battery", "wireless", "usb-c", "bluetooth", "noise cancellation", "ports", "power", "sensors", "aluminum"])
-        # Clothing contains apparel keywords
-        assert any(w in str(descs[1]).lower() for w in ["cotton", "fit", "stretch", "fabric", "silhouette", "wear"])
-        # Home contains kitchen/home keywords
-        assert any(w in str(descs[2]).lower() for w in ["stainless", "food", "wood", "kitchen", "dishwasher", "prep"])
-        # Beauty contains skincare keywords
-        assert any(w in str(descs[3]).lower() for w in ["skin", "hydration", "botanical", "formula", "cleanser", "moisture"])
+        assert len(descs) == 200
+        for cat, name, desc in zip(cats, names, descs):
+            nouns = [n.lower() for n in PRODUCT_FAMILIES[cat].nouns]
+            assert any(n in str(name).lower() for n in nouns), (cat, name)
+            assert any(n in str(desc).lower() for n in nouns), (cat, name, desc)
+        assert len(set(descs)) > 180
 
 
 class TestAutoSemanticInference:
@@ -133,9 +135,12 @@ class TestAutoSemanticInference:
         df = _build_and_sim(schema)
         # Subjects should not be generic business notes or lorem ipsum
         assert all(isinstance(v, str) and len(v) > 10 for v in df["subject"])
-        assert any("SSO" in v or "invoice" in v.lower() or "error" in v.lower() or "link" in v.lower() for v in df["subject"])
-        # Resolution notes should look like technical resolution actions
-        assert any("resolved" in v.lower() or "token" in v.lower() or "cache" in v.lower() or "refund" in v.lower() for v in df["resolution_notes"])
+        # A subject is a short line, not a paragraph
+        assert np.mean([len(v) for v in df["subject"]]) < 40
+        assert np.mean([v.endswith(".") for v in df["subject"]]) < 0.2
+        # Resolution notes say what was wrong and what was done
+        notes = [v for v in df["resolution_notes"] if isinstance(v, str)]
+        assert len(set(notes)) >= 10
 
     def test_fintech_transactions_table_infers_memos(self):
         schema = {

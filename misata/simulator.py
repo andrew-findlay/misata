@@ -528,6 +528,72 @@ class DataSimulator:
             return values
         return None
 
+    _PROSE_NAME_RE = re.compile(
+        r"(^|_)(description|desc|summary|body|subject|review|reviews|resolution|feedback|"
+        r"comment|comments|bio|about|message|details|notes?|address|street)(_|$)|"
+        r"^(review_title|review_text|ticket_title)$")
+    _PRODUCT_TABLE_RE = re.compile(r"product|item|listing|catalog|sku|inventory|merchandise")
+
+    def _prose_last(self, table_name: str, columns):
+        """Generation order with prose after the columns it describes.
+
+        A review is written about a rating, a ticket's subject about its
+        category, priority and status, a product name about its category, an
+        address in its row's city and country. Generating prose last gives
+        each text generator the row it belongs to, whatever order the schema
+        lists columns in. Output column order is unaffected, and anchored
+        generation keeps every column's own random stream, so reordering
+        changes no other column."""
+        late, early = [], []
+        is_product = bool(self._PRODUCT_TABLE_RE.search(table_name.lower()))
+        for c in columns:
+            p = c.distribution_params or {}
+            n = c.name.lower()
+            text_like = c.type == "text" and not p.get("choices") and not p.get("pattern")
+            prose = bool(self._PROSE_NAME_RE.search(n))
+            product_name = is_product and n in ("name", "title", "product_name", "item_name",
+                                                "product_title", "listing_title")
+            (late if text_like and (prose or product_name) else early).append(c)
+        # Country before city before address: a city is drawn from its row's
+        # country, so a bio or an address written later agrees with both.
+        def geo_rank(c):
+            n = c.name.lower()
+            if n == "country" or n.endswith("_country"):
+                return 0
+            if n in ("state", "province", "region") or n.endswith("_state"):
+                return 1
+            return 2
+        early = sorted(early, key=geo_rank)
+        return early + late
+
+    def _parent_text_context(self, table_name: str, table_data, size: int):
+        """Each row's FK parent name and category, for prose that should name
+        what it is about (a review naming its product)."""
+        if table_data is None or getattr(table_data, "empty", True):
+            return None
+        for rel in self.config.relationships:
+            if rel.child_table != table_name or rel.child_key not in table_data.columns:
+                continue
+            parent = self.context.get(rel.parent_table)
+            if parent is None or rel.parent_key not in parent.columns:
+                continue
+            name_col = next((c for c in ("product_name", "name", "title", "item_name",
+                                         "service_name", "plan_name", "listing_title")
+                             if c in parent.columns), None)
+            if name_col is None:
+                continue
+            idx = parent.drop_duplicates(rel.parent_key).set_index(rel.parent_key)
+            keys = table_data[rel.child_key].values[:size]
+            names = pd.Series(keys).map(idx[name_col]).tolist()
+            cats = (pd.Series(keys).map(idx["category"]).tolist()
+                    if "category" in idx.columns else None)
+            names = ["" if v is None or (isinstance(v, float) and np.isnan(v)) else str(v)
+                     for v in names]
+            if sum(1 for v in names if v) < max(1, len(names) // 2):
+                continue
+            return {"name": names, "category": cats, "table": rel.parent_table}
+        return None
+
     @staticmethod
     def _dependency_order(columns):
         """Stable generation order where a depends_on column comes after its
@@ -1393,6 +1459,12 @@ class DataSimulator:
                 needed_cols.add(rel.parent_key)
                 # A child's amount is derived from this parent's price.
                 needed_cols.update(c for c in ("price", "unit_price", "list_price")
+                                   if c in df.columns)
+                # Children's prose names its parent (a review names the
+                # product it reviews), so the name and category survive.
+                needed_cols.update(c for c in ("product_name", "name", "title", "item_name",
+                                               "service_name", "plan_name", "listing_title",
+                                               "category")
                                    if c in df.columns)
                 if rel.filters:
                     needed_cols.update(rel.filters.keys())
@@ -2998,14 +3070,19 @@ class DataSimulator:
             # type that is not a legacy free-text type (sentence, word, etc.)
             _LEGACY_ONLY = {"sentence", "word", "address", "phone", "url"}
             if semantic or text_type not in _LEGACY_ONLY:
-                return self.realistic_text.generate(
-                    column_name=column.name,
-                    table_name=table_name,
-                    size=size,
-                    semantic_type=semantic,  # None → _infer_semantic uses column name
-                    table_data=table_data,
-                    semantic_declared=bool(declared),
-                )
+                self.realistic_text.parent_context = self._parent_text_context(
+                    table_name, table_data, size)
+                try:
+                    return self.realistic_text.generate(
+                        column_name=column.name,
+                        table_name=table_name,
+                        size=size,
+                        semantic_type=semantic,  # None → _infer_semantic uses column name
+                        table_data=table_data,
+                        semantic_declared=bool(declared),
+                    )
+                finally:
+                    self.realistic_text.parent_context = None
 
             # Legacy pool sampler for free-text types (sentence, word, address, phone, url)
             _pool_size = min(max(size * 5, 200), self.TEXT_POOL_SIZE)
@@ -3219,7 +3296,7 @@ class DataSimulator:
 
         df_batch = self.fact_engine.generate(plan, column_map)
 
-        for column in self._dependency_order(columns):
+        for column in self._dependency_order(self._prose_last(table_name, columns)):
             if column.name in df_batch.columns:
                 continue
             values = self.generate_column(table_name, column, len(df_batch), df_batch)
@@ -3275,6 +3352,20 @@ class DataSimulator:
             for column in self.config.get_columns(table_name)
             if column.distribution_params.get("formula")
         }
+
+    def _declared_value_columns(self, table_name: str) -> set[str]:
+        """Columns whose values or ordering the schema states: declared
+        choices or shares, and correlation targets. Realism passes may read
+        these but must not change which values they hold."""
+        out = set()
+        for c in self.config.get_columns(table_name):
+            p = c.distribution_params or {}
+            if p.get("choices") or p.get("probabilities") or p.get("values"):
+                out.add(c.name)
+        table = self.config.get_table(table_name)
+        for spec in (getattr(table, "correlations", None) or []):
+            out.update(str(spec.get(k)) for k in ("col_a", "col_b") if spec.get(k))
+        return out
 
     def _get_protected_generation_columns(self, table_name: str, table: Any) -> set[str]:
         """Columns that coherence/workflows should avoid mutating."""
@@ -3533,7 +3624,7 @@ class DataSimulator:
             data = {}
             df_batch = pd.DataFrame()
 
-            for column in self._dependency_order(columns):
+            for column in self._dependency_order(self._prose_last(table_name, columns)):
                 with self._anchor("column", table_name, column.name, rows_generated):
                     values = self.generate_column(table_name, column, batch_size, df_batch)
                 data[column.name] = values
@@ -4939,7 +5030,13 @@ class DataSimulator:
             return values
         profile = classify_temporal(column.name, table_name)
         if profile is HUMAN_ACTION:
-            profile = replace(profile, weekend_factor=self._domain_weekend_factor())
+            wf = self._domain_weekend_factor()
+            # Support desks, B2B work and office tools are weekday businesses
+            # whatever the store's own domain is: tickets thin out at weekends.
+            if re.search(r"ticket|support|incident|helpdesk|case|timesheet|meeting",
+                         table_name.lower()):
+                wf = min(wf, 0.45)
+            profile = replace(profile, weekend_factor=wf)
         # Learned rhythms (from mimic, or declared) replace the name-guessed ones.
         hour_w = params.get("hour_weights")
         weekday_w = params.get("weekday_weights")
@@ -6140,7 +6237,8 @@ class DataSimulator:
         df = self._fix_denormalized_parent_columns(df, table_name)
         df = self._fix_amount_from_parent_price(df, table_name, protected_columns)
 
-        df = apply_realism_rules(df, table_name, rng=self.rng, protected=protected_columns)
+        df = apply_realism_rules(df, table_name, rng=self.rng, protected=protected_columns,
+                                 declared=self._declared_value_columns(table_name))
 
         realism = self._get_realism_config()
         if realism and realism.coherence != "off":
