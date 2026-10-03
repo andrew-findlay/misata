@@ -111,6 +111,37 @@ column now say they are int-only.
 - Emails are derived from a `full_name` column as well as `name` and
   `first_name`/`last_name`.
 
+### Custom generators, from any door
+
+The escape hatch for logic the language cannot express was a Python-only
+argument (`custom_generators=`) whose function saw parent IDs but not parent
+rows, got no seeded random source, and on a table's first column silently
+returned zeros. Now:
+
+- `@misata.generator("name")` registers a function, and any schema (Python,
+  YAML, dict) names it with `generator: name`. The CLI loads the module with
+  `misata --plugin module ...` or `MISATA_PLUGINS`. A schema never imports
+  code, so a schema from someone else or from an agent cannot run anything
+  unregistered.
+- A one-parameter function receives a `GenContext`: the batch's rows so far,
+  `ctx.parent("customers")` with every parent column aligned to the batch,
+  and `ctx.rng` seeded from the schema seed, table, column and batch.
+  Parents of such tables keep all their rows and columns in context, so
+  `ctx.parent()` finds every parent, not the first 50,000.
+- Wrong-length results, reading a foreign key that is not generated yet, and
+  an unregistered name all raise with the fix in the message; the per-row
+  form on a first column runs instead of returning zeros.
+- A YAML foreign key with `references: table.column` now creates its
+  relationship; it was kept on the column and ignored, so validation failed
+  on a relationship the file had just declared.
+
+### In-memory generation is no longer quadratic
+
+`generate_from_schema` (and the dbt and seed CLI paths) concatenated each
+table onto itself once per 10k-row batch. Batches are now collected and
+joined once: 3M rows build in 3.6 s instead of 6.2 s, and the gap grows with
+size (the audit measured 154 s in memory against 15 s streamed at 10M).
+
 ### A realism benchmark against held-out real data
 
 `benchmarks/realism_bench.py` scores blind generators (a one-line story, a

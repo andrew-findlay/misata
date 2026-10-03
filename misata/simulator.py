@@ -1319,6 +1319,18 @@ class DataSimulator:
             values[roots] = None
         return values
 
+    def _feeds_custom_generator(self, table_name: str) -> bool:
+        """True when a child of this table has a custom generator, which may
+        read any parent row and column through ``ctx.parent()``."""
+        for rel in self.config.relationships:
+            if rel.parent_table != table_name:
+                continue
+            if self.custom_generators.get(rel.child_table) or any(
+                    (c.distribution_params or {}).get("generator")
+                    for c in self.config.columns.get(rel.child_table, [])):
+                return True
+        return False
+
     def _collect_context_columns(self, table_name: str, df: pd.DataFrame) -> List[str]:
         """Return the columns that must be retained for future FK/date/depends_on lookups.
 
@@ -1331,6 +1343,11 @@ class DataSimulator:
             return list(df.columns)
 
         needed_cols = {"id"}
+
+        # A child with a custom generator may read any parent attribute
+        # through ctx.parent(), so its parents keep every column.
+        if self._feeds_custom_generator(table_name):
+            return list(df.columns)
 
         _head = table_name.lower().rstrip("s")
         for rel in self.config.relationships:
@@ -1588,6 +1605,61 @@ class DataSimulator:
             out[i] = candidate
         return np.array(out, dtype=object)
 
+    def _call_custom_generator(self, fn, table_name: str, column: Column, size: int,
+                               table_data: Optional[pd.DataFrame]) -> np.ndarray:
+        """Run a user generator. Three calling conventions:
+
+        - ``fn(ctx)``: one parameter, a :class:`misata.plugins.GenContext`
+          (rows so far, aligned parent rows, a seeded rng). The recommended form.
+        - ``fn(partial_df, context_tables)``: vectorised, the original form.
+        - ``fn(row, col_name, context_tables)``: one scalar per row.
+        """
+        import inspect as _inspect
+        import zlib as _zlib
+        partial_df = table_data if table_data is not None else pd.DataFrame()
+        try:
+            nparams = len(_inspect.signature(fn).parameters)
+        except (TypeError, ValueError):
+            nparams = 2
+        where = f"{table_name}.{column.name}"
+
+        if nparams == 1:
+            from misata.plugins import GenContext
+            key = (table_name, column.name)
+            calls = self.__dict__.setdefault("_custom_calls", {})
+            batch = calls.get(key, 0)
+            calls[key] = batch + 1
+            seed = [int(self.config.seed or 0) & 0xFFFFFFFF,
+                    _zlib.crc32(f"{table_name}.{column.name}".encode()), batch]
+            ctx = GenContext(table=table_name, column=column.name, size=size,
+                             rows=partial_df.reset_index(drop=True),
+                             rng=np.random.default_rng(seed),
+                             params=dict(column.distribution_params or {}),
+                             tables=self.context,
+                             _relationships=list(self.config.relationships))
+            result = fn(ctx)
+        elif nparams >= 3:
+            if partial_df.empty:
+                # The first column of a table has no row to pass; call once
+                # per row with an empty one rather than returning zeros.
+                result = [fn(pd.Series(dtype=object), column.name, self.context)
+                          for _ in range(size)]
+            else:
+                result = partial_df.apply(
+                    lambda row: fn(row, column.name, self.context), axis=1)
+        else:
+            result = fn(partial_df, self.context)
+
+        if isinstance(result, pd.Series):
+            result = result.to_numpy()
+        arr = np.asarray(result)
+        if arr.ndim == 0:
+            raise ValueError(f"generator for {where} returned a scalar; return {size} values")
+        if len(arr) != size:
+            raise ValueError(
+                f"generator for {where} returned {len(arr)} values for a batch of {size}")
+        return arr
+
     def _fresh_pattern_value(self, pattern: str, seen: set, tries: int = 50) -> Optional[str]:
         """A pattern expansion not yet in ``seen``, or None if the pattern's
         space looks exhausted."""
@@ -1623,30 +1695,12 @@ class DataSimulator:
         #   per-row:    fn(row, col_name, context_tables) → scalar per row
         # The per-row form is detected by inspecting the callable's signature.
         _custom_fn = self.custom_generators.get(table_name, {}).get(column.name)
+        _registered = (column.distribution_params or {}).get("generator")
+        if _custom_fn is None and _registered:
+            from misata.plugins import get_generator
+            _custom_fn = get_generator(str(_registered))
         if callable(_custom_fn):
-            partial_df = table_data if table_data is not None else pd.DataFrame()
-            try:
-                import inspect as _inspect
-                _sig = _inspect.signature(_custom_fn)
-                _nparams = len(_sig.parameters)
-            except (TypeError, ValueError):
-                _nparams = 2  # default to vectorized
-
-            if _nparams >= 3:
-                # Per-row signature: fn(row, col_name, context_tables) → scalar
-                # Graceful fallback: if partial_df is empty generate zeros
-                if partial_df.empty or len(partial_df) == 0:
-                    return np.zeros(size, dtype=object)
-                result = partial_df.apply(
-                    lambda row: _custom_fn(row, column.name, self.context), axis=1
-                )
-            else:
-                # Vectorized signature: fn(partial_df, context_tables) → array
-                result = _custom_fn(partial_df, self.context)
-
-            if isinstance(result, pd.Series):
-                return result.to_numpy()
-            return np.asarray(result)
+            return self._call_custom_generator(_custom_fn, table_name, column, size, table_data)
 
         # Apply domain priors as defaults — user-defined params always win.
         _domain = getattr(self.config, "domain", None) or getattr(
@@ -3272,18 +3326,20 @@ class DataSimulator:
                 self._pk_store[table_name] = pk_vals
 
         ctx_df = df[cols_to_store].copy()
+        # Parents of a custom generator keep every row: ctx.parent() must find
+        # the parent of each child, not of the first 50,000.
+        cap = None if self._feeds_custom_generator(table_name) else self.MAX_CONTEXT_ROWS
 
         if table_name not in self.context:
-            if len(ctx_df) > self.MAX_CONTEXT_ROWS:
+            if cap is not None and len(ctx_df) > cap:
                 ctx_df = ctx_df.sample(n=self.MAX_CONTEXT_ROWS, random_state=int(self.rng.integers(0, 2**31)))
             self.context[table_name] = ctx_df
         else:
             current_len = len(self.context[table_name])
-            if current_len >= self.MAX_CONTEXT_ROWS:
+            if cap is not None and current_len >= cap:
                 return
 
-            remaining_space = self.MAX_CONTEXT_ROWS - current_len
-            rows_to_add = ctx_df.iloc[:remaining_space]
+            rows_to_add = ctx_df if cap is None else ctx_df.iloc[:cap - current_len]
             self.context[table_name] = pd.concat(
                 [self.context[table_name], rows_to_add],
                 ignore_index=True,

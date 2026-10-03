@@ -137,18 +137,27 @@ def _run_simulation(
     schema: "SchemaConfig",
     custom_generators: "Optional[Dict[str, Dict[str, Any]]]" = None,
 ) -> "Dict[str, Any]":
-    import pandas as pd
     from misata.simulator import DataSimulator
 
     sim = DataSimulator(schema, custom_generators=custom_generators)
-    tables: Dict[str, Any] = {}
-    for name, batch in sim.generate_all():
-        if name in tables:
-            tables[name] = pd.concat([tables[name], batch], ignore_index=True)
-        else:
-            tables[name] = batch
+    return _collect_batches(sim.generate_all())
 
-    return tables
+
+def _collect_batches(batches) -> "Dict[str, Any]":
+    """Assemble ``(table, batch)`` pairs into whole tables.
+
+    Batches are collected and concatenated once per table: concatenating on
+    every batch copied the growing table each time, which made a 10M-row
+    in-memory build quadratic (154 s, against 15 s streamed).
+    """
+    import pandas as pd
+
+    parts: Dict[str, list] = {}
+    for name, batch in batches:
+        parts.setdefault(name, []).append(batch)
+    return {name: (chunks[0] if len(chunks) == 1
+                   else pd.concat(chunks, ignore_index=True))
+            for name, chunks in parts.items()}
 
 
 # (col_a_keywords, col_b_keywords, pearson_r)
@@ -761,6 +770,7 @@ from misata.generators.base import (
 from misata.profiler import mimic, DataProfiler
 from misata.fidelity import fidelity_report, FidelityReport, privacy_report, PrivacyReport
 from misata.tells import realism_report, RealismReport
+from misata.plugins import generator, register_generator, GenContext
 from misata.ddl import from_ddl
 from misata import spark as spark  # noqa: PLC0414 — re-export the submodule
 
@@ -781,6 +791,9 @@ __all__ = [
     "PrivacyReport",
     "realism_report",
     "RealismReport",
+    "generator",
+    "register_generator",
+    "GenContext",
     "from_dict_schema",
     "verify_integrity",
     "IntegrityReport",

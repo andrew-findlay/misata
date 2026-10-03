@@ -194,13 +194,24 @@ def print_banner():
 
 @click.group()
 @click.version_option(version=__version__)
-def main() -> None:
+@click.option("--plugin", "plugins", multiple=True, envvar="MISATA_PLUGINS",
+              help="Python module that registers custom generators "
+                   "(@misata.generator). Repeatable; also read from "
+                   "MISATA_PLUGINS (space-separated). Example: "
+                   "misata --plugin my_generators generate --config misata.yaml")
+def main(plugins: tuple = ()) -> None:
     """
     Misata - AI-Powered Synthetic Data Engine
 
     Generate industry-realistic data from natural language stories.
     """
-    pass
+    if plugins:
+        from misata.plugins import load_plugins
+        names = [n for p in plugins for n in str(p).split()]
+        try:
+            load_plugins(names)
+        except ImportError as e:
+            raise click.UsageError(f"--plugin: could not import {e.name or e}") from e
 
 
 @main.command("init")
@@ -1808,12 +1819,8 @@ def dbt_seed_cmd(
     console.print(f"\n⚙️  Generating {len(schema_config.tables)} table(s)...")
 
     sim = DataSimulator(schema_config)
-    tables: dict = {}
-    for name, batch in sim.generate_all():
-        if name in tables:
-            tables[name] = pd.concat([tables[name], batch], ignore_index=True)
-        else:
-            tables[name] = batch
+    from misata import _collect_batches
+    tables: dict = _collect_batches(sim.generate_all())
 
     # ── Write seeds with size intelligence ───────────────────────────────
     if from_project:
@@ -2022,12 +2029,8 @@ def prisma_seed_cmd(
 
     console.print(f"\n⚙️  Generating {len(schema_config.tables)} table(s)...")
     sim = DataSimulator(schema_config)
-    tables: dict = {}
-    for name, batch in sim.generate_all():
-        if name in tables:
-            tables[name] = pd.concat([tables[name], batch], ignore_index=True)
-        else:
-            tables[name] = batch
+    from misata import _collect_batches
+    tables: dict = _collect_batches(sim.generate_all())
 
     out = Path(out_dir)
     written, skipped, _ = write_seeds_with_report(tables, out, force=force)

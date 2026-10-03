@@ -137,6 +137,7 @@ nav:
     - Lexicons, Motifs and Joint Margins: guides/declared-vocabulary-and-structure.md
     - MCP Server (AI agents): guides/mcp.md
     - pytest Fixtures: guides/testing.md
+    - Custom Generators: guides/custom-generators.md
     - SQL DDL to Schema: guides/from-ddl.md
     - dbt Seed Integration: guides/dbt-seed.md
     - Streaming Large Datasets: guides/streaming.md
