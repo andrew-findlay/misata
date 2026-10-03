@@ -5,6 +5,26 @@ All notable changes to Misata will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Realism report: the statistical tells of generated data
+
+`misata.realism_report(tables)` and `misata realism DIR` scan any tables,
+whoever generated them, for twelve shapes real data almost never has:
+uniform money, Benford violations in transaction totals, even FK fan-out
+(every customer with about five orders), perfectly balanced categories, flat
+weekday and hour profiles, timestamps piled up at midnight, placeholder
+values, evenly shared email providers, emails unrelated to names, tiny name
+pools, templated free text, and tables with no nulls at all. No real data is
+needed. Each finding carries its evidence and a pass/warn/fail status; the
+CLI exits nonzero on failures (or on warnings with `--strict`), so it can
+gate seed data in CI.
+
+Run on Misata's own default ecommerce story (seed 7) it scores 0.66 with
+three failures: customer and product fan-out are near uniform (Gini 0.25 and
+0.11), and half of `orders.order_date` sits exactly at midnight. A typical
+Faker script scores about 0.3. Those three are the next realism fixes.
+
 ## [0.9.6.60] - 2026-09-28
 
 ### The "Never Use Faker Again" Release: Text Realism & Vertical Supremacy

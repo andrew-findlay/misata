@@ -2927,6 +2927,80 @@ def audit_cmd(data_dir: str, schema: Optional[str], strict: bool) -> None:
         sys.exit(1)
 
 
+@main.command("realism")
+@click.argument("data_dir", type=click.Path(exists=True))
+@click.option("--schema", "-s", type=click.Path(exists=True), default=None,
+              help="Optional schema; its relationships drive the fan-out check.")
+@click.option("--skip", multiple=True,
+              help="Check to leave out (repeatable), e.g. --skip too_clean.")
+@click.option("--json", "as_json", is_flag=True, default=False,
+              help="Print the full report as JSON.")
+@click.option("--strict", is_flag=True, default=False,
+              help="Exit nonzero on any warning too (default: only on failures).")
+def realism_cmd(data_dir: str, schema: Optional[str], skip: tuple, as_json: bool,
+                strict: bool) -> None:
+    """Scan a folder of CSVs for the statistical tells of generated data.
+
+    Where `misata audit` catches contradictions, this catches shapes real data
+    almost never has: amounts spread evenly from min to max, every customer
+    with the same number of orders, flat weekday and hour profiles,
+    timestamps piled up at midnight, emails unrelated to names, placeholder
+    domains, perfectly balanced categories, no nulls anywhere. No real data
+    is needed. Works on data from any generator.
+
+    Examples:
+
+        misata realism ./seed_data/
+
+        misata realism ./seed_data/ --skip too_clean --strict
+    """
+    from pathlib import Path as _Path
+
+    from misata.tells import realism_report
+
+    csvs = sorted(_Path(data_dir).glob("*.csv"))
+    if not csvs:
+        console.print(f"[red]No CSV files found in {data_dir}[/red]")
+        sys.exit(2)
+    tables = {p.stem: pd.read_csv(p) for p in csvs}
+
+    schema_config = None
+    if schema:
+        config_dict = _load_yaml_or_json(schema)
+        schema_config = (load_yaml_schema(schema) if isinstance(config_dict.get("tables"), dict)
+                         else SchemaConfig(**config_dict))
+
+    try:
+        report = realism_report(tables, schema_config, skip=skip)
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        sys.exit(2)
+
+    if as_json:
+        click.echo(json.dumps(report.to_dict(), indent=2, default=str))
+    else:
+        print_banner()
+        n = report.counts()
+        console.print(f"Realism score [bold]{report.score:.2f}[/bold] across "
+                      f"{len(report.checks)} checks: [green]{n['pass']} pass[/green], "
+                      f"[yellow]{n['warn']} warn[/yellow], [red]{n['fail']} fail[/red]")
+        if report.tells:
+            tbl = RichTable(show_header=True, header_style="bold cyan", box=None, padding=(0, 1))
+            for h in ("Status", "Check", "Where", "Finding"):
+                tbl.add_column(h)
+            style = {"fail": "red", "warn": "yellow"}
+            for c in report.tells:
+                where = f"{c.table}.{c.column}" if c.column else c.table
+                tbl.add_row(f"[{style[c.status]}]{c.status}[/]", c.check, where, c.message)
+            console.print()
+            console.print(tbl)
+        else:
+            console.print("[green]No known synthetic tells found.[/green]")
+
+    if not report.passed or (strict and report.tells):
+        sys.exit(1)
+
+
 @main.command("lint")
 @click.argument("schema_file", type=click.Path(exists=True))
 @click.option("--strict", is_flag=True, default=False,

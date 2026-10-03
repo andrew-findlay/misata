@@ -100,6 +100,18 @@ bug worth reporting.
   domain. Data can pass the audit and still be wrong in ways no rule covers.
   A clean audit means "no known defect class present", nothing stronger.
 
+## Realism report
+
+- **The realism report detects tells, it does not prove realism.** Each
+  check is a threshold heuristic over a known regularity of real data
+  (long-tailed money, concentrated popularity, weekly and daily rhythm,
+  name-derived emails). A clean report means none of those tells is present,
+  not that the data would fool a classifier trained on production. Measuring
+  that needs real data (`fidelity_report`).
+- **Column roles are guessed from names.** A money column named `bewertung`
+  or a timestamp named `when` gets no shape checks. Benford is applied only to
+  transaction-style totals, not to prices or salaries, where it does not hold.
+
 ## Scale and memory
 
 - **Tables involved in roll-ups or cascade events are fully buffered in

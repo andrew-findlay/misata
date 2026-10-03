@@ -110,6 +110,7 @@ nav:
   - Export: export.md
   - Databricks & Spark: spark.md
   - Validate: validate.md
+  - Realism Report: realism.md
   - When Misata Refuses: failure-modes.md
   - CLI Reference: cli.md
   - Guides:
