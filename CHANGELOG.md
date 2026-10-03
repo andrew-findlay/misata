@@ -111,6 +111,57 @@ column now say they are int-only.
 - Emails are derived from a `full_name` column as well as `name` and
   `first_name`/`last_name`.
 
+### A realism benchmark against held-out real data
+
+`benchmarks/realism_bench.py` scores blind generators (a one-line story, a
+names-and-types schema, a typical Faker script) and fitted ones (`mimic`,
+SDV's Gaussian copula) against the held-out half of two public datasets:
+Olist's real marketplace orders and the NYC taxi sample. Metrics are
+scale-free (amount shape, hour and weekday profiles, fan-out concentration,
+category balance, a real-vs-synthetic classifier, the tells score), and the
+real train half sets the noise floor. Results and an honest reading are in
+`docs/realism-benchmark.md`: blind Misata beats the script on e-commerce and
+approaches SDV fitted to the data (detection AUC 0.74 vs 0.71); on taxis its
+daytime rhythm and amount prior lose to the script; customer fan-out on a
+buy-once marketplace is a real miss. Nothing was tuned to the test set.
+
+The benchmark found four bugs, fixed here:
+
+- **`mimic` dropped the time of day.** Timestamps were profiled as calendar
+  dates, so every mimicked event landed at midnight (detection AUC 1.0). A
+  column with times of day now profiles as a `datetime` and learns its hour
+  and weekday shares (`hour_weights`, `weekday_weights`, also declarable).
+  Olist AUC: 1.0 to 0.54.
+- **Story columns named `*_at` were dates.** `ordered_at`, `joined_at` and the
+  rest are moments, so they are timestamps now; `order_date` stays a date.
+- **The fan-out tell called real data fake.** With about one child per parent
+  the counts are necessarily even; the check now needs two per parent.
+- **Product names were not reproducible.** A coherence pass chose names with
+  Python's `hash()`, which is salted per process, so the same seed gave
+  different products in different runs. It uses CRC32 now.
+
+### More realistic defaults
+
+- **Product catalogs vary.** About twenty base names per category gave a
+  3,200-listing catalog 120 distinct titles. Base names now combine with
+  fictional brands and category-specific variants (size, colour, capacity,
+  edition): 2,067 distinct titles for the same catalog.
+- **An order's amount is price times quantity.** When a row has a quantity
+  and references a parent with a price, the amount is derived, so the first
+  JOIN to products agrees. Declared curves, roll-ups and formulas keep their
+  values.
+- **A story that names a missing entity says so.** "...12000 orders and
+  order items" returned orders and nothing else, silently; it now warns that
+  no table was built for order items.
+
+### A proposed stability contract
+
+`STABILITY.md` sets out what Misata intends to guarantee from 1.0: semantic
+versioning, batched releases with an **Output changes** changelog section,
+declared outcomes and integrity holding across every minor release, rows
+byte-identical within a minor series, and a two-minor deprecation window. It
+is marked proposed until adopted.
+
 ### Story counts that name a table are honoured
 
 "An ecommerce shop with 3000 customers, 500 products and 12000 orders" came

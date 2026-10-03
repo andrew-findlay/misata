@@ -1269,6 +1269,7 @@ class StoryParser:
 
         schema = self._enrich_schema_text_types(schema)
         self._apply_explicit_counts(story, schema)
+        self._timestamps_for_moments(schema)
 
         # Say what could not be used. Silence here is how a story that asked
         # for six thousand invoices, a plan split and an unpaid rate came back
@@ -1284,9 +1285,56 @@ class StoryParser:
                 stacklevel=2,
             )
 
+        for entity in self._missing_entities(story, schema):
+            warnings.warn(
+                f"The story asks for {entity}, but this parser built no table for "
+                f"them ({', '.join(t.name for t in schema.tables)}). Add the table "
+                f"to the schema, or use an LLM provider for this story.",
+                UserWarning,
+                stacklevel=2,
+            )
+
         # Cache the produced schema so detection_report() can preview tables
         self._last_schema = schema
         return schema
+
+    # Sub-entities people name in a story and expect as their own table.
+    _ENTITY_WORDS = {
+        "order items": ("item", "line"), "line items": ("item", "line"),
+        "order lines": ("item", "line"), "invoices": ("invoice",),
+        "payments": ("payment",), "reviews": ("review",), "shipments": ("shipment",),
+        "refunds": ("refund",), "tickets": ("ticket",), "subscriptions": ("subscription",),
+        "transactions": ("transaction",), "sessions": ("session",),
+        "appointments": ("appointment",), "claims": ("claim",),
+    }
+
+    def _missing_entities(self, story: str, schema: "SchemaConfig") -> List[str]:
+        """Entities the story names that no table represents.
+
+        "...12000 orders and order items" used to return an orders table and
+        nothing else, silently. A named entity with no table is now reported.
+        Matching is by the table-name stem (``order_items`` covers "order
+        items", ``payments`` covers "payments") and ignores phrases already
+        reported as unhandled counts.
+        """
+        low = (story or "").lower()
+        names = [t.name.lower() for t in (schema.tables or [])]
+        cols = {c.name.lower() for cs in (schema.columns or {}).values() for c in cs}
+        missing = []
+        for phrase, stems in self._ENTITY_WORDS.items():
+            if not re.search(rf"\b{re.escape(phrase)}\b", low):
+                continue
+            if any(st in n for st in stems for n in names):
+                continue
+            # A column standing in for the entity (payment_method, ticket_id)
+            # is not a table, but a count on the phrase is already reported.
+            if re.search(rf"\d[\d,]*\s*k?\s+{re.escape(phrase)}", low):
+                continue
+            missing.append(phrase)
+        # "line items" and "order items" name the same table: report once.
+        if "order items" in missing and "line items" in missing:
+            missing.remove("line items")
+        return missing
 
     # ── What the story asked for that this parser did not deliver ──────────
     #
@@ -1311,6 +1359,22 @@ class StoryParser:
         "days", "day", "weeks", "week", "months", "month", "years", "year",
         "hours", "hour", "minutes", "minute", "seconds",
     })
+
+    @staticmethod
+    def _timestamps_for_moments(schema: "SchemaConfig") -> None:
+        """A column named ``*_at`` records a moment, so it is a timestamp.
+
+        The domain builders typed ``ordered_at``, ``joined_at`` and the rest as
+        calendar dates, so every order landed at midnight and the hour-of-day
+        profile real orders have was impossible to produce. Columns named as
+        dates (``order_date``, ``signup_date``) stay dates.
+        """
+        for table, cols in (schema.columns or {}).items():
+            for i, col in enumerate(cols):
+                if col.type == "date" and col.name.lower().endswith("_at"):
+                    params = {k: v for k, v in (col.distribution_params or {}).items()}
+                    cols[i] = col.model_copy(update={"type": "datetime",
+                                                     "distribution_params": params})
 
     # Story nouns that name a table under another name.
     _COUNT_SYNONYMS = {

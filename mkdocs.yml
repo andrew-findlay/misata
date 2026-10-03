@@ -111,6 +111,7 @@ nav:
   - Databricks & Spark: spark.md
   - Validate: validate.md
   - Realism Report: realism.md
+  - Realism Benchmark: realism-benchmark.md
   - When Misata Refuses: failure-modes.md
   - CLI Reference: cli.md
   - Guides:

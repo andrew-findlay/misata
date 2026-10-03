@@ -482,8 +482,12 @@ def _check_fanout(parent: str, pkey: str, child: str, ckey: str,
     pdf, cdf = tables[parent], tables[child]
     keys = pdf[pkey].dropna()
     refs = cdf[ckey].dropna()
-    if len(keys) < 20 or len(refs) < 200 or len(refs) < len(keys):
-        return None  # 1:1 or sparse links have no fan-out shape to judge
+    # About one child per parent (most buyers on a marketplace buy once) has
+    # no fan-out shape to judge: the counts are necessarily even. Calibrated
+    # on Olist's real orders, where 30,000 orders over 29,651 customers gave
+    # Gini 0.01 and this check used to call real data fake.
+    if len(keys) < 20 or len(refs) < 200 or len(refs) < 2 * len(keys):
+        return None
     per_parent = refs.value_counts().reindex(keys.unique(), fill_value=0).to_numpy()
     g = _gini(per_parent)
     top_n = max(1, int(round(len(per_parent) * 0.1)))

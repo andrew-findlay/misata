@@ -544,8 +544,24 @@ class DataProfiler:
         # --- date ---
         if _is_date_col(series):
             params = _fit_date(series)
-            col = Column(name=col_name, type="date", distribution_params=params)
-            return col
+            ts = pd.to_datetime(series, errors="coerce").dropna()
+            if getattr(ts.dt, "tz", None) is not None:
+                ts = ts.dt.tz_localize(None)
+            # A column whose values carry a time of day is a timestamp, and
+            # its daily and weekly rhythm is part of what makes it real.
+            # Profiling it as a calendar date dropped the time entirely:
+            # every mimicked purchase landed at midnight.
+            has_time = len(ts) and float(
+                ((ts.dt.hour != 0) | (ts.dt.minute != 0) | (ts.dt.second != 0)).mean()) > 0.05
+            if len(ts) >= 50:
+                wd = np.bincount(ts.dt.dayofweek, minlength=7) / len(ts)
+                params["weekday_weights"] = [round(float(x), 5) for x in wd]
+            if has_time:
+                if len(ts) >= 50:
+                    hw = np.bincount(ts.dt.hour, minlength=24) / len(ts)
+                    params["hour_weights"] = [round(float(x), 5) for x in hw]
+                return Column(name=col_name, type="datetime", distribution_params=params)
+            return Column(name=col_name, type="date", distribution_params=params)
 
         # --- numeric ---
         if pd.api.types.is_numeric_dtype(series):

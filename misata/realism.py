@@ -3121,6 +3121,53 @@ for _pool, _names in PRODUCT_NAME_POOLS.items():
         _NAME_TO_POOL[_n] = _pool
 
 
+# Fictional brands and real-catalog variant axes. About twenty base names per
+# category gave a 3,200-listing catalog 120 distinct titles; real catalogs
+# repeat a product line across brands, sizes and colours.
+_PRODUCT_BRANDS = {
+    "electronics": ["Voltra", "Nexion", "Aurelo", "Kestrel", "Lumio", "Orbix", "Zentra",
+                    "Quill & Bolt", "Sonaro", "Helix"],
+    "clothing": ["Northfold", "Marlowe", "Juniper & Co", "Aster", "Fennick", "Calder",
+                 "Wren", "Solace"],
+    "home": ["Hearthwell", "Oakline", "Nordhaus", "Casa Verde", "Linden", "Tidewater",
+             "Ember & Ash"],
+    "sports": ["Peakform", "Stride", "Trailborn", "Vantage", "Ironbark", "Swiftline"],
+    "beauty": ["Lumière", "Botanica", "Velour", "Pure Theory", "Saffron Lane"],
+    "food": ["Harvest Table", "Golden Acre", "Wildroot", "Old Mill", "Sunny Ridge"],
+}
+_PRODUCT_VARIANTS = {
+    "electronics": ["Pro", "Max", "Mini", "2nd Gen", "Lite", "Plus", "- Black", "- White",
+                    "128GB", "256GB", "(2024)"],
+    "clothing": ["- Navy", "- Black", "- Olive", "- Heather Grey", "- Size M", "- Size L",
+                 "Slim Fit", "Relaxed Fit", "- Ivory"],
+    "home": ["- Set of 2", "- Set of 4", "- Large", "- Small", "- Walnut", "- Oak",
+             "- Matte Black", "- Linen"],
+    "sports": ["- Size 9", "- Size 10", "- Medium", "- Large", "- Blue", "- Red"],
+    "beauty": ["50ml", "100ml", "30ml", "Travel Size", "Unscented"],
+    "food": ["250g", "500g", "1kg", "Pack of 6", "Organic"],
+    "books": ["(Paperback)", "(Hardcover)", "(2nd Edition)", "- Illustrated Edition"],
+}
+
+
+def _stable_index(key: str, n: int) -> int:
+    """A deterministic index. ``hash()`` on a str is salted per process, so
+    choosing names with it made the same seed produce different products in
+    different runs."""
+    return zlib.crc32(key.encode("utf-8")) % n
+
+
+def _vary_product_name(base: str, pool: str, key: str) -> str:
+    r = np.random.default_rng(zlib.crc32(key.encode("utf-8")))
+    brands = _PRODUCT_BRANDS.get(pool)
+    variants = _PRODUCT_VARIANTS.get(pool, [])
+    name = base
+    if brands and r.random() < 0.7:
+        name = f"{brands[int(r.integers(len(brands)))]} {name}"
+    if variants and r.random() < 0.55:
+        name = f"{name} {variants[int(r.integers(len(variants)))]}"
+    return name
+
+
 def _fix_category_from_product_name(df: pd.DataFrame, columns: set[str], table_name: str = "") -> None:
     """Make a product's ``category`` consistent with its ``name``.
 
@@ -3197,7 +3244,7 @@ def _fix_category_from_product_name(df: pd.DataFrame, columns: set[str], table_n
             cur_pool = _NAME_TO_POOL.get(str(names[i]))
             if cur_pool != pool:  # name doesn't belong to its category — regenerate it
                 pool_names = PRODUCT_NAME_POOLS[pool]
-                names[i] = pool_names[hash(str(names[i]) + str(i)) % len(pool_names)]
+                names[i] = pool_names[_stable_index(str(names[i]) + str(i), len(pool_names))]
     else:
         for i, nm in enumerate(names):
             nm = str(nm)
@@ -3219,7 +3266,14 @@ def _fix_category_from_product_name(df: pd.DataFrame, columns: set[str], table_n
                     sorted(representable)[0],
                 )
                 pool_names = PRODUCT_NAME_POOLS[target_pool]
-                names[i] = pool_names[hash(nm) % len(pool_names)]
+                names[i] = pool_names[_stable_index(nm, len(pool_names))]
+    # Vary the built-in base names (brand, size, colour) so a large catalog
+    # does not repeat the same hundred titles. Only exact base names are
+    # touched: a capsule's or user's own names are left as they are.
+    for i, nm in enumerate(names):
+        pool = _NAME_TO_POOL.get(str(nm))
+        if pool is not None:
+            names[i] = _vary_product_name(str(nm), pool, f"{nm}|{i}|{table_name}")
     df[name_col] = names
     df["category"] = cats
 

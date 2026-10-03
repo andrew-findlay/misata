@@ -145,7 +145,19 @@ bug worth reporting.
 
 ## Reproducibility and interfaces
 
-- **Determinism is per-version.** The same schema, seed, and misata version
+- **Default customer fan-out assumes repeat buyers.** Popularity weighting
+  (children-per-parent Gini about 0.55) fits stores with repeat customers. On a
+  marketplace where nearly every buyer buys once, it produces too many repeat
+  customers; declare `sampling: "uniform"` or a smaller `popularity_sigma`.
+  The [realism benchmark](docs/realism-benchmark.md) measures this miss.
+- **Default time-of-day rhythms are daytime-weighted.** They suit orders,
+  signups and payments; they are wrong for night-heavy activity (taxis,
+  nightlife, gaming in non-gaming domains). Declare `hour_weights` on the
+  column when you know the shape.
+- **Name-derived emails need a Latin-script name.** A name in another script
+  keeps its generated email, which then does not match the name.
+- **Determinism is per-version.** See [STABILITY.md](STABILITY.md) for the
+  proposed cross-version contract. The same schema, seed, and misata version
   reproduce byte-identical output. Upgrading may change the RNG stream (it did
   in 0.8.1.29 and 0.8.2): declared outcomes, identities, and integrity
   survive any upgrade, individual rows do not. Pin the version for

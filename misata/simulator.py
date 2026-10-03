@@ -1350,6 +1350,9 @@ class DataSimulator:
                 needed_cols.update(rel.partition_by)
             if rel.parent_table == table_name:
                 needed_cols.add(rel.parent_key)
+                # A child's amount is derived from this parent's price.
+                needed_cols.update(c for c in ("price", "unit_price", "list_price")
+                                   if c in df.columns)
                 if rel.filters:
                     needed_cols.update(rel.filters.keys())
                 # Denormalized copies: a child column named like this parent's
@@ -4732,6 +4735,16 @@ class DataSimulator:
         profile = classify_temporal(column.name, table_name)
         if profile is HUMAN_ACTION:
             profile = replace(profile, weekend_factor=self._domain_weekend_factor())
+        # Learned rhythms (from mimic, or declared) replace the name-guessed ones.
+        hour_w = params.get("hour_weights")
+        weekday_w = params.get("weekday_weights")
+        hour_w = hour_w if isinstance(hour_w, (list, tuple)) and len(hour_w) == 24 else None
+        weekday_w = (weekday_w if isinstance(weekday_w, (list, tuple)) and len(weekday_w) == 7
+                     else None)
+        if hour_w is not None:
+            profile = replace(profile, hour_weights=list(hour_w))
+        if weekday_w is not None:
+            profile = replace(profile, weekend_factor=1.0)
         values = pd.DatetimeIndex(values)
         if date_only:
             if profile.date_only:
@@ -4741,6 +4754,14 @@ class DataSimulator:
             shaped = apply_temporal_profile(
                 values, profile, self.rng,
                 domain_hour_weights=self._domain_hour_weights())
+        if weekday_w is not None:
+            # Move each row to a weekday drawn from the declared shares,
+            # within its own week, so the date range barely moves.
+            w = np.asarray(weekday_w, dtype=float)
+            if w.sum() > 0:
+                target = self.rng.choice(7, size=len(shaped), p=w / w.sum())
+                shift = target - np.asarray(shaped.dayofweek)
+                shaped = shaped + pd.to_timedelta(shift, unit="D")
         lo = pd.Timestamp(start).normalize()
         hi = pd.Timestamp(end)
         if hi.normalize() == hi:
@@ -5697,6 +5718,53 @@ class DataSimulator:
                 df[c] = mapped.where(mapped.notna(), df[c])
         return df
 
+    _AMOUNT_COLS = ("amount", "total", "total_amount", "order_total", "subtotal",
+                    "line_total", "total_price")
+    _QTY_COLS = ("quantity", "qty", "units")
+
+    def _fix_amount_from_parent_price(self, df: pd.DataFrame, table_name: str,
+                                      protected: set) -> pd.DataFrame:
+        """An order line's amount is its product's price times its quantity.
+
+        Drawn independently, ``orders.amount`` matched ``price * quantity`` on
+        0.2% of rows and was below a single unit's price on 45%: the first
+        JOIN to products exposes it. When a row has a quantity and references
+        a parent with a price, the amount is derived. Columns that carry a
+        declared outcome (curve, rollup, formula, dependency) or are otherwise
+        protected keep their values: the declaration wins.
+        """
+        qty = next((c for c in self._QTY_COLS if c in df.columns), None)
+        amt = next((c for c in self._AMOUNT_COLS if c in df.columns), None)
+        if qty is None or amt is None or amt in protected:
+            return df
+        params = next((c.distribution_params or {} for c in self.config.columns.get(table_name, [])
+                       if c.name == amt), {})
+        if any(k in params for k in ("formula", "rollup", "depends_on", "after_column")):
+            return df
+        for curve in list(getattr(self.config, "outcome_curves", None) or []):
+            if getattr(curve, "table", None) == table_name and \
+                    getattr(curve, "column", None) == amt:
+                return df
+        for rel in self.config.relationships:
+            if rel.child_table != table_name or rel.child_key not in df.columns:
+                continue
+            parent_df = self.context.get(rel.parent_table)
+            if parent_df is None or rel.parent_key not in parent_df.columns:
+                continue
+            price_col = next((c for c in ("price", "unit_price", "list_price")
+                              if c in parent_df.columns), None)
+            if price_col is None:
+                continue
+            prices = df[rel.child_key].map(
+                parent_df.drop_duplicates(rel.parent_key).set_index(rel.parent_key)[price_col])
+            q = pd.to_numeric(df[qty], errors="coerce")
+            derived = (pd.to_numeric(prices, errors="coerce") * q).round(2)
+            ok = derived.notna()
+            if ok.any():
+                df.loc[ok, amt] = derived[ok]
+            break
+        return df
+
     def _apply_state_machine(self, df: pd.DataFrame, table_name: str) -> pd.DataFrame:
         """Assign entity states via a Markov transition model.
 
@@ -5865,6 +5933,7 @@ class DataSimulator:
         # Runs here (the choke point every generation path passes through)
         # so denormalized parent copies agree regardless of code path.
         df = self._fix_denormalized_parent_columns(df, table_name)
+        df = self._fix_amount_from_parent_price(df, table_name, protected_columns)
 
         df = apply_realism_rules(df, table_name, rng=self.rng, protected=protected_columns)
 
