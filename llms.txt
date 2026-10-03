@@ -11,6 +11,29 @@ Key facts for agents:
 - `misata seed <db-url>` fills a live Postgres/SQLite database in one transaction; never pass `--truncate` without the user's confirmation.
 - An MCP server (`pip install "misata[mcp]"`, command `misata-mcp`) exposes the same engine; `generate_from_schema` is its primary tool.
 
+## Common commands
+
+```bash
+pip install misata
+misata generate --config misata.yaml --output-dir data   # from a schema you design
+misata seed --dry-run                  # plan for the database in .env; then misata seed
+misata seed --sql-out seed.sql         # topologically ordered seed.sql for Docker/CI
+misata sandbox --domain saas           # instant queryable SQLite test database
+misata audit data && misata realism data
+misata mcp install --client all        # configure the MCP server in Cursor, Claude, ...
+```
+
+```python
+import misata
+tables = misata.generate_from_schema(schema, seed=42)   # dict or SchemaConfig
+misata.to_seed_sql(tables, "seed.sql", dialect="postgresql")
+misata.to_parquet(tables, "./data/")
+```
+
+MCP tools for agents include `generate_from_schema` (primary), `create_sandbox`
+and `query_sandbox` (an isolated SQLite database to test SQL against),
+`seed_database`, `audit_dataset` and `check_realism`.
+
 ## Docs
 
 - [README](https://raw.githubusercontent.com/rasinmuhammed/misata/main/README.md): what Misata is, install, quick start
@@ -32,3 +55,4 @@ Key facts for agents:
 - [Stability policy](https://raw.githubusercontent.com/rasinmuhammed/misata/main/STABILITY.md): versioning and output-stability contract
 - [Changelog](https://raw.githubusercontent.com/rasinmuhammed/misata/main/CHANGELOG.md)
 - [Agent Skill](https://raw.githubusercontent.com/rasinmuhammed/misata/main/skills/misata/SKILL.md): instructions for coding agents
+- [llms-full.txt](https://raw.githubusercontent.com/rasinmuhammed/misata/main/llms-full.txt): full API, CLI and MCP tool reference

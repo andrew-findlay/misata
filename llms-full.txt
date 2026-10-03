@@ -29,7 +29,7 @@ claude mcp add misata misata-mcp
 
 ---
 
-## 3. Agent MCP Server (11 Native Tools)
+## 3. Agent MCP Server (12 Native Tools)
 
 Misata runs an MCP (Model Context Protocol) server over `stdio` via `misata-mcp` or `misata mcp run`.
 
@@ -98,6 +98,9 @@ Returns how Misata will interpret a plain-English story, which domain it detecte
 ### Tool 11: `list_domains`
 Returns all supported built-in industry domains and their default table hierarchies.
 
+### Tool 12: `check_realism`
+Finds the statistical tells of generated data in a folder of CSVs, without real data to compare against: money spread evenly from min to max, every customer with the same number of orders, balanced categories, flat hour or weekday profiles, timestamps piled at midnight, placeholder values, emails unrelated to names, templated text, no nulls. Returns a 0-1 score and each tell with its evidence. Fix findings in the schema, not the rows.
+
 ---
 
 ## 4. Misata CLI Reference
@@ -115,13 +118,19 @@ misata seed --sql-out ./seed.sql         # Generates standalone SQL file for CI/
 
 # MCP Management
 misata mcp run                           # Launch stdio MCP server
-misata mcp status                        # List operational status of all 11 MCP tools
+misata mcp status                        # List operational status of the MCP tools
 misata mcp install --client all          # Auto-configure Cursor, Windsurf, Claude Desktop, and agent rules
 
 # Project Scaffolding
 misata init                              # Creates misata.yaml template
 misata init --db postgresql://localhost/app # Reverse-engineers misata.yaml from DB
 misata generate                          # Generates data from misata.yaml
+misata --plugin my_generators generate   # Load @misata.generator functions first
+
+# Checking any dataset (from Misata or anything else)
+misata audit ./data                      # Contradictions: order, arithmetic, geography
+misata realism ./data                    # Synthetic tells: uniform money, flat hours, ...
+misata lint misata.yaml                  # Declarations that cannot hold, before generating
 ```
 
 ---
@@ -145,8 +154,26 @@ from misata.introspect import schema_from_db
 from misata.db import seed_database
 
 schema = schema_from_db("postgresql://localhost:5432/dev")
-report = seed_database(schema, "postgresql://localhost:5432/dev", truncate=True)
+report = seed_database(schema, "postgresql://localhost:5432/dev")   # one transaction
 print(f"Seeded {report.total_rows} rows into {report.dialect} with 0 orphan FKs")
+# truncate=True empties the tables first: only with the user's explicit consent.
+
+# 4. Check realism (works on any tables)
+report = misata.realism_report(tables)
+print(report.summary())
+
+# 5. Custom column logic, from any schema door
+@misata.generator("loyalty_tier")
+def loyalty_tier(ctx):                  # ctx.rows, ctx.parent("customers"), ctx.rng
+    spend = ctx.parent("customers")["lifetime_value"].to_numpy()
+    return np.where(spend > 1000, "gold", "standard")
+# column spec: {"type": "text", "generator": "loyalty_tier"}
+
+# 6. Event logs: a process with loops and step durations
+# schema key "__processes__" (dict) or "processes:" (YAML); see docs/guides/processes.md
+misata.to_xes(tables["ticket_flow_events"], "tickets.xes", case_column="ticket_id")
+
+# 7. pytest: @pytest.mark.misata(schema="misata.yaml") -> misata_tables, misata_sqlite
 ```
 
 ---
