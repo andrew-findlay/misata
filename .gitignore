@@ -78,6 +78,7 @@ tests/*
 !tests/test_seed_command.py
 !tests/test_dbt_unit.py
 !tests/test_template_text.py
+!tests/test_text_enrichment_realism.py
 !tests/test_cross_table_rules.py
 !tests/test_lifecycle.py
 !tests/test_feasibility.py

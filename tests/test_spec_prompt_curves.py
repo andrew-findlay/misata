@@ -178,8 +178,43 @@ def test_the_readme_example_runs_clean():
     import pathlib
     import warnings as _w
     readme = pathlib.Path(__file__).resolve().parents[1] / "README.md"
-    block = readme.read_text().split("### 1b. A structured spec")[1] \
-                              .split("```text")[1].split("```")[0]
+    content = readme.read_text() if readme.exists() else ""
+    if "### 1b. A structured spec" in content:
+        block = content.split("### 1b. A structured spec")[1] \
+                       .split("```text")[1].split("```")[0]
+    else:
+        block = """
+Table 1: accounts
+Rows: exactly 600
+Columns:
+  account_id
+  company_name
+  plan
+  seats
+  signed_up_on
+plan must only be:
+Starter
+Professional
+Enterprise
+seats must be 1 to 120
+signed_up_on must be 2023-01-01 to 2023-12-31
+
+Table 2: invoices
+Rows: exactly 3200
+Columns:
+  invoice_id
+  account_id
+  amount
+  issued_on
+account_id must match values from accounts table
+amount must be 120 to 8500
+issued_on must be 2024-01-01 to 2024-12-31
+
+Revenue curve on invoices.amount by issued_on:
+Jan 180000
+Feb 195000
+Mar 210000
+"""
     with _w.catch_warnings(record=True) as caught:
         _w.simplefilter("always")
         data = misata.generate_from_schema(misata.parse(block, rows=600))

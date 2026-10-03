@@ -92,7 +92,11 @@ mcp = FastMCP(
         "structure (correlations, profiles, time_series, state machines), so read "
         "it and revise the schema rather than the rows. audit_dataset re-runs "
         "that check on any folder of CSVs, and validate_domain flags values that "
-        "are physiologically or financially impossible for a stated domain."
+        "are physiologically or financially impossible for a stated domain. "
+        "FOR INSTANT TESTING & SQL VERIFICATION: Use create_sandbox to spin up an "
+        "isolated SQLite test database pre-seeded with referentially-intact tables "
+        "and get back the db_url and DDL instantly. Use query_sandbox to execute "
+        "read-only verification queries against the sandbox directly."
     ),
 )
 
@@ -1080,6 +1084,214 @@ def seed_database(
             "just in memory."
         ),
     }
+
+
+# ---------------------------------------------------------------------------
+# Instant Sandbox Oracle for AI Coding Agents
+# ---------------------------------------------------------------------------
+
+@mcp.tool(
+    title="Create an instant sandbox database",
+    annotations=ToolAnnotations(
+        title="Create an instant sandbox database",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def create_sandbox(
+    domain: Optional[str] = None,
+    story: Optional[str] = None,
+    schema: Optional[Dict[str, Any]] = None,
+    rows: int = 100,
+    seed: int = 42,
+    db_path: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create and seed a real, isolated SQLite sandbox database for testing.
+
+    Perfect for AI coding agents: spins up a queryable database with realistic,
+    referentially intact tables (0 orphan foreign keys) so you can test SQL
+    queries, analytics logic, or application code immediately without touching
+    a real database.
+
+    Args:
+        domain: Pre-built domain template ('saas', 'ecommerce', 'fintech', 'healthcare').
+        story: Plain-English description (e.g. 'A restaurant with tables, bookings, and guests').
+        schema: Explicit schema dict if you want exact column control.
+        rows: Base row count (default: 100). Transactions scale proportionally.
+        seed: Random seed for 100% reproducible results (default: 42).
+        db_path: Target SQLite file path (default: '.misata/sandbox.db').
+
+    Returns:
+        Dictionary with db_url, db_path, table summaries, DDL, and sample verification queries.
+    """
+    import sqlite3
+    from pathlib import Path
+    from misata.db import (
+        create_tables,
+        seed_database as _seed_db,
+        verify_referential_integrity,
+        _topological_sort,
+    )
+    from misata.templates.library import load_template, list_templates
+
+    target_path = Path(db_path) if db_path else Path(".misata/sandbox.db")
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    db_url = f"sqlite:///{target_path.resolve()}"
+
+    # Resolve schema config
+    if schema:
+        from misata.compat import from_dict_schema
+        config = from_dict_schema(schema)
+    elif domain and domain.lower() in list_templates():
+        config = load_template(domain.lower(), row_multiplier=max(0.1, rows / 500.0))
+    elif story:
+        parser = StoryParser()
+        config = parser.parse(story, default_rows=rows)
+    else:
+        chosen_domain = domain.lower() if domain and domain.lower() in list_templates() else "saas"
+        config = load_template(chosen_domain, row_multiplier=max(0.1, rows / 500.0))
+
+    config.seed = seed
+
+    # Connect and create tables
+    conn = sqlite3.connect(target_path)
+    conn.execute("PRAGMA foreign_keys=ON")
+    dialect = "sqlite"
+
+    try:
+        create_tables(config, conn, dialect)
+    finally:
+        conn.close()
+
+    # Seed the database
+    try:
+        report = _seed_db(
+            config, db_url, create=False, truncate=True,
+            smart_mode=False, use_llm=False,
+        )
+        integrity = verify_referential_integrity(config, db_url)
+    except Exception as exc:
+        return _tool_error(exc, "Failed to seed sandbox database.")
+
+    # Inspect table schemas and build sample queries
+    con = sqlite3.connect(target_path)
+    ddl_statements = []
+    tables_summary = {}
+    for table_name in _topological_sort(config):
+        row = con.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name = ?", (table_name,)).fetchone()
+        if row and row[0]:
+            ddl_statements.append(row[0] + ";")
+        cols_info = con.execute(f'PRAGMA table_info("{table_name}")').fetchall()
+        tables_summary[table_name] = {
+            "rows": report.table_rows.get(table_name, 0),
+            "columns": [c[1] for c in cols_info],
+        }
+
+    # Generate sample queries
+    sample_queries = []
+    for t_name in tables_summary:
+        sample_queries.append(f'SELECT * FROM "{t_name}" LIMIT 3;')
+    for rel in config.relationships[:3]:
+        sample_queries.append(
+            f'SELECT p.*, c.* FROM "{rel.parent_table}" p JOIN "{rel.child_table}" c ON p."{rel.parent_key}" = c."{rel.child_key}" LIMIT 3;'
+        )
+
+    con.close()
+
+    return {
+        "ok": True,
+        "message": f"Sandbox database created and seeded with {report.total_rows:,} rows across {len(tables_summary)} tables.",
+        "db_url": db_url,
+        "db_path": str(target_path.resolve()),
+        "dialect": "sqlite",
+        "tables": tables_summary,
+        "total_rows": report.total_rows,
+        "integrity_verified": integrity.verified,
+        "foreign_keys_count": len(config.relationships),
+        "ddl": "\n\n".join(ddl_statements),
+        "sample_queries": sample_queries,
+        "how_to_query": (
+            "Use the query_sandbox tool, or connect directly using sqlite3 in Python or CLI:\n"
+            f"    sqlite3 {target_path}"
+        ),
+    }
+
+
+@mcp.tool(
+    title="Query the sandbox database",
+    annotations=ToolAnnotations(
+        title="Query the sandbox database",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+def query_sandbox(
+    query: str,
+    db_path: Optional[str] = None,
+    limit: int = 100,
+) -> Dict[str, Any]:
+    """Execute a read-only SQL query against the sandbox database.
+
+    Allows AI coding agents to verify SQL queries, test aggregations, or inspect
+    data in the sandbox directly without opening external terminals.
+
+    Args:
+        query: SQL SELECT query to execute.
+        db_path: Optional path to the database (defaults to '.misata/sandbox.db').
+        limit: Max rows to return (default: 100).
+
+    Returns:
+        Dict with columns, rows (as list of dicts), row_count, and execution status.
+    """
+    import sqlite3
+    from pathlib import Path
+
+    target_path = Path(db_path) if db_path else Path(".misata/sandbox.db")
+    if not target_path.exists():
+        return {
+            "ok": False,
+            "error": "FileNotFound",
+            "message": f"Sandbox database not found at {target_path}. Call create_sandbox first.",
+        }
+
+    # Guard read-only queries
+    cleaned = query.strip().rstrip(";").strip()
+    first_word = cleaned.split()[0].upper() if cleaned else ""
+    if first_word not in ("SELECT", "WITH", "PRAGMA", "EXPLAIN"):
+        return {
+            "ok": False,
+            "error": "ReadOnlyViolation",
+            "message": "Only read-only queries (SELECT, WITH, PRAGMA, EXPLAIN) are permitted in query_sandbox.",
+        }
+
+    try:
+        conn = sqlite3.connect(target_path)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute(cleaned)
+        rows_raw = cur.fetchmany(limit)
+        columns = [desc[0] for desc in cur.description] if cur.description else []
+        rows = [dict(row) for row in rows_raw]
+        conn.close()
+        return {
+            "ok": True,
+            "query": cleaned,
+            "columns": columns,
+            "rows": rows,
+            "row_count": len(rows),
+            "truncated": len(rows) == limit,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": type(exc).__name__,
+            "message": str(exc),
+            "query": cleaned,
+        }
 
 
 # Checks a schema for infeasible declarations. Changes nothing.

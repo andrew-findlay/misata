@@ -25,7 +25,24 @@ which misata-mcp   # → /path/to/venv/bin/misata-mcp
 
 ---
 
-## Wire it into your AI assistant
+## Automatic Installation (Cursor, Windsurf, Claude)
+
+Configure your editor and generate project agent rules in one command:
+
+```bash
+misata mcp install --client all
+```
+
+This automatically configures `.cursor/mcp.json`, `~/.codeium/windsurf/mcp_config.json`, and `claude_desktop_config.json`, plus sets up `.cursor/rules/misata.mdc` so your AI agent knows to use Misata automatically.
+
+For **Claude Code CLI**:
+```bash
+claude mcp add misata misata-mcp
+```
+
+---
+
+## Wire it manually into your AI assistant
 
 ### Claude Desktop
 
@@ -77,10 +94,12 @@ The command is always `misata-mcp`. Refer to your editor's MCP documentation for
 
 ## What the agent can do
 
-The server exposes nine tools:
+The server exposes eleven tools:
 
 | Tool | Purpose |
 |:--|:--|
+| `create_sandbox` | **Instant Sandbox Oracle.** Spins up an isolated SQLite test database seeded with realistic relational data (zero FK orphans) for testing queries and features |
+| `query_sandbox` | **Query Oracle.** Executes read-only SQL queries against the sandbox so the agent can test and verify code directly |
 | `generate_from_schema` | **Primary.** The agent designs a schema dict (any domain); Misata generates CSVs and returns an integrity proof (per-relationship orphan counts, exact roll-ups, seeded reproducibility), a coherence score, and — when a `__domain__` is declared — a domain-validation pass |
 | `generate_dataset` | Story-based generation: Misata's own parser designs the schema from one sentence. Also returns a coherence score |
 | `list_domains` | List all 18 built-in domains with a sample story for each |
@@ -101,6 +120,14 @@ Both generation tools write CSVs to a temp directory by default. The agent gets 
 
 Paste any of these into your assistant. Each one is chosen to push a
 different part of the engine.
+
+**Instant Sandbox Oracle (Isolated test database & SQL testing)**
+
+> "Spin up an e-commerce sandbox database with 200 orders and test my cohort retention query against it."
+
+> "Create an isolated SaaS sandbox database with 100 users, subscriptions, and payments, and verify that no subscriptions are orphaned."
+
+> "Spin up a fintech sandbox from the story 'A banking app with accounts, transfers, and fraud flags' and run a query finding all flagged transfers over $5,000."
 
 **One sentence, let the parser design it**
 

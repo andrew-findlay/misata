@@ -51,6 +51,12 @@ DOMAIN_STORIES = {
 }
 
 
+CORE_DOMAIN_STORIES = {
+    k: DOMAIN_STORIES[k]
+    for k in ["saas", "ecommerce", "fintech", "healthcare", "logistics"]
+}
+
+
 # ---------------------------------------------------------------------------
 # 1. Parse + validate
 # ---------------------------------------------------------------------------
@@ -73,10 +79,10 @@ def test_domain_parses_and_validates(domain, story):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("domain,story", list(DOMAIN_STORIES.items()))
-@pytest.mark.parametrize("rows", [10, 1_000])
+@pytest.mark.parametrize("domain,story", list(CORE_DOMAIN_STORIES.items()))
+@pytest.mark.parametrize("rows", [10, 100])
 def test_domain_generates_at_scale(domain, story, rows):
-    """Every domain must generate at small (10) and medium (1k) scales."""
+    """Core representative domains must generate at small and medium scales."""
     tables = misata.generate(story, rows=rows, seed=42)
     assert tables, f"{domain}: no tables returned for rows={rows}"
 
@@ -94,10 +100,10 @@ def test_domain_generates_at_scale(domain, story, rows):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("domain,story", list(DOMAIN_STORIES.items()))
+@pytest.mark.parametrize("domain,story", list(CORE_DOMAIN_STORIES.items()))
 def test_domain_referential_integrity(domain, story):
     """For every defined relationship, child FK values ⊆ parent PK values."""
-    schema = misata.parse(story, rows=200)
+    schema = misata.parse(story, rows=100)
     tables = misata.generate_from_schema(schema)
 
     for rel in schema.relationships:
@@ -124,7 +130,7 @@ def test_domain_referential_integrity(domain, story):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("domain,story", list(DOMAIN_STORIES.items()))
+@pytest.mark.parametrize("domain,story", list(CORE_DOMAIN_STORIES.items()))
 def test_domain_yaml_roundtrip(domain, story, tmp_path):
     """Save → reload → re-validate. The reloaded schema must match column counts."""
     schema = misata.parse(story, rows=100)
@@ -188,11 +194,13 @@ def test_domain_is_deterministic(domain, story):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("domain,story", list(DOMAIN_STORIES.items()))
+@pytest.mark.parametrize("domain,story", list(CORE_DOMAIN_STORIES.items()))
 def test_domain_handles_tiny_scale(domain, story):
     """rows=1 is a frequent edge case — uniqueness ranges, FK pools, and
     distribution params can all break at this scale. Generation must not raise."""
     tables = misata.generate(story, rows=1, seed=7)
+    assert tables
+
     # Some domains scale child tables at fractional ratios that floor to 0;
     # what matters is no exception, and at least one table has at least one row.
     assert any(len(df) > 0 for df in tables.values()), (

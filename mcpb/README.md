@@ -37,10 +37,12 @@ personal information in the output and nothing to anonymise.
 | `generate_from_schema` | generates from an explicit schema, with an integrity report | no |
 | `validate_yaml` | refuses declarations that cannot all hold, with the arithmetic | no |
 | `seed_database` | inserts rows into a database you point it at | **yes** |
+| `audit_dataset` | scores a folder of CSVs for contradictions | no |
+| `validate_domain` | flags impossible values for a domain (clinical, financial) | no |
+| `create_sandbox` | spins up an isolated SQLite test database with realistic relational data | **yes** (isolated sandbox file) |
+| `query_sandbox` | executes a read-only SQL query against an isolated sandbox database | no |
 
-`seed_database` is the only tool that writes anything anywhere. It plans by
-default and applies only when you explicitly tell it to, and it never truncates
-a table unless you ask.
+`seed_database` and `create_sandbox` are the only tools that write files/data. `seed_database` plans by default and applies only when explicitly told to. `create_sandbox` writes to an isolated test SQLite database.
 
 ## Example prompts
 

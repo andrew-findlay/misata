@@ -693,3 +693,28 @@ class TestStatusColumnFallbackChecksItsOwnChoices:
             )
         assert "inactive" in set(tables["drivers"]["status"].unique())
         assert set(tables["vehicles"]["status"].unique()) <= {"in_use", "available", "maintenance"}
+
+    def test_unhandled_claims_are_reported(self):
+        import warnings
+        import misata
+        story = "A B2B SaaS company with 1,500 customers and 6,000 invoices."
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            misata.parse(story, rows=1500)
+        messages = [str(w.message) for w in caught]
+        assert any("could not turn" in m for m in messages)
+
+    def test_declared_order_count_honoured(self):
+        import warnings
+        import misata
+        curve = ("Revenue curve: Jan 120000, Feb 140000, Mar 160000, Apr 180000, "
+                 "May 200000, Jun 220000, Jul 210000, Aug 230000, Sep 250000, "
+                 "Oct 280000, Nov 400000, Dec 320000.")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            data = misata.generate_from_schema(
+                misata.parse(f"An ecommerce store with 1200 customers and 4000 orders in 2026. {curve}", rows=1200)
+            )
+        assert len(data["orders"]) == 4000
+
+

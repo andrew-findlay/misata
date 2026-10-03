@@ -263,3 +263,27 @@ class TestDuplicates:
         a = misata.generate_from_schema(self._cfg())["tickets"]
         b = misata.generate_from_schema(self._cfg())["tickets"]
         pd.testing.assert_frame_equal(a, b)
+
+
+class TestDuplicatesPreserveIdentity:
+    def test_no_child_row_is_orphaned(self):
+        schema = {
+            "customers": {"__rows__": 300,
+                          "id": {"type": "integer", "primary_key": True},
+                          "name": {"type": "text", "semantic": "person_name"},
+                          "email": {"type": "email"}},
+            "orders": {"__rows__": 1000,
+                       "id": {"type": "integer", "primary_key": True},
+                       "customer_id": {"type": "foreign_key",
+                                       "foreign_key": {"table": "customers", "column": "id"}}},
+            "__duplicates__": [{"table": "customers", "count": 10}],
+        }
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            config = misata.from_dict_schema(schema, seed=42)
+            tables = misata.generate_from_schema(config)
+        from misata.compat import verify_integrity
+        report = verify_integrity(tables, config)
+        assert sum(r["orphans"] for r in report.relationships) == 0
+        assert tables["customers"]["id"].nunique() == len(tables["customers"])
+

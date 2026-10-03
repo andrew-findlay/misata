@@ -370,6 +370,24 @@ _TITLE_RULES: Dict[str, List[Rule]] = {
     ],
 }
 
+from misata.vocab_seeds import (
+    AUDIT_REASONS,
+    CHIEF_COMPLAINTS,
+    CHURN_REASONS,
+    CLINICAL_NOTES,
+    CUSTOMER_FEEDBACK,
+    DELIVERY_INSTRUCTIONS,
+    DISCHARGE_INSTRUCTIONS,
+    PRODUCT_DESCRIPTIONS_BY_CATEGORY,
+    RESOLUTION_NOTES,
+    RETURN_REASONS,
+    SECONDARY_UNITS,
+    STREET_NAMES,
+    SYSTEM_ERROR_MESSAGES,
+    TICKET_SUBJECTS,
+    TRANSACTION_MEMOS,
+)
+
 # ---------------------------------------------------------------------------
 # Generic business note grammar — replaces the lorem ipsum fallback
 # ---------------------------------------------------------------------------
@@ -380,10 +398,12 @@ _NOTE_RULES: Dict[str, List[Rule]] = {
         "{actor} {action}; {follow_up}.",
         "{action_cap} {timeframe}. {follow_up_cap}.",
         (0.6, "{actor} {action}."),
+        (0.4, "{status_note}"),
     ],
     "actor": [
         "Customer", "Client", "The team", "Account manager", "Support",
-        "The vendor", "Requester", "Stakeholder",
+        "The vendor", "Requester", "Stakeholder", "Operations lead",
+        "Compliance officer", "Engineering", "QA reviewer", "Billing admin",
     ],
     "action": [
         "requested a follow-up call", "confirmed the updated details",
@@ -392,20 +412,36 @@ _NOTE_RULES: Dict[str, List[Rule]] = {
         "submitted the remaining documents", "requested expedited processing",
         "confirmed receipt of the shipment", "asked for clarification on terms",
         "escalated the open issue", "completed the onboarding steps",
+        "verified credentials against policy", "initiated account security check",
+        "requested contract renewal options", "confirmed delivery timeline",
+        "authorized manual limit override", "signed off on deployment checklist",
     ],
     "action_cap": [
         "Follow-up scheduled", "Documents received and verified",
         "Issue resolved and closed", "Pending review by the billing team",
         "Awaiting confirmation from the client", "Records updated",
+        "Security audit completed", "Manual verification pending",
+        "Account review finalized", "Reconciliation completed",
     ],
     "timeframe": [
         "earlier today", "yesterday afternoon", "last week", "this morning",
         "on the last call", "during onboarding", "after the latest update",
+        "prior to end-of-month close", "during the quarterly audit",
+        "following customer escalation", "in the morning standup",
     ],
     "follow_up": [
         "will follow up next week", "no further action needed",
         "needs review before Friday", "details logged in the account history",
         "second reminder sent", "awaiting response",
+        "ticket marked as resolved", "monitoring performance over 48 hours",
+        "escalation path documented", "notified account executive",
+    ],
+    "status_note": [
+        "All checklist items verified and approved for release.",
+        "Routine monitoring indicates normal system operations.",
+        "Pending final customer sign-off prior to case closure.",
+        "Internal review completed with zero compliance exceptions noted.",
+        "Automated sync completed successfully with zero failed records.",
     ],
 }
 # Sentence-initial variants of follow_up for use after a full stop.
@@ -532,6 +568,131 @@ class MicrotextGenerator:
 
     def comments(self, size: int) -> np.ndarray:
         return np.array([self._comment.expand("comment") for _ in range(size)], dtype=object)
+
+    def ticket_subjects(self, size: int) -> np.ndarray:
+        """Realistic customer support & IT incident ticket subjects."""
+        pool = list(TICKET_SUBJECTS)
+        return np.array([self.rng.choice(pool) for _ in range(size)], dtype=object)
+
+    def ticket_bodies(self, size: int, context: Optional[Dict[str, Sequence]] = None) -> np.ndarray:
+        """Structured, multi-sentence issue descriptions with contextual detail."""
+        _URGENCY = [
+            "This is blocking our workflow and needs immediate escalation.",
+            "Impact is currently moderate; affecting several team members.",
+            "Workaround in place temporarily, but need a permanent fix.",
+            "Please investigate as soon as possible.",
+            "Affecting multiple customer-facing accounts.",
+            "",
+            "",
+        ]
+        _STEPS = [
+            "We attempted clearing cache and re-logging in with no change in behavior.",
+            "The error is reproducible across both desktop Chrome and Safari.",
+            "Observed right after the latest system deployment.",
+            "Checked internal network logs and confirmed request reached the gateway.",
+            "Occurs consistently whenever payload size exceeds 2MB.",
+            "Able to reproduce reliably on staging environment.",
+            "",
+        ]
+        subjects = self._slot_series(context, "subject", size, TICKET_SUBJECTS)
+        results = []
+        for i in range(size):
+            subj = subjects[i]
+            step = self.rng.choice(_STEPS)
+            urg = self.rng.choice(_URGENCY)
+            parts = [subj]
+            if step:
+                parts.append(step)
+            if urg:
+                parts.append(urg)
+            results.append(" ".join(parts))
+        return np.array(results, dtype=object)
+
+    def resolution_notes(self, size: int, context: Optional[Dict[str, Sequence]] = None) -> np.ndarray:
+        """Realistic engineering & support resolution notes."""
+        pool = list(RESOLUTION_NOTES)
+        return np.array([self.rng.choice(pool) for _ in range(size)], dtype=object)
+
+    def transaction_memos(self, size: int) -> np.ndarray:
+        """Realistic bank statement descriptors and transaction memos."""
+        pool = list(TRANSACTION_MEMOS)
+        return np.array([self.rng.choice(pool) for _ in range(size)], dtype=object)
+
+    def error_messages(self, size: int, context: Optional[Dict[str, Sequence]] = None) -> np.ndarray:
+        """Authentic server error messages, exceptions, and system traces."""
+        pool = list(SYSTEM_ERROR_MESSAGES)
+        return np.array([self.rng.choice(pool) for _ in range(size)], dtype=object)
+
+    def clinical_notes(self, size: int, note_type: str = "clinical_notes") -> np.ndarray:
+        """Authentic healthcare and clinical notes."""
+        nt = str(note_type).lower()
+        if "complaint" in nt:
+            pool = list(CHIEF_COMPLAINTS)
+        elif "discharge" in nt or "instruction" in nt:
+            pool = list(DISCHARGE_INSTRUCTIONS)
+        else:
+            pool = list(CLINICAL_NOTES)
+        return np.array([self.rng.choice(pool) for _ in range(size)], dtype=object)
+
+    def delivery_instructions(self, size: int) -> np.ndarray:
+        """Realistic delivery and shipping instructions."""
+        pool = list(DELIVERY_INSTRUCTIONS)
+        return np.array([self.rng.choice(pool) for _ in range(size)], dtype=object)
+
+    def return_reasons(self, size: int) -> np.ndarray:
+        """Realistic e-commerce return / refund reasons."""
+        pool = list(RETURN_REASONS)
+        return np.array([self.rng.choice(pool) for _ in range(size)], dtype=object)
+
+    def churn_reasons(self, size: int) -> np.ndarray:
+        """Realistic SaaS churn and cancellation reasons."""
+        pool = list(CHURN_REASONS)
+        return np.array([self.rng.choice(pool) for _ in range(size)], dtype=object)
+
+    def audit_reasons(self, size: int) -> np.ndarray:
+        """Realistic compliance and audit log reasons."""
+        pool = list(AUDIT_REASONS)
+        return np.array([self.rng.choice(pool) for _ in range(size)], dtype=object)
+
+    def customer_feedback(self, size: int, ratings: Optional[Sequence] = None) -> np.ndarray:
+        """Realistic customer feedback and survey comments."""
+        pool = list(CUSTOMER_FEEDBACK)
+        return np.array([self.rng.choice(pool) for _ in range(size)], dtype=object)
+
+    def product_descriptions(self, size: int, category: Optional[Sequence] = None) -> np.ndarray:
+        """Category-conditioned multi-sentence product descriptions."""
+        if category is None:
+            flat = [desc for descs in PRODUCT_DESCRIPTIONS_BY_CATEGORY.values() for desc in descs]
+            return np.array([self.rng.choice(flat) for _ in range(size)], dtype=object)
+        cats = [str(c).lower().strip() for c in list(category)[:size]]
+        if len(cats) < size:
+            cats += ["generic"] * (size - len(cats))
+        res = []
+        for cat in cats:
+            matched_key = "generic"
+            for k in PRODUCT_DESCRIPTIONS_BY_CATEGORY:
+                if k in cat:
+                    matched_key = k
+                    break
+            pool = PRODUCT_DESCRIPTIONS_BY_CATEGORY.get(matched_key, PRODUCT_DESCRIPTIONS_BY_CATEGORY["generic"])
+            res.append(self.rng.choice(pool))
+        return np.array(res, dtype=object)
+
+    def addresses(self, size: int) -> np.ndarray:
+        """Realistic street addresses with diverse street names and optional secondary units."""
+        numbers = self.rng.integers(100, 9999, size=size)
+        streets = self.rng.choice(STREET_NAMES, size=size)
+        suffixes = self.rng.choice(["St", "Ave", "Blvd", "Way", "Dr", "Ln", "Ct", "Pkwy", "Rd"], size=size)
+        has_secondary = self.rng.random(size) < 0.32
+        secondaries = self.rng.choice(SECONDARY_UNITS, size=size)
+        out = []
+        for n, st, sfx, sec_flag, sec in zip(numbers, streets, suffixes, has_secondary, secondaries):
+            base = f"{n} {st} {sfx}"
+            if sec_flag:
+                base += f", {sec}"
+            out.append(base)
+        return np.array(out, dtype=object)
+
 
 
 # Lexicons for verifying sentiment conformance (used by tests and the Oracle

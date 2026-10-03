@@ -202,3 +202,58 @@ class TestACurveMayRunLongerThanAYear:
         by = df.groupby(pd.to_datetime(df.sold_at).dt.strftime("%Y-%m")).revenue.sum()
         assert round(by["2024-01"], 2) == 50000.0
         assert round(by["2025-12"], 2) == 90000.0
+
+    def test_negative_curve_target_holds(self):
+        import warnings
+        schema = {
+            "t": {
+                "__rows__": 200,
+                "k": {"type": "integer", "primary_key": True},
+                "d": {"type": "datetime", "min_date": "2024-01-01", "max_date": "2024-02-28"},
+                "v": {"type": "float", "min": -50000, "max": 50000},
+            },
+            "__outcome_curves__": [{
+                "table": "t", "column": "v", "time_column": "d", "time_unit": "month",
+                "pattern_type": "custom", "value_mode": "absolute", "start_date": "2024-01-01",
+                "curve_points": [
+                    {"date": "2024-01-01", "value": 5000.0},
+                    {"date": "2024-02-01", "value": -3000.0},
+                ],
+            }],
+        }
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            tables = misata.generate_from_schema(misata.from_dict_schema(schema, seed=1))
+        df = tables["t"]
+        feb = df[df["d"].astype(str).str.startswith("2024-02")]
+        assert len(feb) > 0
+        assert abs(feb["v"].sum() - (-3000.0)) < 0.01
+
+    def test_curve_fitter_normal(self):
+        from misata.curve_fitting import CurveFitter
+        from scipy.stats import norm
+        fitter = CurveFitter()
+        target_dist = norm(loc=100, scale=10)
+        points = [{"x": x, "y": target_dist.pdf(x)} for x in [80, 90, 100, 110, 120]]
+        params = fitter.fit_distribution(points, "normal")
+        assert 99 <= params["mean"] <= 101
+        assert 9 <= params["std"] <= 11
+
+    def test_exact_curve_keeps_rows_inside_bounds(self):
+        curve = [{"period": p, "value": v} for p, v in [
+            ("2026-01", 50_000), ("2026-02", 60_000)]]
+        df = misata.generate_from_schema({
+            "name": "t", "seed": 11,
+            "tables": {"invoices": {"rows": 400, "columns": {
+                "invoice_id": {"type": "int", "unique": True, "min": 1, "max": 8000},
+                "amount": {"type": "float", "min": 50, "max": 1000},
+                "issued_at": {"type": "datetime", "start": "2026-01-01", "end": "2026-02-28"}}}},
+            "outcome_curves": [{
+                "table": "invoices", "column": "amount", "time_column": "issued_at",
+                "time_unit": "month", "pattern_type": "custom",
+                "value_mode": "absolute", "curve_points": curve}]})["invoices"]
+        a = df["amount"]
+        assert int((a < 50).sum()) == 0
+        assert int((a > 1000).sum()) == 0
+
+

@@ -249,3 +249,17 @@ class TestFeasibility:
             warnings.simplefilter("always")
             misata.generate_from_schema(cfg)
         assert any("Temporal eligibility" in str(w.message) for w in caught)
+
+
+def test_plain_date_range_has_no_time_of_day():
+    schema = {
+        "loans": {
+            "__rows__": 100,
+            "loan_id": {"type": "integer", "primary_key": True},
+            "originated_on": {"type": "date", "min_date": "2022-01-01", "max_date": "2025-12-01"},
+        },
+    }
+    tables = misata.generate_from_schema(misata.from_dict_schema(schema, seed=1))
+    dt = pd.to_datetime(tables["loans"]["originated_on"])
+    assert bool((dt.dt.normalize() == dt).all())
+
