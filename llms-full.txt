@@ -99,7 +99,7 @@ Returns how Misata will interpret a plain-English story, which domain it detecte
 Returns all supported built-in industry domains and their default table hierarchies.
 
 ### Tool 12: `check_realism`
-Finds the statistical tells of generated data in a folder of CSVs, without real data to compare against: money spread evenly from min to max, every customer with the same number of orders, balanced categories, flat hour or weekday profiles, timestamps piled at midnight, placeholder values, emails unrelated to names, templated text, no nulls. Returns a 0-1 score and each tell with its evidence. Fix findings in the schema, not the rows.
+Finds the statistical tells of generated data in a folder of CSVs, without real data to compare against: money spread evenly from min to max, every customer with the same number of orders, balanced categories, flat hour or weekday profiles, timestamps piled at midnight, placeholder values, emails unrelated to names, templated or low-vocabulary text, text that ignores its row (review tone vs rating, title vs body), no nulls. Returns a 0-1 score and each tell with its evidence. Fix findings in the schema, not the rows.
 
 ---
 

@@ -63,6 +63,46 @@ def zipf_choice(rng: np.random.Generator, pool: Sequence, size: int, *,
     return arr[order[idx]]
 
 
+_POPULATION: Optional[Dict[str, Dict[str, int]]] = None
+
+
+def city_populations(country: str) -> Dict[str, int]:
+    """GeoNames populations for the cities Misata's own lists name in
+    ``country`` (CC BY 4.0; see DATA-PROVENANCE.md). Empty when unknown."""
+    global _POPULATION
+    if _POPULATION is None:
+        try:
+            import json
+            from importlib.resources import files
+            raw = files("misata").joinpath("data_packs/city_population.json").read_text("utf-8")
+            _POPULATION = json.loads(raw)["populations"]
+        except Exception:
+            _POPULATION = {}
+    return _POPULATION.get(str(country), {})
+
+
+def population_choice(rng: np.random.Generator, pool: Sequence[str], size: int,
+                      country: str) -> np.ndarray:
+    """Cities in proportion to how many people live there.
+
+    Falls back to a Zipf curve over the list order (lists run largest first)
+    when the country has no population data, and gives a city missing from
+    the data half the smallest known population."""
+    pool = list(dict.fromkeys(pool))
+    pops = city_populations(country)
+    known = [pops[c] for c in pool if c in pops]
+    if len(known) < max(3, len(pool) // 2):
+        return zipf_choice(rng, pool, size, s=0.95, q=1.5, ranked=True)
+    floor = min(known) / 2
+    w = np.array([float(pops.get(c, floor)) for c in pool])
+    # Sub-linear: online customers concentrate in big cities less than
+    # residents do (suburbs, smaller towns), so weight by population^0.8.
+    w = w ** 0.8
+    arr = np.empty(len(pool), dtype=object)
+    arr[:] = pool
+    return arr[rng.choice(len(pool), size=size, p=w / w.sum())]
+
+
 _SLOT = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)(?::(\d+)-(\d+))?\}")
 
 

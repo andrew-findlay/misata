@@ -37,13 +37,41 @@ misata realism ./seed_data/ --skip too_clean --json
 | `email_domains` | consumer email columns | providers evenly shared | warn |
 | `name_email` | tables with an email and a name | email local part unrelated to the name: < 20% fail, < 50% warn | fail / warn |
 | `value_diversity` | name, product, company and title columns | fewer than 20% distinct values | warn |
-| `text_templates` | free text averaging 40+ characters | > 10% share one three-word opening, or > 20% exact duplicates | warn |
+| `text_templates` | free-text columns, 200+ rows | > 20% exact duplicates; > 50% open with one of ten three-word openings; for texts of 8+ words, > 35% repeat another's sentence skeleton, or > 5% are near-copies | warn |
+| `text_diversity` | free-text columns, 200+ rows | gzip ratio > 4; < 40% of word trigrams distinct; length CV < 0.15 (8+ words); Zipf slope flatter than -0.5 (10+ words) | warn |
+| `text_context` | a rating with review text, or a title with a body | review tone uncorrelated with the rating (Spearman < 0.1); body shares no more words with its own title than with a random row's (< 1.5x) | warn |
 | `too_clean` | tables with 5+ non-key columns | not a single null | warn |
 
 Each check runs only when the table is big enough for the statistic to mean
 something, so a five-row fixture gets a short report. Every finding carries
 its evidence (`report.to_dict()`): the Gini, the chi-square p-value, the hour
 histogram, the examples that matched.
+
+### The free-text checks
+
+"Free text" means prose columns: names such as `description`, `review_text`,
+`subject`, `notes`, `bio`, or any text column whose values have a median of
+five words or more. Emails, addresses, names, companies, codes and log or
+error columns are left out; real system logs are legitimately templated.
+
+The thresholds come from a local calibration on seven real English corpora
+(product and hotel reviews, news, tweets, forum posts and titles), 2,000 rows
+each. Every real corpus compressed under 3x, had over 70% distinct word
+trigrams, under 16% repeated skeletons, under 0.2% near-copies, a length CV
+over 0.29 and a top-10 opener share under 0.28. Template text sits 5x to 50x
+outside those bands, and each threshold sits well inside that gap.
+
+A *skeleton* is the text with numbers masked to `#`, emails to `@E` and
+every word that is not a stopword to `W`. "The kettle arrived on time" and
+"The lamp arrived on time" share one; people almost never write the same
+skeleton twice at sentence length, while slot-filling templates do on every
+row.
+
+These checks are strict, and they flag Misata's own grammar prose on
+`text_diversity`: it does not repeat itself, but its vocabulary is far
+smaller than people's (see [LIMITATIONS](https://github.com/rasinmuhammed/misata/blob/main/LIMITATIONS.md)).
+Skip `text_diversity` when the vocabulary does not matter to you, for example
+in UI fixtures.
 
 ## What a clean report means
 

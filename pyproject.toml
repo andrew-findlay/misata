@@ -185,7 +185,7 @@ include = ["misata*"]
 exclude = ["web*", "tests*"]
 
 [tool.setuptools.package-data]
-misata = ["py.typed", "_schemas/*.json", "capsules_registry/*.json"]
+misata = ["py.typed", "_schemas/*.json", "capsules_registry/*.json", "data_packs/*.json", "data_packs/*.toml"]
 
 [tool.black]
 line-length = 100

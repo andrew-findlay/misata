@@ -1577,8 +1577,10 @@ def check_realism(dataset_dir: str, skip: Optional[List[str]] = None) -> Dict[st
     orders, perfectly balanced categories, flat weekday or hour-of-day
     profiles, timestamps piled up at midnight, placeholder values
     (@example.com, John Doe), emails unrelated to names, small name pools,
-    templated free text, tables with no nulls at all. Works on data from any
-    generator, including a script you wrote.
+    templated or repetitive free text, prose with a tiny vocabulary, review
+    text whose tone ignores its rating, descriptions unrelated to their
+    titles, tables with no nulls at all. Works on data from any generator,
+    including a script you wrote.
 
     Fix a finding in the schema, not the rows: lognormal for money, a curve or
     weights for time, ``sampling`` on foreign keys, ``null_rate`` or

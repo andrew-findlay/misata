@@ -811,14 +811,14 @@ class RealisticTextGenerator:
             # the 50-city US geography map (the same one the address, state and
             # zip repairs read), other locales their pack's top cities.
             try:
-                from misata.scenarios import zipf_choice
+                from misata.scenarios import population_choice
                 if self.locale == "en_US":
                     from misata.vocab_seeds import US_CITY_GEO
-                    return zipf_choice(self.rng, list(US_CITY_GEO), size, s=0.95, q=1.5, ranked=True)
+                    return population_choice(self.rng, list(US_CITY_GEO), size, "United States")
                 from misata.locales.registry import LocaleRegistry
                 pack = LocaleRegistry.global_instance().get_pack(self.locale)
                 if pack.top_cities:
-                    return zipf_choice(self.rng, pack.top_cities, size, s=0.95, q=1.5, ranked=True)
+                    return population_choice(self.rng, pack.top_cities, size, pack.country_name)
             except Exception:
                 pass
             if faker:
@@ -1798,8 +1798,8 @@ class RealisticTextGenerator:
             return lines
         if countries is None:
             from misata.vocab_seeds import US_CITY_GEO
-            from misata.scenarios import zipf_choice
-            cs = zipf_choice(self.rng, list(US_CITY_GEO), size, s=0.95, q=1.5, ranked=True)
+            from misata.scenarios import population_choice
+            cs = population_choice(self.rng, list(US_CITY_GEO), size, "United States")
             out = []
             for line, c in zip(lines, cs):
                 _state, code, z3 = US_CITY_GEO[c]
@@ -2207,13 +2207,14 @@ def _fix_time_chains(df: pd.DataFrame, columns: set, rng: np.random.Generator) -
 def _cities_for_countries(rng: np.random.Generator, countries) -> np.ndarray:
     """A city for each row's country, population-weighted within the country
     (the per-country lists run largest first). Unknown countries get US cities."""
-    from misata.scenarios import zipf_choice
+    from misata.scenarios import population_choice
     countries = np.asarray([str(c) for c in countries], dtype=object)
     out = np.empty(len(countries), dtype=object)
     for c in sorted(set(countries)):
         idx = np.flatnonzero(countries == c)
+        known = c in COUNTRY_CITIES
         pool = COUNTRY_CITIES.get(c, COUNTRY_CITIES["United States"])
-        out[idx] = zipf_choice(rng, pool, len(idx), s=0.95, q=1.5, ranked=True)
+        out[idx] = population_choice(rng, pool, len(idx), c if known else "United States")
     return out
 
 

@@ -21,10 +21,23 @@ bug worth reporting.
 - **Priors are US-flavoured where currency or culture matters.** Salary shapes
   center on US dollar magnitudes, price endings follow US retail conventions.
   Locale packs adjust names, phones, and formats, not economic distributions.
-- **Free text is grammar-generated, not written.** Review text agrees with its
-  rating and notes read like business notes, but long-form prose has template
-  rhythm a careful reader can spot. This is a deliberate trade (deterministic,
-  seedable, no LLM in the data path), not an oversight.
+- **Free text is grammar-generated, not written.** It agrees with its row:
+  reviews follow their rating and name their product, ticket subjects,
+  descriptions and resolutions describe one issue, descriptions describe the
+  product named. It does not repeat itself: Misata's prose passes the
+  exact-duplicate, skeleton and near-copy checks. Its vocabulary is still far
+  smaller than people's, and `realism_report` says so: on 2,000 rows, review
+  and ticket text compresses 9-14x under gzip and 13-18% of its word trigrams
+  are distinct, where real text compresses under 3x with over 70% distinct.
+  A reader skimming a few rows will not notice; a classifier trained on word
+  n-grams would. Closing that gap needs much larger phrase banks or a
+  language model in the data path; Misata keeps generation deterministic,
+  seedable and offline instead.
+- **Notes, feedback, error messages and clinical text use smaller pools.**
+  Products, tickets, reviews and bios render from row-level scenarios; the
+  remaining free-text kinds (business notes, survey feedback, error
+  messages, memos, clinical notes, delivery and return reasons) are still
+  drawn from smaller grammars or lists and do not condition on their row.
 - **Fictional entities are the point, not a bug.** Company names, people, and
   products do not exist. Anything needing real-world facts in the values
   (actual ticker prices, real addresses) is out of scope by design.

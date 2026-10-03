@@ -15,8 +15,14 @@ constraints, and gains the two things that most often sent people back to
 hand-written scripts: a process layer for event logs, and first-class custom
 generators. Highlights:
 
-- `misata.realism_report` / `misata realism` / MCP `check_realism`: twelve
-  statistical tells of generated data, checked without real data.
+- `misata.realism_report` / `misata realism` / MCP `check_realism`: fourteen
+  statistical tells of generated data, checked without real data, including
+  free-text checks calibrated on real reviews, news and forum text.
+- Text that agrees with its row: a product's name, description, brand and
+  price follow its category; a ticket's subject, description and resolution
+  describe one issue and follow its category, priority and status; reviews
+  name the product they review; bios and addresses use the row's own job,
+  city and country.
 - Realistic defaults: popularity-weighted foreign keys, daily and weekly
   rhythm on timestamps, amounts equal to price times quantity, varied product
   catalogs, seasonal peaks where declared.
@@ -39,7 +45,13 @@ generators. Highlights:
 
 Generated rows differ from 0.9.6.x for the same seed: foreign-key fan-out,
 timestamp shaping, the causality shift, product names, email providers,
-order amounts and seasonal phase all changed. Declared outcomes, identities
+order amounts and seasonal phase all changed. So does most default text:
+product names and descriptions, brands, ticket subjects, descriptions and
+resolution notes (now empty while a ticket is open), review titles, bios,
+addresses, company names, job titles, and the cities and countries drawn when
+none are declared (now weighted by population). Prose columns are generated
+after the columns they describe, which changes their values but not the
+output column order. Declared outcomes, identities
 and integrity hold as before. Pin `misata==0.9.6.60` to keep old bytes.
 
 ### Breaking
@@ -56,16 +68,89 @@ and integrity hold as before. Pin `misata==0.9.6.60` to keep old bytes.
 - `poisson` and `binomial` on a float column raise (they were uniform).
 
 
+### Text realism: one story per row
+
+Text columns used to be filled one at a time from small flat pools, so a row's
+columns described different things: a linen dress "lightweight and portable
+with a modern aesthetic", a ticket about a double charge whose resolution
+reset a password. A product table's description column held eight distinct
+sentences; ticket subjects were full sentences drawn from 120; brands were
+business-note prose. Measured on a 6,500-row customers, products, reviews and
+tickets schema:
+
+| Column | 0.9.6.x | 0.9.7 |
+|---|---|---|
+| products.description | 8 distinct of 500, shares a word with the name in 1% | 499 distinct, 99% |
+| products.category (declared, six values) | Toys rewritten down to 3% | kept as declared |
+| products.brand | note sentences | 48 brands, concentrated |
+| support_tickets.subject | 120 full sentences, 89 chars | short lines, 23 chars |
+| ticket subject matches its description | 7% (chance) | same issue by construction |
+| resolution_notes on open tickets | 100% filled | empty |
+| customers.company_name | 28 names, 3.8% "Acme Retail" | 941 distinct |
+| customers.job_title | 22 titles, even shares | 200, skewed |
+| reviews that name their product | 0% | about 45% |
+
+- **Scenarios** (`misata/scenarios.py`). One latent product or support issue
+  is drawn per row and every column renders it. Products come from nineteen
+  families (electronics through baby and tools), each with nouns, attributes,
+  materials, features, uses and care or spec lines tagged to the nouns they
+  fit, so a vacuum never gets "a soft-touch weave". Tickets come from
+  twenty-nine issues across billing, shipping, returns, technical, account
+  and product questions, each with subjects, symptoms, details and paired
+  causes and fixes. The declared category picks the family, the declared
+  priority leans the draw toward severe issues, and the status decides
+  whether there is a resolution. None of those columns are changed.
+- **Declared vocabulary wins, built-in defaults lose.** Capsule vocabulary
+  tagged `misata-defaults` is now a last resort everywhere, not data: it had
+  let eight generic sentences outrank the category-aware grammar.
+- **Prose after the columns it describes.** Review text, ticket text,
+  descriptions, bios, notes and addresses are generated after ratings,
+  categories, statuses and geography, whatever order the schema lists them
+  in. Output column order is unchanged.
+- **Parent attributes through foreign keys.** A review of `product_id` 42
+  names product 42's type; a ticket can name the customer's product.
+- **Prices follow category** when they were drawn independently of it:
+  existing prices are reassigned between rows, so a declared range or shape
+  holds exactly. Capsule price bands and declared correlations are left alone.
+- **Labels are skewed.** City, country, job title, employer and brand draws
+  follow Zipf curves or real population, not even shares. City weights use
+  GeoNames populations (CC BY 4.0, `misata/data_packs/`, see
+  DATA-PROVENANCE.md). Company names come from the composing lexicon, and
+  the pop-culture placeholders (Acme, Globex, Initech) are gone.
+- **Routing fixes.** `brand`/`manufacturer` get brands; `review_title` gets
+  review titles and a listing's, post's or course's `title` is no longer a
+  job title; a ticket's `subject`/`title` is a subject line and its
+  `description`/`body` a ticket body.
+- **Speed.** Grammar expansion draws one uniform per node instead of calling
+  `rng.choice`, and review text is no longer generated twice. A 130,000-row
+  products, reviews and tickets schema generates in 6.9 s (15.9 s before).
+
+New free-text tells in `realism_report`:
+
+- `text_templates` now also catches repeated sentence skeletons (the same
+  sentence with the nouns swapped) and near-copies (MinHash, Jaccard ≥ 0.8),
+  and uses the top-10 opener share.
+- `text_diversity`: compressibility (gzip ratio), distinct word trigrams,
+  length spread and the word-frequency curve (flat means word salad).
+- `text_context`: review tone against the rating (Spearman), and whether a
+  description shares more words with its own title than with a random row's.
+
+Thresholds come from a local calibration on seven real English corpora at
+2,000 rows each, and sit well outside every one of them. They are strict on
+purpose: Misata's own grammar prose passes the repetition and context checks
+but not `text_diversity`, because its vocabulary is still far smaller than
+people's (see LIMITATIONS.md).
+
 ### Realism report: the statistical tells of generated data
 
 `misata.realism_report(tables)` and `misata realism DIR` scan any tables,
-whoever generated them, for twelve shapes real data almost never has:
+whoever generated them, for fourteen shapes real data almost never has:
 uniform money, Benford violations in transaction totals, even FK fan-out
 (every customer with about five orders), perfectly balanced categories, flat
 weekday and hour profiles, timestamps piled up at midnight, placeholder
 values, evenly shared email providers, emails unrelated to names, tiny name
-pools, templated free text, and tables with no nulls at all. No real data is
-needed. Each finding carries its evidence and a pass/warn/fail status; the
+pools, templated free text, prose with a tiny vocabulary, text that ignores
+its own row, and tables with no nulls at all. No real data is needed. Each finding carries its evidence and a pass/warn/fail status; the
 CLI exits nonzero on failures (or on warnings with `--strict`), so it can
 gate seed data in CI.
 

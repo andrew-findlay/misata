@@ -52,7 +52,7 @@ and `query_sandbox` (an isolated SQLite database to test SQL against),
 - [Seeding a database](https://raw.githubusercontent.com/rasinmuhammed/misata/main/docs/guides/database-seeding-python.md): fill an existing schema
 - [From DDL](https://raw.githubusercontent.com/rasinmuhammed/misata/main/docs/guides/from-ddl.md): CHECK, UNIQUE and widths carried into generation
 - [MCP server](https://raw.githubusercontent.com/rasinmuhammed/misata/main/docs/guides/mcp.md): tools for Claude, Cursor and other agents
-- [Realism report](https://raw.githubusercontent.com/rasinmuhammed/misata/main/docs/realism.md): the twelve tells of generated data
+- [Realism report](https://raw.githubusercontent.com/rasinmuhammed/misata/main/docs/realism.md): the fourteen tells of generated data, free text included
 - [Limitations](https://raw.githubusercontent.com/rasinmuhammed/misata/main/LIMITATIONS.md): where Misata is expected to fail; this page wins over any other
 
 ## Optional
