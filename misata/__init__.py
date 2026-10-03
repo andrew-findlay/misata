@@ -287,8 +287,13 @@ def generate_from_schema(
     capsule: "Optional[str]" = None,
     verify: bool = False,
     strict: bool = True,
+    preset: "Optional[str]" = None,
 ) -> "Dict[str, Any]":
     """Generate data from an already-built SchemaConfig.
+
+    ``preset`` names the use case (``demo``, ``test``, ``load``, ``ml``,
+    ``eval``) and fills in the realism defaults it needs; see
+    :mod:`misata.presets`.
 
     Args:
         schema:            A SchemaConfig (from ``misata.parse()``, an LLM generator,
@@ -329,6 +334,10 @@ def generate_from_schema(
     if isinstance(schema, dict):
         from misata.compat import from_dict_schema
         schema = from_dict_schema(schema)
+
+    if preset is not None or getattr(schema, "preset", None):
+        from misata.presets import apply_preset
+        schema = apply_preset(schema, preset or schema.preset)
 
     # Refuse contradictory declarations before generating anything. A
     # declarative engine owes the user a compiler error here, not a warning
@@ -688,7 +697,7 @@ from misata.exceptions import (
     ConfigurationError,
     ExportError,
 )
-from misata.export import to_parquet, to_duckdb, to_jsonl, to_sql, to_arrow, to_seed_sql
+from misata.export import to_parquet, to_duckdb, to_jsonl, to_sql, to_arrow, to_seed_sql, to_polars, decode_json_columns
 from misata.compat import from_dict_schema, verify_integrity, IntegrityReport
 from misata.validator import validate as validate_domain, ValidationReport
 from misata.smart_values import SmartValueGenerator
@@ -770,6 +779,8 @@ from misata.fidelity import fidelity_report, FidelityReport, privacy_report, Pri
 from misata.tells import realism_report, RealismReport
 from misata.plugins import generator, register_generator, GenContext
 from misata.process import simulate_process, process_audit, to_xes
+from misata.django_import import from_django
+from misata.presets import apply_preset, PRESETS
 from misata.schema import Process
 from misata.ddl import from_ddl
 from misata import spark as spark  # noqa: PLC0414 — re-export the submodule
@@ -798,6 +809,9 @@ __all__ = [
     "simulate_process",
     "process_audit",
     "to_xes",
+    "from_django",
+    "apply_preset",
+    "PRESETS",
     "from_dict_schema",
     "verify_integrity",
     "IntegrityReport",
@@ -947,6 +961,8 @@ __all__ = [
     "to_parquet",
     "to_duckdb",
     "to_jsonl",
+    "to_polars",
+    "decode_json_columns",
     # Spark / Delta Lake
     "spark",
     # DB seeding

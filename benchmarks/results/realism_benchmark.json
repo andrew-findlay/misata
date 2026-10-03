@@ -1,6 +1,6 @@
 {
   "seed": 7,
-  "misata_version": "0.9.6.60",
+  "misata_version": "0.9.7",
   "datasets": {
     "olist": {
       "description": "Olist Brazilian e-commerce, real orders 2016-2018",
@@ -26,18 +26,18 @@
           "category_gap": null,
           "detect_auc": 0.7747984874999999,
           "tells": 0.9375,
-          "seconds": 6.2
+          "seconds": 5.7
         },
         "misata_schema": {
           "amount_ks": 0.050866666666666664,
           "hour_tvd": 0.1453666666666667,
           "weekday_tvd": 0.04783333333333333,
-          "customer_gini": 0.38706226379742636,
+          "customer_gini": 0.25618375970010726,
           "product_gini": 0.027613898627335598,
           "category_gap": 0.4808765311655241,
           "detect_auc": 0.737632,
           "tells": 1.0,
-          "seconds": 2.5
+          "seconds": 2.6
         },
         "faker_script": {
           "amount_ks": 0.19069999999999998,
@@ -48,7 +48,7 @@
           "category_gap": 0.4997318365641834,
           "detect_auc": 0.79398836875,
           "tells": 0.3333333333333333,
-          "seconds": 4.2
+          "seconds": 4.5
         },
         "misata_mimic": {
           "amount_ks": 0.024133333333333333,
@@ -59,7 +59,7 @@
           "category_gap": 0.0013054887252070824,
           "detect_auc": 0.5413135666666667,
           "tells": 1.0,
-          "seconds": 1.0
+          "seconds": 0.9
         },
         "sdv_copula": {
           "amount_ks": 0.0724,
@@ -70,7 +70,7 @@
           "category_gap": 0.0027767816331989437,
           "detect_auc": 0.7090467111111111,
           "tells": 0.75,
-          "seconds": 2.9
+          "seconds": 5.3
         }
       }
     },
@@ -98,18 +98,18 @@
           "category_gap": null,
           "detect_auc": 0.8866347210163701,
           "tells": 1.0,
-          "seconds": 1.9
+          "seconds": 1.8
         },
         "misata_schema": {
           "amount_ks": 0.2507434653310377,
-          "hour_tvd": 0.23853498200031303,
-          "weekday_tvd": 0.07043355767725781,
+          "hour_tvd": 0.08170292690561903,
+          "weekday_tvd": 0.03020817029269058,
           "customer_gini": null,
           "product_gini": null,
           "category_gap": 0.1296301827349523,
-          "detect_auc": 0.9163041363074402,
-          "tells": 0.8333333333333334,
-          "seconds": 1.8
+          "detect_auc": 0.9111258738985926,
+          "tells": 0.6666666666666666,
+          "seconds": 1.3
         },
         "faker_script": {
           "amount_ks": 0.21709187666301455,
@@ -120,7 +120,7 @@
           "category_gap": 0.13953977177665233,
           "detect_auc": 0.8858676994952669,
           "tells": 0.4,
-          "seconds": 2.3
+          "seconds": 2.0
         },
         "misata_mimic": {
           "amount_ks": 0.025039123630672927,
@@ -131,7 +131,7 @@
           "category_gap": 0.009100503778195268,
           "detect_auc": 0.6633369334420713,
           "tells": 1.0,
-          "seconds": 1.5
+          "seconds": 1.4
         },
         "sdv_copula": {
           "amount_ks": 0.1352112676056338,
@@ -142,7 +142,7 @@
           "category_gap": 0.00339271999574442,
           "detect_auc": 0.8282192196825535,
           "tells": 0.6666666666666666,
-          "seconds": 2.7
+          "seconds": 2.8
         }
       }
     }

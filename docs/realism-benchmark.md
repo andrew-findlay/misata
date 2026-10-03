@@ -37,7 +37,7 @@ a blind generator is not punished for not knowing the currency:
 
 ## Results
 
-Misata 0.9.6.60, seed 7. Reproduce with
+Misata 0.9.7, seed 7. Reproduce with
 `python -m benchmarks.realism_bench --cache .bench_cache`.
 
 ### Olist (30,000 orders)
@@ -47,7 +47,7 @@ Misata 0.9.6.60, seed 7. Reproduce with
 | Amount shape (KS) | 0.008 | 0.169 | 0.051 | 0.191 | 0.024 | 0.072 |
 | Hour profile (TVD) | 0.018 | 0.149 | 0.145 | 0.289 | 0.017 | 0.286 |
 | Weekday profile (TVD) | 0.010 | 0.046 | 0.048 | 0.054 | 0.009 | 0.057 |
-| Customer fan-out (ΔGini) | 0.001 | n/a | 0.387 | 0.237 | n/a | n/a |
+| Customer fan-out (ΔGini) | 0.001 | n/a | 0.256 | 0.237 | n/a | n/a |
 | Product fan-out (ΔGini) | 0.003 | 0.440 | 0.028 | 0.149 | n/a | n/a |
 | Category balance (Δ) | 0.003 | n/a | 0.481 | 0.500 | 0.001 | 0.003 |
 | Detection AUC | 0.498 | 0.775 | 0.738 | 0.794 | 0.541 | 0.709 |
@@ -58,45 +58,68 @@ Misata 0.9.6.60, seed 7. Reproduce with
 | Metric | `real_train` | `misata_story` | `misata_schema` | `faker_script` | `misata_mimic` | `sdv_copula` |
 |---|---|---|---|---|---|---|
 | Amount shape (KS) | 0.015 | 0.225 | 0.251 | 0.217 | 0.025 | 0.135 |
-| Hour profile (TVD) | 0.039 | 0.237 | 0.239 | 0.193 | 0.060 | 0.189 |
-| Weekday profile (TVD) | 0.026 | 0.074 | 0.070 | 0.033 | 0.054 | 0.049 |
+| Hour profile (TVD) | 0.039 | 0.237 | 0.082 | 0.193 | 0.060 | 0.189 |
+| Weekday profile (TVD) | 0.026 | 0.074 | 0.030 | 0.033 | 0.054 | 0.049 |
 | Category balance (Δ) | 0.003 | n/a | 0.130 | 0.140 | 0.009 | 0.003 |
-| Detection AUC | 0.504 | 0.887 | 0.916 | 0.886 | 0.663 | 0.828 |
-| Tells score ↑ | 1.000 | 1.000 | 0.833 | 0.400 | 1.000 | 0.667 |
+| Detection AUC | 0.504 | 0.887 | 0.911 | 0.886 | 0.663 | 0.828 |
+| Tells score ↑ | 1.000 | 1.000 | 0.667 | 0.400 | 1.000 | 0.667 |
 
 ## What it says
 
 **On e-commerce, blind Misata beats the script and approaches a model fitted
-to the data.** With nothing but table and column names, `misata_schema`
+to the data.** With table and column names and the domain, `misata_schema`
 reaches a detection AUC of 0.74 against SDV's 0.71 (SDV saw 15,000 real
-orders), gets the shape of order amounts closer than SDV does (0.05 vs 0.07),
-and matches real product popularity almost exactly (ΔGini 0.03), which the
-uniform script misses by five times as much.
+orders), gets the shape of order amounts closer than SDV (0.05 vs 0.07), and
+matches real product popularity almost exactly (ΔGini 0.03), which the
+uniform script misses by five times as much. One qualification: the
+e-commerce amount prior was set from Olist's public data when Misata's priors
+were built, so the amount row is not a blind result. Hours, weekdays and
+fan-out are.
 
-**On taxis, it does not.** Misata's default daily rhythm is daytime-weighted,
-which suits orders and signups but not taxi demand, which runs into the
-night; its default amount prior is wider than taxi fares. The plain script,
-with uniform hours, lands closer on both. These defaults were not tuned to
-this benchmark, deliberately: tuning them to the test set would make the
-numbers meaningless. A user who knows taxi traffic peaks at night can say so
-(`hour_weights` on the column); the default does not know it.
+**On taxis, the hour rhythm is now right; fares are not.** Declaring the
+domain as `transport` gives the night-heavy demand curve ride data has (hour
+TVD 0.08, better than SDV fitted on the data at 0.19). Fares are still drawn
+from a generic money shape that is wider than taxi totals, so the classifier
+still separates Misata from real trips more easily than it separates the
+script (AUC 0.91 vs 0.89). That is the remaining miss here, and it is left
+in rather than fixed with a taxi-specific fare prior fitted to the same
+public data.
 
-**Customer fan-out is a real miss.** In this Olist sample nearly every
-buyer buys once (30,000 orders from 29,651 customers). Misata's default popularity weighting assumes repeat buyers
-(Gini about 0.55 when there are several orders per customer), so at roughly
-one order per customer it still produces too many repeat customers.
+**Customer fan-out is better, not solved.** In this Olist sample nearly every
+buyer buys once (30,000 orders from 29,651 customers). Declaring the domain
+as `marketplace` makes person-like parents (customers, buyers, guests) mildly
+weighted while products stay concentrated, which cut the gap from 0.39 to
+0.26. Declaring `min_children: 1` on the relationship, which says what this
+sample says (every customer in it has ordered), closes it: ΔGini 0.000. That
+declaration did not work before 0.9.7 for child tables larger than one
+10,000-row batch; it now counts coverage across batches.
 
-**`mimic` is now the strongest fitted generator here.** It beats SDV on
-every metric except weekday profile and category balance on taxis, and is
-close to indistinguishable on Olist (AUC 0.54). That required a fix this benchmark found: `mimic` used to
-profile timestamps as calendar dates, so every mimicked order landed at
-midnight (AUC 1.0). It now keeps the time of day and learns the hour and
-weekday shares.
+**`mimic` is the strongest fitted generator here.** It beats SDV on every
+metric except weekday profile and category balance on taxis, and is close to
+indistinguishable on Olist (AUC 0.54).
 
 **The tells check calibrates on real data.** Both real datasets score 1.0 on
-`realism_report`. That too required a fix the benchmark found: the fan-out
-check flagged Olist's real orders as fake, because with about one order per
-customer the counts are necessarily even.
+`realism_report`.
+
+## Changes between runs, and why
+
+The first published run (0.9.6.60 defaults) found five problems, and the
+fixes are in 0.9.7. To keep the benchmark honest about what it tests:
+
+- **Bugs, fixed generally:** `mimic` dropped the time of day; story `*_at`
+  columns were dates; the fan-out tell flagged real data; product names were
+  not reproducible across processes. None of these fixes look at the
+  benchmark data.
+- **Domain knowledge added after the benchmark exposed its absence:** a
+  night-heavy hour curve for `transport`/`taxi`/`mobility`/`nightlife`
+  domains, and mild person fan-out for `marketplace`/`travel`/`realestate`.
+  These are general facts about those businesses, not parameters fitted to
+  these samples, but they were added because these samples showed they were
+  missing. Treat the taxi hour row and the Olist customer row as validation
+  of a fix, not as a blind first measurement.
+- **The Olist blind schema now declares `marketplace`** (it declared
+  `ecommerce` before), because that is what Olist is. With the same
+  declaration as before, every number but customer fan-out is unchanged.
 
 ## Caveats
 

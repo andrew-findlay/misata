@@ -395,6 +395,13 @@ def init(db: Optional[str], story: Optional[str], output: str,
     default=None,
     help="Capsule JSON whose vocabularies override built-in pools (see `misata capsule`).",
 )
+@click.option(
+    "--preset",
+    type=click.Choice(["demo", "test", "load", "ml", "eval"]),
+    default=None,
+    help="Use-case defaults: demo (current dates, clean), test (small, fixed seed), "
+         "load (x10 rows), ml (declared dirt), eval (current dates, modest dirt).",
+)
 def generate(
     story: Optional[str],
     config: Optional[str],
@@ -416,6 +423,7 @@ def generate(
     locale: Optional[str],
     oracle: bool,
     capsule: Optional[str],
+    preset: Optional[str] = None,
 ) -> None:
     """
     Generate synthetic data from a story or configuration file.
@@ -557,6 +565,10 @@ def generate(
     # Set seed if provided
     if seed is not None:
         schema_config.seed = seed
+
+    if preset:
+        object.__setattr__(schema_config, "preset", preset)
+        console.print(f"Preset: [cyan]{preset}[/cyan]")
 
     # Attach capsule file: its vocabularies beat built-in pools
     if capsule:

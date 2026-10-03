@@ -26,7 +26,6 @@ try:
 except ImportError:
     _anthropic_sdk = None
 
-from misata.curve_fitting import CurveFitter
 from misata.feedback import FeedbackDatabase
 from misata.param_check import repair_distribution_params
 from misata.schema import Column, OutcomeCurve, RateCurve, Relationship, ScenarioEvent, SchemaConfig, Table
@@ -1650,6 +1649,7 @@ Include reference tables with inline_data for lookup values and transactional ta
             try:
                 points = normalized.pop("control_points")
                 dist_type = normalized.get("distribution", "normal")
+                from misata.curve_fitting import CurveFitter
                 fitter = CurveFitter()
                 fitted_params = fitter.fit_distribution(points, dist_type)
                 normalized.update(fitted_params)

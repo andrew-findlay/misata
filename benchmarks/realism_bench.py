@@ -216,7 +216,7 @@ def _blind_schema(ds: Dataset, n: int, seed: int) -> SchemaConfig:
                 Column(name="payment", type="categorical",
                        distribution_params={"choices": ds.categories}),
             ]})
-    return SchemaConfig(name="olist", seed=seed, domain="ecommerce",
+    return SchemaConfig(name="olist", seed=seed, domain="marketplace",
         tables=[Table(name="customers", row_count=ds.n_customers),
                 Table(name="products", row_count=ds.n_products),
                 Table(name="orders", row_count=n)],

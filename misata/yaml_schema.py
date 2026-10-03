@@ -644,6 +644,7 @@ def load_yaml_schema(
         dag_edges=_declared["dag_edges"],
         closures=_declared["closures"],
         processes=_declared["processes"],
+        preset=raw.get("preset"),
         noise_config=noise_config,
         vocabularies=vocabularies,
         realism=realism,

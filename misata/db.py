@@ -597,6 +597,9 @@ def _map_type(col_type: str, dialect: str) -> str:
         return "DOUBLE PRECISION" if dialect == "postgres" else "REAL"
     if col_type in ("text", "categorical"):
         return "TEXT"
+    if col_type in ("json", "array"):
+        # Values are canonical JSON text, which both accept.
+        return "JSONB" if dialect == "postgres" else "TEXT"
     if col_type == "boolean":
         return "BOOLEAN" if dialect == "postgres" else "INTEGER"
     if col_type == "date":

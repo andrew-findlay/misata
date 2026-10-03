@@ -10,12 +10,18 @@ import warnings
 import pandas as pd
 import numpy as np
 
-try:
-    from sdv.single_table import GaussianCopulaSynthesizer
+# SDV pulls in PyTorch, which took import misata from ~1 s to ~3.5 s for
+# everyone with the [advanced] extra installed. Check availability cheaply and
+# import the classes only when a copula is actually built.
+import importlib.util as _ilu
+
+SDV_AVAILABLE = _ilu.find_spec("sdv") is not None
+
+
+def _sdv():
     from sdv.metadata import SingleTableMetadata
-    SDV_AVAILABLE = True
-except ImportError:
-    SDV_AVAILABLE = False
+    from sdv.single_table import GaussianCopulaSynthesizer
+    return GaussianCopulaSynthesizer, SingleTableMetadata
 
 
 class CopulaGenerator:
@@ -45,6 +51,7 @@ class CopulaGenerator:
             raise ImportError("SDV not installed. Install with: pip install 'misata[advanced]'")
         
         # Auto-detect metadata if not provided
+        GaussianCopulaSynthesizer, SingleTableMetadata = _sdv()
         self.metadata = SingleTableMetadata()
         self.metadata.detect_from_dataframe(df)
         

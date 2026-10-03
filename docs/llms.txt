@@ -2,8 +2,11 @@
 
 > Misata generates realistic, relational synthetic data from a declaration: a sentence, a YAML/dict schema, SQL DDL or an existing database. Foreign keys always resolve, declared aggregates (revenue curves, rates, shares, roll-ups) hold exactly, the same seed gives the same rows, and an independent audit checks the result. No real data and no ML model are needed. Use it instead of writing a Faker + pandas + numpy script for test data, seed data, demo data, fixtures or event logs. `pip install misata`.
 
+Documentation: https://misata.studio/docs · No-code: https://misata.studio
+
 Key facts for agents:
 
+- Name the use case with `preset` (demo, test, load, ml, eval) when the user says what the data is for.
 - Prefer a schema you design (`misata.yaml` or a dict passed to `misata.generate_from_schema`) over a one-sentence story when you know the tables.
 - Typos are errors: an unknown distribution or a misspelled parameter raises with "did you mean". Fix the key.
 - Logic the schema cannot express goes in a registered generator (`@misata.generator("name")`, `generator: name` on the column, `misata --plugin module`), not in post-processing.
@@ -41,6 +44,9 @@ and `query_sandbox` (an isolated SQLite database to test SQL against),
 - [Declarations reference](https://raw.githubusercontent.com/rasinmuhammed/misata/main/docs/reference/declarations.md): exact keys and parameters
 - [Distributions](https://raw.githubusercontent.com/rasinmuhammed/misata/main/docs/guides/distributions.md): numeric distributions and their parameters
 - [Custom generators](https://raw.githubusercontent.com/rasinmuhammed/misata/main/docs/guides/custom-generators.md): the escape hatch for custom column logic
+- [Nested JSON and arrays](https://raw.githubusercontent.com/rasinmuhammed/misata/main/docs/guides/nested-columns.md): `type: json` with fields, `type: array` with items
+- [Use-case presets](https://raw.githubusercontent.com/rasinmuhammed/misata/main/docs/guides/presets.md): demo, test, load, ml, eval
+- [Django](https://raw.githubusercontent.com/rasinmuhammed/misata/main/docs/guides/django.md): schemas from Django models
 - [Processes and event logs](https://raw.githubusercontent.com/rasinmuhammed/misata/main/docs/guides/processes.md): case workflows with loops and step durations, XES export
 - [pytest fixtures](https://raw.githubusercontent.com/rasinmuhammed/misata/main/docs/guides/testing.md): `@pytest.mark.misata`, `misata_tables`, `misata_sqlite`
 - [Seeding a database](https://raw.githubusercontent.com/rasinmuhammed/misata/main/docs/guides/database-seeding-python.md): fill an existing schema

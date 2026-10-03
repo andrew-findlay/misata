@@ -1,9 +1,10 @@
 # Stability policy
 
-> **Status: proposed.** This is the contract Misata intends to keep from 1.0.
-> Until a maintainer adopts it, the current behaviour is what
-> [LIMITATIONS.md](LIMITATIONS.md) describes: determinism holds within one
-> exact version only.
+> **Status: adopted, October 2026.** Release cadence, the Output changes
+> changelog section and the deprecation window apply from 0.9.7. Semantic
+> versioning and the cross-version guarantees below apply from 1.0; until
+> then a MINOR bump (0.9 to 0.10) may break, and is announced as Breaking in
+> the changelog.
 
 A test-data library is something people pin in CI and regenerate fixtures
 from months later. That only works if what changes between versions is
@@ -69,11 +70,10 @@ under **Deprecated**.
 
 ## Checklist before 1.0
 
-- [ ] Adopt this page (remove the "proposed" banner).
-- [ ] Switch to three-part versions and batch releases as above.
-- [ ] Split the changelog's per-release notes into Added / Changed / Fixed /
-      Deprecated / **Output changes**.
-- [ ] Re-check the `Development Status` classifier in `pyproject.toml`
-      (currently "Production/Stable") against this policy.
-- [ ] Freeze `misata.__all__`: remove the duplicate exports and decide which
-      of the ~150 names are public.
+- [x] Adopt this page.
+- [x] Three-part versions (0.9.7) and batched releases.
+- [x] Changelog notes carry **Output changes** and **Breaking** sections.
+- [x] Duplicate exports removed from `misata.__all__`.
+- [ ] Decide which of the ~160 names in `misata.__all__` are public at 1.0;
+      deprecate the rest with a warning first.
+- [ ] Re-check the `Development Status` classifier against this policy at 1.0.

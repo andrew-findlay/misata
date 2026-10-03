@@ -139,6 +139,12 @@ advanced = [
 documents = [
     "weasyprint>=60.0",       # HTML → PDF conversion
 ]
+polars = [
+    "polars>=0.20.0",         # to_polars(): DataFrames with json/array as structs and lists
+]
+django = [
+    "django>=4.2",            # from_django(): schemas from Django models
+]
 docs = [
     "mkdocs-material>=9.5.0",
 ]
@@ -159,7 +165,7 @@ evalpack = [
     "duckdb>=0.9.0",          # Independent SQL verification of evalpack answer keys
 ]
 all = [
-    "misata[dev,db,orm,llm,formulas,api,studio,advanced,documents,mcp,kaggle,spark,fidelity,evalpack]",
+    "misata[dev,db,orm,llm,formulas,api,studio,advanced,documents,mcp,kaggle,spark,fidelity,evalpack,polars,django]",
 ]
 
 [project.scripts]

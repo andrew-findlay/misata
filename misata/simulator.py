@@ -270,6 +270,9 @@ class DataSimulator:
         # patching every parser separately. See repair_curve_time_columns's
         # docstring for the bug this closes.
         repair_curve_time_columns(config)
+        if getattr(config, "preset", None):
+            from misata.presets import apply_preset
+            config = apply_preset(config, config.preset)
         validate_schema(config)
 
 
@@ -1145,7 +1148,9 @@ class DataSimulator:
             weights = np.power(1.0 - u, -1.0 / alpha)
         else:
             from scipy.special import ndtri
-            sigma = max(float(params.get("popularity_sigma", 1.1)), 0.0)
+            sigma = max(float(params.get(
+                "popularity_sigma",
+                self._default_popularity_sigma(relationship.parent_table))), 0.0)
             weights = np.exp(sigma * ndtri(u))
         cache[ckey] = (ids, weights)
         return weights
@@ -1187,23 +1192,38 @@ class DataSimulator:
 
         from collections import Counter
         values = np.asarray(values).copy()
+        # Coverage accumulates across batches. Counting one batch at a time,
+        # every 10k-row batch tried to cover every parent from scratch and
+        # always started with the same first parents, so a child table larger
+        # than one batch left most parents uncovered (and warned each batch).
+        rel_key = (relationship.parent_table, relationship.parent_key,
+                   relationship.child_table, relationship.child_key)
+        state = self.__dict__.setdefault("_min_children_state", {})
+        seen, rows_so_far, warned = state.get(rel_key, (Counter(), 0, False))
         counts = Counter(values.tolist())
+        counts.update(seen)
+        table = self.config.get_table(relationship.child_table)
+        planned = (self._planned_row_count(relationship.child_table, table.row_count)
+                   if table is not None else len(values))
+        last_batch = rows_so_far + len(values) >= planned
+        if not warned and min_children * len(parent_ids) > planned:
+            warnings.warn(
+                f"Relationship {relationship.parent_table}->{relationship.child_table}: "
+                f"min_children={min_children} needs at least "
+                f"{min_children * len(parent_ids)} child rows but only "
+                f"{planned} exist; covering as many parents as possible."
+            )
+            warned = True
         needed: list = []
         for pid in parent_ids:
             short = min_children - counts.get(pid, 0)
             if short > 0:
                 needed.extend([pid] * short)
         if not needed:
+            seen.update(values.tolist())
+            state[rel_key] = (seen, rows_so_far + len(values), warned)
             return values
-
-        if len(needed) > len(values):
-            warnings.warn(
-                f"Relationship {relationship.parent_table}->{relationship.child_table}: "
-                f"min_children={min_children} needs at least "
-                f"{min_children * len(parent_ids)} child rows but only "
-                f"{len(values)} exist; covering as many parents as possible."
-            )
-            needed = needed[: len(values)]
+        needed = needed[: len(values)]
 
         # Steal positions from over-covered parents, never dropping one to
         # (or below) the minimum in the process.
@@ -1229,13 +1249,17 @@ class DataSimulator:
             values[pos] = needed[ni]
             counts[needed[ni]] = counts.get(needed[ni], 0) + 1
             ni += 1
-        if ni < len(needed):
-            warnings.warn(
-                f"Relationship {relationship.parent_table}->{relationship.child_table}: "
-                f"{len(needed) - ni} parent(s) remain under min_children="
-                f"{min_children}; the child table cannot cover them without "
-                "starving other parents."
-            )
+        seen.update(values.tolist())
+        state[rel_key] = (seen, rows_so_far + len(values), warned)
+        if last_batch and not warned:
+            remaining = sum(1 for pid in parent_ids if seen.get(pid, 0) < min_children)
+            if remaining:
+                warnings.warn(
+                    f"Relationship {relationship.parent_table}->{relationship.child_table}: "
+                    f"{remaining} parent(s) remain under min_children="
+                    f"{min_children}; the child table cannot cover them without "
+                    "starving other parents."
+                )
         return values
 
     def _generate_self_referential_fk(
@@ -1604,6 +1628,93 @@ class DataSimulator:
             seen.add(candidate)
             out[i] = candidate
         return np.array(out, dtype=object)
+
+    @staticmethod
+    def _inner_column(name: str, spec: Any) -> Column:
+        """A field or item spec as a Column, in YAML or dict-schema spelling."""
+        from misata.compat import resolve_column_type
+        if isinstance(spec, str):
+            spec = {"type": spec}
+        spec = dict(spec or {})
+        raw = str(spec.pop("type", "text"))
+        col_type = resolve_column_type(raw, where=f"field {name!r}")
+        choices = spec.pop("enum", None) or spec.pop("choices", None)
+        if choices:
+            col_type = "categorical"
+            spec["choices"] = list(choices)
+        if raw in ("email", "phone", "url", "uuid") and col_type == "text":
+            spec.setdefault("text_type", raw)
+        for k in ("nullable", "unique", "description"):
+            spec.pop(k, None)
+        return Column(name=name, type=col_type, distribution_params=spec)
+
+    def _generate_nested(self, table_name: str, column: Column, size: int,
+                         table_data: Optional[pd.DataFrame]) -> list:
+        """Python values (dicts or lists) for a json/array column."""
+        params = column.distribution_params or {}
+
+        def py(values) -> list:
+            arr = np.asarray(values, dtype=object)
+            out = []
+            for v in arr:
+                if isinstance(v, np.generic):
+                    v = v.item()
+                if isinstance(v, (pd.Timestamp, np.datetime64)):
+                    v = pd.Timestamp(v).isoformat()
+                if isinstance(v, float) and np.isnan(v):
+                    v = None
+                out.append(v)
+            return out
+
+        def decode(col: Column, values) -> list:
+            # A nested json/array field comes back as JSON text; keep it a value.
+            if col.type in ("json", "array"):
+                import json as _json
+                return [_json.loads(v) for v in values]
+            return py(values)
+
+        if column.type == "array":
+            item = self._inner_column(params.get("item_name", f"{column.name}_item"),
+                                      params.get("items", {"type": "text"}))
+            lo = int(params.get("min_items", params.get("length", 0 if "max_items" in params else 1)))
+            hi = int(params.get("max_items", params.get("length", max(lo, 3))))
+            if lo < 0 or hi < lo:
+                raise ValueError(f"{table_name}.{column.name}: need 0 <= min_items <= max_items")
+            lengths = self.rng.integers(lo, hi + 1, size=size)
+            total = int(lengths.sum())
+            flat = decode(item, self.generate_column(table_name, item, total) if total else [])
+            unique = bool(params.get("unique_items"))
+            out, i = [], 0
+            for n in lengths:
+                chunk = flat[i:i + n]
+                if unique:   # drop repeats, keep first-seen order
+                    chunk = list({repr(v): v for v in chunk}.values())
+                if params.get("sorted"):   # login times, version histories
+                    chunk = sorted(chunk, key=lambda v: (v is None, v))
+                out.append(chunk)
+                i += n
+            return out
+
+        fields = params.get("fields") or {}
+        if not fields:
+            raise ValueError(
+                f"{table_name}.{column.name} is type json but declares no fields; "
+                f"give it fields: {{name: spec, ...}}")
+        optional = set(params.get("optional") or [])
+        opt_rate = float(params.get("optional_rate", 0.3))
+        cols = {name: decode(self._inner_column(name, spec),
+                             self.generate_column(table_name, self._inner_column(name, spec), size))
+                for name, spec in fields.items()}
+        drop = {name: self.rng.random(size) < opt_rate for name in optional if name in cols}
+        rows = []
+        for r in range(size):
+            obj = {}
+            for name, vals in cols.items():
+                if name in drop and drop[name][r]:
+                    continue
+                obj[name] = vals[r]
+            rows.append(obj)
+        return rows
 
     def _call_custom_generator(self, fn, table_name: str, column: Column, size: int,
                                table_data: Optional[pd.DataFrame]) -> np.ndarray:
@@ -2639,11 +2750,14 @@ class DataSimulator:
                 return self._generate_unique_text("uuid", size)
             return np.array([str(_uuid.UUID(bytes=self.rng.bytes(16), version=4)) for _ in range(size)])
 
-        # JSON
-        elif column.type == "json":
-            if column.unique:
-                return np.array([f'{{"id": {i+1}, "status": "active"}}' for i in range(size)])
-            return np.array(['{"status": "active", "source": "system"}' for _ in range(size)])
+        # JSON objects and arrays, built from declared fields and items. Each
+        # field is generated through generate_column, so an `email` field is a
+        # real email and a `city` field a real city; nesting recurses.
+        elif column.type in ("json", "array"):
+            values = self._generate_nested(table_name, column, size, table_data)
+            import json as _json
+            return np.array([_json.dumps(v, separators=(",", ":"), ensure_ascii=False,
+                                         default=str) for v in values], dtype=object)
 
         # TEXT
         elif column.type == "text":
@@ -4745,11 +4859,38 @@ class DataSimulator:
         if domain in ("gaming", "social"):
             # Evening/night heavy: 6pm-2am
             return [8,6,4,3,2,1,1,1,2,3,4,5,6,6,6,6,8,10,14,16,18,18,16,12]
+        if domain in ("transport", "mobility", "rideshare", "taxi", "nightlife"):
+            # Ride demand: a morning commute, an evening peak, and a long tail
+            # past midnight; the trough is 4-6am, not midnight. A daytime-only
+            # rhythm was the measured miss on the NYC taxi benchmark.
+            return [7,5,4,3,2,2,3,5,7,7,7,7,7,7,7,7,8,9,10,10,10,10,10,9]
         if domain in ("saas", "edtech"):
             # Workday with morning/afternoon bias
             return [1,1,1,1,1,2,4,9,14,16,15,13,12,14,15,13,11,8,5,4,3,2,2,1]
         # Generic mild daytime bias
         return [1,1,1,1,1,2,4,7,10,12,12,11,11,12,12,11,10,9,7,6,4,3,2,1]
+
+    _PERSON_TABLE_RE = re.compile(
+        r"(customer|user|buyer|client|guest|member|account|patient|shopper|passenger)",
+        re.I)
+
+    def _default_popularity_sigma(self, parent_table: str = "") -> float:
+        """How unequal fan-out is when the schema does not say.
+
+        Products, sellers and content are always concentrated: a few take
+        most of the activity (sigma 1.1, children-per-parent Gini about
+        0.55). People depend on the business. Stores and SaaS have repeat
+        customers, but on a marketplace or a travel site most buyers buy
+        once, and the store weighting invents repeat customers there (the
+        miss the realism benchmark measured on Olist). So in those domains
+        person-like parents get a mild weighting; everything else keeps the
+        concentrated one.
+        """
+        domain = (self.config.domain or "").lower()
+        if (domain in ("marketplace", "travel", "realestate")
+                and self._PERSON_TABLE_RE.search(parent_table or "")):
+            return 0.4
+        return 1.1
 
     def _domain_weekend_factor(self) -> float:
         """Share of weekend activity kept, by domain. Work happens on
@@ -4757,7 +4898,8 @@ class DataSimulator:
         domain = (self.config.domain or "").lower()
         if domain in ("fintech", "hr", "healthcare", "realestate", "saas", "edtech"):
             return 0.5
-        if domain in ("gaming", "social"):
+        if domain in ("gaming", "social", "transport", "mobility", "rideshare", "taxi",
+                      "nightlife"):
             return 1.0
         return 0.8
 

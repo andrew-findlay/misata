@@ -24,7 +24,8 @@ class Column(BaseModel):
     """
 
     name: str
-    type: Literal["int", "float", "date", "time", "datetime", "categorical", "foreign_key", "text", "boolean"]
+    type: Literal["int", "float", "date", "time", "datetime", "categorical", "foreign_key", "text",
+                  "boolean", "json", "array"]
     distribution_params: Dict[str, Any] = Field(default_factory=dict, validate_default=True)
     nullable: bool = False
     unique: bool = False
@@ -1650,6 +1651,9 @@ class SchemaConfig(BaseModel):
         ),
     )
     noise_config: Optional[NoiseConfig] = None
+    # A use-case preset (demo, test, load, ml, eval) applied when generation
+    # starts; see misata.presets.
+    preset: Optional[str] = None
     realism: Optional[RealismConfig] = None
     seed: Optional[int] = None
     vocabularies: Optional[Dict[str, List[str]]] = Field(

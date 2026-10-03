@@ -174,6 +174,12 @@ def loyalty_tier(ctx):                  # ctx.rows, ctx.parent("customers"), ctx
 misata.to_xes(tables["ticket_flow_events"], "tickets.xes", case_column="ticket_id")
 
 # 7. pytest: @pytest.mark.misata(schema="misata.yaml") -> misata_tables, misata_sqlite
+
+# 8. Nested columns, presets, Django, Polars
+# {"type": "json", "fields": {...}} / {"type": "array", "items": ..., "max_items": 5}
+tables = misata.generate_from_schema(schema, preset="demo")   # demo|test|load|ml|eval
+schema = misata.from_django(app_labels=["shop"])             # after django.setup()
+frames = misata.to_polars(tables)                             # json/array -> structs/lists
 ```
 
 ---

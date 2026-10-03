@@ -3,7 +3,7 @@
 All notable changes to Misata will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+and versions follow [STABILITY.md](STABILITY.md): batched releases with Output changes and Breaking notes now, [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from 1.0.
 
 ## [0.9.7] - 2026-10-03
 
@@ -27,8 +27,13 @@ generators. Highlights:
 - Strict distribution parameters with did-you-mean errors; `gamma` added.
 - Atomic `seed_database`, Postgres `--truncate` with foreign keys, relative
   SQLite paths, `from_ddl` honouring CHECK, UNIQUE and column widths.
-- A realism benchmark (`benchmarks/realism_bench.py`) and a proposed
-  stability contract (`STABILITY.md`).
+- `type: json` / `type: array` columns with declared fields and items;
+  nested JSONL, Polars structs, Postgres JSONB.
+- Use-case presets: `preset: demo | test | load | ml | eval`.
+- `misata.from_django()` and `misata.to_polars()`.
+- `import misata` in about 0.7 s (was 1.7 s, and 3.5 s with SDV installed).
+- A realism benchmark (`benchmarks/realism_bench.py`) and an adopted
+  stability policy (`STABILITY.md`).
 
 ### Output changes
 
@@ -38,6 +43,10 @@ order amounts and seasonal phase all changed. Declared outcomes, identities
 and integrity hold as before. Pin `misata==0.9.6.60` to keep old bytes.
 
 ### Breaking
+
+- Dict-schema types `object`, `json`, `jsonb`, `array` and `list` are now
+  nested columns and need `fields` (objects) or take `items` (arrays); they
+  used to be generated as text.
 
 - A schema with an unknown distribution name, a misspelled distribution
   parameter or an impossible value (negative spread, `min > max`) now raises
@@ -151,6 +160,63 @@ column now say they are int-only.
 - Emails are derived from a `full_name` column as well as `name` and
   `first_name`/`last_name`.
 
+### Nested JSON and array columns
+
+`type: json` with `fields` and `type: array` with `items` (`min_items`,
+`max_items`, `unique_items`, `sorted`) generate real nested values. Every
+field and item is generated through the same column machinery, so an `email`
+field holds a real email and a `pattern` a code of that shape; nesting
+recurses, and `optional` fields are left out of a share of rows. Values are
+canonical JSON text, so CSV, SQL and database writers all handle them;
+Postgres columns are created as `JSONB`. `misata.to_jsonl` writes them as
+nested objects, `misata.decode_json_columns` parses them in pandas, and
+`misata.to_polars` returns structs and lists. The dict spellings `object`,
+`list` and `jsonb` map to these types; they used to become prose text, and a
+`json` column used to hold the same constant string on every row.
+
+### Use-case presets
+
+`preset: demo | test | load | ml | eval` (YAML), `"__preset__"` (dict),
+`preset=` (Python) or `--preset` (CLI) fills in what a job needs: `demo`
+shifts declared dates to end today, `test` caps tables at 200 rows with a
+fixed seed, `load` multiplies rows by 10, `ml` declares nulls, outliers,
+typos and duplicates with keys protected and infers correlations, `eval`
+combines current dates with modest dirt. A preset never overrides a
+declaration.
+
+### Django and Polars
+
+`misata.from_django(app_labels=[...])` reads Django models (types,
+`max_length`, `choices`, `unique`, `null`, validators, decimal places,
+foreign keys, one-to-one, many-to-many through tables, `unique_together` and
+`UniqueConstraint`) into a schema whose rows fit the migrated tables.
+`misata.to_polars(tables)` converts output to Polars. New extras:
+`misata[polars]`, `misata[django]`.
+
+### Faster import
+
+`import misata` takes about 0.7 s, down from 1.7 s, and from 3.5 s when the
+`[advanced]` extra was installed: the copula generator imported SDV (and with
+it PyTorch) at import time, and curve fitting imported scipy.optimize. Both
+load when used.
+
+### Benchmark misses addressed
+
+- Ride and nightlife domains (`transport`, `taxi`, `mobility`, `rideshare`,
+  `nightlife`) get a night-heavy hour curve and no weekend dip. NYC taxi hour
+  profile error: 0.24 to 0.08.
+- In `marketplace`, `travel` and `realestate` domains, person-like parents
+  (customers, buyers, guests) get mild popularity weighting while products
+  stay concentrated. Olist customer fan-out error: 0.39 to 0.26.
+- **`min_children` held only within a 10,000-row batch.** Each batch tried to
+  cover every parent from scratch, starting with the same parents, so a large
+  child table left most parents uncovered and warned once per batch.
+  Coverage now accumulates across batches; on Olist, `min_children: 1` closes
+  the customer fan-out gap entirely.
+- `marketplace` gains the retail amount and price priors `ecommerce` had.
+
+The benchmark page records which results followed these fixes.
+
 ### Custom generators, from any door
 
 The escape hatch for logic the language cannot express was a Python-only
@@ -252,13 +318,13 @@ The benchmark found four bugs, fixed here:
   order items" returned orders and nothing else, silently; it now warns that
   no table was built for order items.
 
-### A proposed stability contract
+### The stability policy
 
 `STABILITY.md` sets out what Misata intends to guarantee from 1.0: semantic
 versioning, batched releases with an **Output changes** changelog section,
 declared outcomes and integrity holding across every minor release, rows
 byte-identical within a minor series, and a two-minor deprecation window. It
-is marked proposed until adopted.
+is adopted with this release.
 
 ### Story counts that name a table are honoured
 

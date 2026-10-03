@@ -145,19 +145,22 @@ bug worth reporting.
 
 ## Reproducibility and interfaces
 
-- **Default customer fan-out assumes repeat buyers.** Popularity weighting
-  (children-per-parent Gini about 0.55) fits stores with repeat customers. On a
-  marketplace where nearly every buyer buys once, it produces too many repeat
-  customers; declare `sampling: "uniform"` or a smaller `popularity_sigma`.
-  The [realism benchmark](docs/realism-benchmark.md) measures this miss.
-- **Default time-of-day rhythms are daytime-weighted.** They suit orders,
-  signups and payments; they are wrong for night-heavy activity (taxis,
-  nightlife, gaming in non-gaming domains). Declare `hour_weights` on the
-  column when you know the shape.
+- **Default fan-out assumes repeat customers.** Popularity weighting
+  (children-per-parent Gini about 0.55) fits stores and SaaS. Declare the
+  domain as `marketplace`, `travel` or `realestate` and person-like parents
+  (customers, buyers, guests) get a mild weighting while products stay
+  concentrated; declare `min_children: 1` when every customer has ordered at
+  least once. The [realism benchmark](docs/realism-benchmark.md) measures this.
+- **Default time-of-day rhythms follow the declared domain.** Daytime for most
+  businesses; night-heavy for `transport`, `taxi`, `mobility` and `nightlife`;
+  evening for `gaming` and `social`. A domain that does not match the activity
+  gets the wrong curve: declare the domain, or `hour_weights` on the column.
+- **No fare prior for rides.** Taxi and ride totals take the generic money
+  shape, which is wider than real fares; declare the distribution.
 - **Name-derived emails need a Latin-script name.** A name in another script
   keeps its generated email, which then does not match the name.
 - **Determinism is per-version.** See [STABILITY.md](STABILITY.md) for the
-  proposed cross-version contract. The same schema, seed, and misata version
+  cross-version contract. The same schema, seed, and misata version
   reproduce byte-identical output. Upgrading may change the RNG stream (it did
   in 0.8.1.29 and 0.8.2): declared outcomes, identities, and integrity
   survive any upgrade, individual rows do not. Pin the version for

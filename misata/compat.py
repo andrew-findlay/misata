@@ -85,6 +85,7 @@ _ENVELOPE_KEYS: Tuple[Tuple[str, str], ...] = (
     ("joint_distributions", "__joint_distributions__"),
     ("closures", "__closures__"),
     ("processes", "__processes__"),
+    ("preset", "__preset__"),
     ("noise", "__noise__"),
     ("realism", "__realism__"),
     ("events", "__events__"),
@@ -153,9 +154,11 @@ _TYPE_MAP: Dict[str, str] = {
     "boolean": "boolean",
     "bool": "boolean",
     "foreign_key": "foreign_key",
-    "array": "text",
-    "json": "text",
-    "object": "text",
+    "list": "array",
+    "jsonb": "json",
+    "object": "json",
+    "struct": "json",
+    "map": "json",
 }
 
 #: The types `Column` itself accepts. `_TYPE_MAP` translates foreign spellings
@@ -166,7 +169,7 @@ _SEED_UNSET = object()
 
 _NATIVE_TYPES = frozenset({
     "int", "float", "date", "time", "datetime",
-    "categorical", "foreign_key", "text", "boolean",
+    "categorical", "foreign_key", "text", "boolean", "json", "array",
 })
 
 
@@ -1275,6 +1278,7 @@ def from_dict_schema(
         joint_distributions=declared["joint_distributions"],
         closures=declared["closures"],
         processes=declared["processes"],
+        preset=schemas.get("__preset__"),
         generation_mode=(schemas.get("__generation_mode__")
                          or schemas.get("generation_mode") or "anchored"),
         noise_config=noise_config,

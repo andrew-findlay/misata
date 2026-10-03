@@ -139,6 +139,9 @@ nav:
     - pytest Fixtures: guides/testing.md
     - Custom Generators: guides/custom-generators.md
     - Processes and Event Logs: guides/processes.md
+    - Nested JSON and Arrays: guides/nested-columns.md
+    - Use-case Presets: guides/presets.md
+    - Django: guides/django.md
     - SQL DDL to Schema: guides/from-ddl.md
     - dbt Seed Integration: guides/dbt-seed.md
     - Streaming Large Datasets: guides/streaming.md

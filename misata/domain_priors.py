@@ -245,6 +245,16 @@ _PRIORS: Dict[str, Dict[str, Dict[str, Any]]] = {
 
     # ── Marketplace / Gig economy ────────────────────────────────────────────
     "marketplace": {
+        # Marketplace orders are retail orders: the same right-skewed shape as
+        # ecommerce (whose prior was set from Olist, itself a marketplace).
+        "order_amount": {"distribution": "lognormal", "mu": 4.4, "sigma": 0.9,
+                         "min": 1.0, "decimals": 2},
+        "amount": {"distribution": "lognormal", "mu": 4.4, "sigma": 0.9,
+                   "min": 1.0, "decimals": 2},
+        "price": {"distribution": "lognormal", "mu": 3.8, "sigma": 0.9,
+                  "min": 0.01, "decimals": 2},
+        "unit_price": {"distribution": "lognormal", "mu": 3.8, "sigma": 0.9,
+                       "min": 0.01, "decimals": 2},
         "earnings": {
             "distribution": "lognormal", "mu": 4.2, "sigma": 1.0,
             "min": 0.0, "decimals": 2,

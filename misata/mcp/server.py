@@ -523,6 +523,11 @@ def generate_from_schema(
       email, phone, url, uuid   Semantic strings; always valid format.
       date, datetime            Temporal; realistic granularity applied automatically.
       boolean                   True/False with declared probability.
+      object (json)             Nested object: {"type": "object", "fields": {"email": "email",
+                                "age": {"type": "integer", "min": 18}, "tags": {"type": "list",
+                                "items": "string"}}}. Optional: "optional": [...], "optional_rate".
+      list (array)              {"type": "list", "items": <spec>, "min_items": 0, "max_items": 5,
+                                "unique_items": true, "sorted": true}. Values are JSON text.
 
     COLUMN SPEC KEYS (inside a column dict)
       primary_key: true         Auto-incremented PK; column excluded from CSV output.
@@ -763,6 +768,10 @@ def generate_from_schema(
       Each injects exactly that many defects, leaving primary/unique/foreign
       keys intact. Use when the user is building or testing a data-quality or
       cleaning pipeline.
+
+    __preset__  Use-case defaults: "demo" (dates end today, clean), "test" (<=200 rows,
+      fixed seed), "load" (x10 rows), "ml" (declared nulls/outliers/typos/duplicates,
+      keys protected), "eval" (current dates, modest dirt). Declarations always win.
 
     __domain__  Domain hint for post-generation validation.
       "__domain__": "clinical_trial"   # or "clinical", "financial", "fintech"

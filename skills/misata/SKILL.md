@@ -44,6 +44,7 @@ requests where you do not care about the shape.
 | SQL DDL | `misata.from_ddl(ddl)`: CHECK, UNIQUE, VARCHAR widths and NUMERIC scale carry over |
 | A real CSV to imitate | `misata.mimic(df)`: matches distributions and time-of-day rhythm, no original rows |
 | Tests that need data | the pytest plugin: `@pytest.mark.misata(schema="misata.yaml")` then use `misata_tables` or `misata_sqlite` |
+| Django models | `misata.from_django(app_labels=["shop"])`, then `misata.seed_database(schema, url)` |
 
 Run `misata init` to scaffold a `misata.yaml`, and `misata lint misata.yaml`
 before generating. Lint catches declarations that cannot hold together and shows
@@ -73,6 +74,13 @@ are top-level keys in `misata.yaml`:
   with `misata.to_xes(events, path, case_column=...)`.
 - `event_logs`, `bitemporal`, `dag_edges`, `closures`: event-sourced,
   as-of-versioned and graph structures.
+- `preset`: `demo` (dates end today, clean), `test` (small, fixed seed), `load`
+  (x10 rows), `ml` (declared dirt, keys protected), `eval` (current dates,
+  modest dirt). Pick the one matching the user's job.
+- `type: json` with `fields`, `type: array` with `items`: nested payloads
+  (profiles, event properties, tags). Fields are generated like columns, so
+  emails and cities inside them are real. `misata.to_jsonl` / `to_polars`
+  write them as nested objects.
 - `seed`: set it. Same schema and seed produce identical bytes.
 
 `partition_by` is a field on a **relationship**, not a top-level key. It says a
