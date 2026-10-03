@@ -33,6 +33,7 @@ DIST_PARAMS: Dict[str, frozenset] = {
     "poisson": frozenset({"lambda"}),
     "binomial": frozenset({"n", "p"}),
     "exponential": frozenset({"scale"}),
+    "gamma": frozenset({"shape", "scale"}),
     "beta": frozenset({"a", "b"}),
     "empirical": frozenset({"quantiles"}),
     "categorical": frozenset({"choices", "probabilities"}),
@@ -51,7 +52,7 @@ _ALIASES = {
 # Supported per column type. Discrete samplers (poisson, binomial) are
 # int-only; float columns have no sampler for them.
 _FLOAT_DISTS = {"normal", "lognormal", "log_normal", "power_law", "pareto", "zipf",
-                "uniform", "exponential", "beta", "empirical", "categorical",
+                "uniform", "exponential", "gamma", "beta", "empirical", "categorical",
                 "sequence", "custom"}
 _INT_DISTS = _FLOAT_DISTS | {"poisson", "binomial"}
 _ALL_DIST_KEYS = frozenset().union(*DIST_PARAMS.values())
@@ -134,6 +135,10 @@ def check_distribution_params(col_type: str, params: Dict[str, Any],
         a = num("alpha") if "alpha" in params else num("a")
         if a is not None and a <= 0:
             raise DistributionParamError(f"{where}: alpha must be > 0, got {a:g}")
+    if dist == "gamma":
+        v = num("shape")
+        if v is not None and v <= 0:
+            raise DistributionParamError(f"{where}: gamma shape must be > 0, got {v:g}")
     if dist == "beta":
         for key in ("a", "b"):
             v = num(key)

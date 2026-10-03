@@ -80,6 +80,71 @@ df_enriched = misata.enrich_text(df, seed=42)
 
 ---
 
+## Replace your data script
+
+The Faker + pandas script draws every column on its own: foreign keys are
+uniform, amounts are uniform, timestamps are flat across the clock, emails do
+not match names, and nothing reconciles under a JOIN. Write the shape down
+instead, and check the result:
+
+```yaml
+# misata.yaml
+seed: 7
+tables:
+  customers:
+    rows: 2000
+    columns:
+      customer_id: {type: int, primary_key: true}
+      email: {type: text, text_type: email}
+      signup_at: {type: datetime, start: "2024-01-01", end: "2025-12-31"}
+  orders:
+    rows: 20000
+    columns:
+      order_id: {type: int, primary_key: true}
+      customer_id: {type: foreign_key, references: customers.customer_id}
+      ordered_at: {type: datetime, start: "2024-01-01", end: "2025-12-31"}
+      amount: {type: float, distribution: lognormal, mu: 3.8, sigma: 0.9, decimals: 2}
+```
+
+```bash
+misata generate --config misata.yaml --output-dir data
+misata audit data      # contradictions: shipped before ordered, totals that do not add up
+misata realism data    # synthetic tells: uniform money, even fan-out, flat hours, no nulls
+```
+
+By default customers are unevenly active (a few place most orders), times of
+day and days of the week have a rhythm, and every order postdates its
+customer. A typo such as `lamda: 3` is an error with a suggestion, not a
+column of noise.
+
+**When the schema is not enough:**
+
+- **Event logs.** `processes:` declares how tickets, claims or orders move
+  through steps, with branch probabilities, rework loops and a duration per
+  step, and writes an event-log table (`misata.to_xes` for process mining).
+  [Guide](docs/guides/processes.md)
+- **Your own logic.** `@misata.generator("tier")` registers a function that
+  sees the parent row and a seeded RNG; the schema names it with
+  `generator: tier`, and `misata --plugin my_module` loads it on the CLI.
+  [Guide](docs/guides/custom-generators.md)
+- **Tests.** Installing misata registers a pytest plugin:
+  `@pytest.mark.misata(schema="misata.yaml")` and a test receives
+  `misata_tables` or a seeded `misata_sqlite` URL. No conftest.
+  [Guide](docs/guides/testing.md)
+- **Your existing database.** `misata seed postgresql://...` reads the
+  schema, honours CHECK, UNIQUE and column widths, and inserts everything in
+  one transaction.
+
+**How realistic is it?** We test blind generation against held-out real data
+([benchmark](docs/realism-benchmark.md)). On Olist's real marketplace orders,
+a names-and-types schema with no access to the data is harder to tell from
+real rows than a Faker script (classifier AUC 0.74 vs 0.79), close to SDV
+fitted on 15,000 real orders (0.71). On NYC taxi trips, where traffic runs
+into the night, it does worse than the script on hours and fares. The
+benchmark publishes both.
+
+---
+
 ## 🚀 The 6 Unique Capabilities of Misata
 
 What separates Misata from legacy libraries like Faker and imitation models like SDV:
@@ -170,7 +235,7 @@ Misata is built for engineers, testers, data teams, and founders across dozens o
 
 Faker was built over a decade ago for single-attribute mock values. For modern applications, it introduces critical failure modes:
 
-| Problem in 2026 | Faker Reality | Misata 0.9.6.60 Advantage |
+| Problem in 2026 | Faker Reality | Misata |
 |:---|:---|:---|
 | **Relational Topology** | ✗ 0 concept of databases or FKs; manual glue code required | **✓ Strict topological DAG; 0 orphan FKs guaranteed** |
 | **Cross-Column Coherence** | ✗ Incoherent (e.g. "Male" name, mismatched email, invalid city) | **✓ Coherent identities, addresses, and causality** |

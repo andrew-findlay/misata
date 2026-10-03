@@ -5,7 +5,47 @@ All notable changes to Misata will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.7] - 2026-10-03
+
+The realism and trust release. Misata now measures its own realism (a
+reference-free tells report, and a benchmark against held-out real data),
+fixes what those measurements found in its defaults, refuses typos instead of
+generating noise, seeds real databases atomically and within their
+constraints, and gains the two things that most often sent people back to
+hand-written scripts: a process layer for event logs, and first-class custom
+generators. Highlights:
+
+- `misata.realism_report` / `misata realism` / MCP `check_realism`: twelve
+  statistical tells of generated data, checked without real data.
+- Realistic defaults: popularity-weighted foreign keys, daily and weekly
+  rhythm on timestamps, amounts equal to price times quantity, varied product
+  catalogs, seasonal peaks where declared.
+- `processes:` event logs with loops and per-step durations, audited, with
+  XES export. No SimPy.
+- `@misata.generator` + `generator:` in any schema + `misata --plugin`.
+- Auto-registered pytest plugin (`misata_tables`, `misata_sqlite`).
+- Strict distribution parameters with did-you-mean errors; `gamma` added.
+- Atomic `seed_database`, Postgres `--truncate` with foreign keys, relative
+  SQLite paths, `from_ddl` honouring CHECK, UNIQUE and column widths.
+- A realism benchmark (`benchmarks/realism_bench.py`) and a proposed
+  stability contract (`STABILITY.md`).
+
+### Output changes
+
+Generated rows differ from 0.9.6.x for the same seed: foreign-key fan-out,
+timestamp shaping, the causality shift, product names, email providers,
+order amounts and seasonal phase all changed. Declared outcomes, identities
+and integrity hold as before. Pin `misata==0.9.6.60` to keep old bytes.
+
+### Breaking
+
+- A schema with an unknown distribution name, a misspelled distribution
+  parameter or an impossible value (negative spread, `min > max`) now raises
+  instead of generating `uniform(0, 1000)`.
+- `misata validate --data-dir/--db-url` moved to `misata validate-data` (it
+  was unreachable under the old name).
+- `poisson` and `binomial` on a float column raise (they were uniform).
+
 
 ### Realism report: the statistical tells of generated data
 

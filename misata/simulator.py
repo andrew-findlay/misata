@@ -2140,6 +2140,10 @@ class DataSimulator:
             elif distribution == "exponential":
                 scale = float(params.get("scale", 1.0))
                 values = np.round(self.rng.exponential(scale, size=size)).astype(int)
+            elif distribution == "gamma":
+                values = np.round(self.rng.gamma(float(params.get("shape", 2.0)),
+                                                 float(params.get("scale", 1.0)),
+                                                 size=size)).astype(int)
             elif distribution == "beta":
                 a = float(params.get("a", 2.0))
                 b = float(params.get("b", 5.0))
@@ -2357,6 +2361,9 @@ class DataSimulator:
             elif distribution == "exponential":
                 scale = params.get("scale", 1.0)
                 values = self.rng.exponential(scale, size=size)
+            elif distribution == "gamma":
+                values = self.rng.gamma(float(params.get("shape", 2.0)),
+                                        float(params.get("scale", 1.0)), size=size)
             elif distribution == "beta":
                 a = float(params.get("a", 2.0))
                 b = float(params.get("b", 5.0))
