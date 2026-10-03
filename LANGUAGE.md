@@ -507,7 +507,8 @@ Not declarations, but always on:
 | Determinism | same spec, same seed, identical bytes |
 | Anchored streams | edit one declaration and only it changes |
 | Atomic geo | city, state and zip drawn as one consistent tuple |
-| Temporal profiles | timestamps quantised by name-guess; the *default*, not a guarantee. Declare `time_grids` to make it one |
+| Temporal profiles | timestamps quantised by name-guess, with a daily cycle and a domain-dependent weekend dip; activity `date` columns get the weekend dip only. The *default*, not a guarantee: declare `time_grids` to make it one, or `time_profile: "uniform"` to opt out. Curve time columns are never reshaped |
+| Popularity-weighted FKs | children per parent follow a lognormal popularity weight (`popularity_sigma`, default 1.1, Gini about 0.55), stable per parent across batches. The *default*, not a guarantee: `sampling: "pareto"` changes the shape, `sampling: "uniform"` opts out |
 | Forest hierarchies | a self-referential key is always acyclic, with roots |
 | FK temporal eligibility | when declared on a relationship, a row can only reference a parent that already existed |
 

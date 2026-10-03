@@ -634,7 +634,12 @@ def _detect_rollup_mismatch(tables, schema) -> List[CoherenceFinding]:
         else:
             continue
         got = parent.set_index(s.parent_key)[s.target_column]
-        joined = got.to_frame("got").join(expected.to_frame("want")).dropna()
+        joined = got.to_frame("got").join(expected.to_frame("want"))
+        if s.agg in ("sum", "count"):
+            # A parent with no children sums (and counts) to zero; dropping
+            # it would hide a nonzero total on a childless parent.
+            joined["want"] = joined["want"].fillna(0)
+        joined = joined.dropna()
         if joined.empty:
             continue
         bad = int((abs(joined["got"] - joined["want"]) > 0.01).sum())

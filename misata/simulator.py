@@ -1086,6 +1086,50 @@ class DataSimulator:
                      c_codes)
         return values, eligibility, partition
 
+    def _fk_popularity_weights(
+        self,
+        relationship: Relationship,
+        parent_ids: np.ndarray,
+        sampling: str,
+        params: Dict[str, Any],
+    ) -> np.ndarray:
+        """A fixed popularity weight per parent, keyed by the parent's ID.
+
+        Real fan-out is concentrated: a few customers place most orders and a
+        few products take most sales. Uniform assignment gives every parent
+        about the same number of children, one of the clearest tells of
+        generated data. Each parent's weight comes from a hash of its ID (and
+        the seed), so it is the same in every batch and under any filter on
+        the parent set, and it draws nothing from the main RNG stream.
+
+        ``auto`` (default) is lognormal with ``popularity_sigma`` (1.1 gives a
+        children-per-parent Gini near 0.55). ``pareto`` keeps its documented
+        ``alpha`` shape.
+        """
+        ids = np.asarray(parent_ids)
+        cache = self.__dict__.setdefault("_fk_weight_cache", {})
+        ckey = (relationship.parent_table, relationship.parent_key, sampling,
+                params.get("alpha"), params.get("popularity_sigma"))
+        hit = cache.get(ckey)
+        if hit is not None and len(hit[0]) == len(ids) and np.array_equal(hit[0], ids):
+            return hit[1]
+        key = (f"{self.config.seed or 0}:{relationship.parent_table}."
+               f"{relationship.parent_key}")
+        hash_key = f"{zlib.crc32(key.encode()):016d}"[:16]
+        h = pd.util.hash_array(ids.astype(str) if ids.dtype == object else ids,
+                               hash_key=hash_key)
+        u = (h >> np.uint64(11)).astype(np.float64) / float(1 << 53)
+        u = np.clip(u, 1e-12, 1 - 1e-12)
+        if sampling == "pareto":
+            alpha = max(float(params.get("alpha", 1.5)), 0.1)
+            weights = np.power(1.0 - u, -1.0 / alpha)
+        else:
+            from scipy.special import ndtri
+            sigma = max(float(params.get("popularity_sigma", 1.1)), 0.0)
+            weights = np.exp(sigma * ndtri(u))
+        cache[ckey] = (ids, weights)
+        return weights
+
     def _ensure_min_children(
         self,
         values: np.ndarray,
@@ -2325,8 +2369,11 @@ class DataSimulator:
             # loan origination date reading "2025-09-12 08:16:54" gives away
             # a synthetic file as fast as an unrounded dollar figure does.
             # normalize() truncates to midnight, matching what "date" means
-            # everywhere else in this schema.
-            return pd.DatetimeIndex(values).normalize()
+            # everywhere else in this schema. Activity dates still get the
+            # weekly rhythm their semantics imply.
+            return self._shape_activity_times(
+                pd.DatetimeIndex(values).normalize(), table_name, column,
+                start, end, date_only=True)
 
         # FOREIGN KEY
         elif column.type == "foreign_key":
@@ -2412,11 +2459,15 @@ class DataSimulator:
                 return self._ensure_min_children(
                     values, parent_ids, relationship, eligibility=elig)
 
-            sampling = params.get("sampling", "uniform")
-            if sampling == "pareto":
-                alpha = max(float(params.get("alpha", 1.5)), 0.1)
-                weights = self.rng.pareto(alpha, len(parent_ids)) + 1.0
-                probabilities = weights / weights.sum()
+            # Fan-out is popularity-weighted unless the column opts out with
+            # ``sampling="uniform"``; see _fk_popularity_weights.
+            sampling = params.get("sampling", "auto")
+            popularity = (None if sampling == "uniform" else
+                          self._fk_popularity_weights(
+                              relationship, parent_ids, sampling, params))
+            if popularity is not None and relationship.parent_table not in \
+                    self._parent_temporal_density:
+                probabilities = popularity / popularity.sum()
                 values = self.rng.choice(parent_ids, size=size, p=probabilities)
             else:
                 # Gap 3 — Level-1 temporal FK weighting:
@@ -2439,13 +2490,19 @@ class DataSimulator:
                                     all_weights = density_map.compute_fk_weights(parent_ctx)
                                     row_weights = np.ones(len(parent_ids), dtype=float)
                                     row_weights[valid_mask] = all_weights[id_indices[valid_mask]]
+                                    if popularity is not None:
+                                        row_weights = row_weights * popularity
                                     probabilities = row_weights / row_weights.sum()
                                     values = self.rng.choice(parent_ids, size=size, p=probabilities)
                                     return self._ensure_min_children(
                                         values, parent_ids, relationship)
                             except Exception:
-                                pass  # Fall through to uniform sampling on any error
-                values = self.rng.choice(parent_ids, size=size)
+                                pass  # Fall through to popularity sampling on any error
+                if popularity is not None:
+                    values = self.rng.choice(parent_ids, size=size,
+                                             p=popularity / popularity.sum())
+                else:
+                    values = self.rng.choice(parent_ids, size=size)
             return self._ensure_min_children(values, parent_ids, relationship)
 
         # UUID
@@ -2761,7 +2818,8 @@ class DataSimulator:
             start_int, end_int = _datetime_range_ns(start, end)
             random_ints = self.rng.integers(start_int, end_int, size=size)
             values = pd.to_datetime(random_ints)
-            return values
+            return self._shape_activity_times(
+                values, table_name, column, start, end, date_only=False)
 
         else:
             raise ValueError(f"Unknown column type: {column.type}")
@@ -4564,6 +4622,71 @@ class DataSimulator:
         # Generic mild daytime bias
         return [1,1,1,1,1,2,4,7,10,12,12,11,11,12,12,11,10,9,7,6,4,3,2,1]
 
+    def _domain_weekend_factor(self) -> float:
+        """Share of weekend activity kept, by domain. Work happens on
+        weekdays; consumer activity dips less."""
+        domain = (self.config.domain or "").lower()
+        if domain in ("fintech", "hr", "healthcare", "realestate", "saas", "edtech"):
+            return 0.5
+        if domain in ("gaming", "social"):
+            return 1.0
+        return 0.8
+
+    def _shape_activity_times(
+        self,
+        values: pd.DatetimeIndex,
+        table_name: str,
+        column: Column,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+        *,
+        date_only: bool,
+    ) -> pd.DatetimeIndex:
+        """Give generated timestamps the weekly and daily rhythm of their
+        mechanism (see :mod:`misata.temporal_profiles`).
+
+        Uniform draws make 3am as busy as noon and Sunday as busy as
+        Tuesday, two of the fastest tells of generated data. Rows that the
+        weekend shift would push outside the declared range keep their
+        original day. Curve time columns are left alone, because moving a
+        row across a period boundary would break the declared aggregate;
+        ``time_profile: "uniform"`` opts out.
+        """
+        from dataclasses import replace
+
+        from misata.temporal_profiles import (
+            HUMAN_ACTION, apply_temporal_profile, classify_temporal, damp_weekends)
+
+        params = column.distribution_params or {}
+        if params.get("time_profile") == "uniform" or len(values) == 0:
+            return values
+        curve_cols = {getattr(c, "time_column", None)
+                      for c in list(getattr(self.config, "outcome_curves", None) or [])
+                      + list(getattr(self.config, "rate_curves", None) or [])
+                      if getattr(c, "table", None) == table_name}
+        if column.name in curve_cols:
+            return values
+        profile = classify_temporal(column.name, table_name)
+        if profile is HUMAN_ACTION:
+            profile = replace(profile, weekend_factor=self._domain_weekend_factor())
+        values = pd.DatetimeIndex(values)
+        if date_only:
+            if profile.date_only:
+                return values
+            shaped = damp_weekends(values, profile.weekend_factor, self.rng)
+        else:
+            shaped = apply_temporal_profile(
+                values, profile, self.rng,
+                domain_hour_weights=self._domain_hour_weights())
+        lo = pd.Timestamp(start).normalize()
+        hi = pd.Timestamp(end)
+        if hi.normalize() == hi:
+            hi = hi + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        out_of_range = (shaped < lo) | (shaped > hi)
+        if out_of_range.any():
+            shaped = shaped.where(~out_of_range, values)
+        return shaped
+
     def _add_realistic_time(
         self,
         dates: pd.DatetimeIndex,
@@ -5363,7 +5486,12 @@ class DataSimulator:
             strict_shift = strict_shift + strict.fillna(pd.Timedelta(0))
 
         if (total_shift > pd.Timedelta(0)).any():
-            total_shift = total_shift.dt.ceil("s")   # never leak sub-second noise
+            # Whole days, not hours: shifting by the exact deficit plus a few
+            # hours parked every moved row in the small hours after its
+            # parent's (often midnight) birth, so a fifth of all orders
+            # landed between 1am and 5am. A whole-day shift still clears the
+            # deficit and keeps each row's own time of day.
+            total_shift = total_shift.dt.ceil("D")
             strict_shift = strict_shift.dt.ceil("s")
             # The comfortable shift must not push any column past its declared
             # end: cap each row's shift at the tightest remaining headroom
@@ -5434,8 +5562,18 @@ class DataSimulator:
                     f"them. Align the parent's date range with the curve "
                     f"window to avoid this."
                 )
+            col_types = {c.name: c.type for c in self.config.columns.get(table_name, [])}
             for c in child_dt:
-                df[c] = df[c] + final_shift
+                shifted = df[c] + final_shift
+                if col_types.get(c) == "date":
+                    # A "date" is a calendar day: a shift of a few hours must
+                    # not hand it a time of day. Round forward to the next
+                    # day (still after the parent), or back to the same day
+                    # where rounding forward would cross a curve bucket.
+                    ceiled = shifted.dt.ceil("D")
+                    over = (final_shift + (ceiled - shifted)) > cap_hard_nonneg
+                    shifted = ceiled.where(~over, shifted.dt.floor("D"))
+                df[c] = shifted
         return df
 
     def _fix_denormalized_parent_columns(self, df: pd.DataFrame, table_name: str) -> pd.DataFrame:

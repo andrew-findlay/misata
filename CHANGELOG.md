@@ -20,10 +20,48 @@ needed. Each finding carries its evidence and a pass/warn/fail status; the
 CLI exits nonzero on failures (or on warnings with `--strict`), so it can
 gate seed data in CI.
 
-Run on Misata's own default ecommerce story (seed 7) it scores 0.66 with
-three failures: customer and product fan-out are near uniform (Gini 0.25 and
-0.11), and half of `orders.order_date` sits exactly at midnight. A typical
-Faker script scores about 0.3. Those three are the next realism fixes.
+Run on Misata's own default ecommerce story (seed 7) it first scored 0.66,
+with three failures. A typical Faker script scores about 0.3. All three are
+fixed below; the same story now scores 0.93, with "no nulls" as the only
+remaining warning (nulls stay opt-in, because NOT NULL seeding must work).
+
+### Realistic defaults, fixed where the realism report pointed
+
+- **Foreign keys are popularity-weighted by default.** Every parent used to
+  get about the same number of children (Gini 0.11 to 0.25). Each parent now
+  carries a lognormal popularity weight derived from a hash of its ID, so the
+  same customers stay heavy buyers in every batch and the main RNG stream is
+  untouched; children-per-parent Gini is about 0.55. `popularity_sigma` tunes
+  it, `sampling: "uniform"` restores the old behaviour. `sampling: "pareto"`
+  used to redraw its weights every 10k-row batch, so a popular parent in one
+  batch was ordinary in the next; it now uses the same stable weights.
+- **datetime columns get a daily and weekly rhythm again.** The temporal
+  profiles (business hours for appointments, waking hours for human actions,
+  sub-second precision for machine events) were unhooked in 0.9.6.36 when the
+  `date` branch stopped calling them, and the `datetime` branch never did, so
+  every datetime was uniform nanosecond noise: 3am as busy as noon, Sunday as
+  busy as Tuesday. They are wired into `datetime` generation now, with a
+  domain-dependent weekend dip that also applies to activity `date` columns.
+  Rows the dip would push outside the declared range keep their day, and
+  curve time columns are left alone. `time_profile: "uniform"` opts out.
+- **The causality shift no longer piles rows into the small hours.** A child
+  row that predated its parent was moved to the parent's birth plus a few
+  hours. Parents are often born at midnight, so about a fifth of all orders
+  landed between 1am and 5am, and on `date` columns half the values carried a
+  time of day. The shift is now whole days, so each row keeps its own time of
+  day and a `date` stays a calendar day.
+- **Seasonal peaks land where `peak_offset` says.** `sin(x - offset)` peaks a
+  quarter period after the offset, so a declared Friday peak landed on Monday
+  and a December peak in March. It is `cos` now, and day-of-year is 0-based as
+  documented. Story phrases set the phase too: "weekend" peaks on Saturday,
+  "winter", "holiday", "Christmas" and "December" in late December, "summer"
+  in July.
+- **The roll-up audit sees a childless parent.** A parent with no children
+  was dropped from the sum/count comparison, so a nonzero total on it was
+  never flagged. Uniform fan-out hid this, because every parent had children.
+
+All of the above change output bytes for the same seed. Declared outcomes,
+identities and integrity are unchanged.
 
 ## [0.9.6.60] - 2026-09-28
 

@@ -3018,6 +3018,9 @@ def _fix_email_from_name(df: pd.DataFrame, columns: set[str], rng: np.random.Gen
         "gmail.com", "yahoo.com", "outlook.com", "protonmail.com",
         "icloud.com", "hotmail.com", "aol.com", "mail.com",
     ]
+    # Consumer mail is concentrated: one provider holds a plurality and the
+    # tail is thin. An even split across eight providers is a tell on its own.
+    domain_weights = np.array([0.46, 0.13, 0.11, 0.03, 0.10, 0.10, 0.05, 0.02])
 
     def _clean(part: str) -> str:
         return re.sub(r"[^a-z]", "", str(part).lower().strip())
@@ -3038,7 +3041,7 @@ def _fix_email_from_name(df: pd.DataFrame, columns: set[str], rng: np.random.Gen
         return
 
     n = len(df)
-    domain_choices = rng.choice(domains, size=n)
+    domain_choices = rng.choice(domains, size=n, p=domain_weights / domain_weights.sum())
     separators = rng.choice([".", "_", ""], size=n, p=[0.6, 0.2, 0.2])
     emails = []
     for i in range(n):
