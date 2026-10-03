@@ -12,8 +12,8 @@ Story given to `misata_story`: *"A Brazilian e-commerce marketplace with 29651 c
 | Customer fan-out (ΔGini) | 0.001 | n/a | 0.256 | 0.237 | n/a | n/a |
 | Product fan-out (ΔGini) | 0.003 | 0.440 | 0.028 | 0.149 | n/a | n/a |
 | Category balance (Δ) | 0.003 | n/a | 0.481 | 0.500 | 0.001 | 0.003 |
-| Detection AUC | 0.498 | 0.775 | 0.738 | 0.794 | 0.541 | 0.709 |
-| Tells score ↑ | 1.000 | 0.938 | 1.000 | 0.333 | 1.000 | 0.750 |
+| Detection AUC | 0.498 | 0.767 | 0.738 | 0.794 | 0.541 | 0.709 |
+| Tells score ↑ | 1.000 | 0.942 | 1.000 | 0.333 | 1.000 | 0.750 |
 
 ### taxis: NYC yellow/green taxi trips, March 2019 (seaborn sample) (6,389 rows)
 

@@ -24,9 +24,9 @@
           "customer_gini": null,
           "product_gini": 0.4400537889574435,
           "category_gap": null,
-          "detect_auc": 0.7747984874999999,
-          "tells": 0.9375,
-          "seconds": 5.7
+          "detect_auc": 0.7668999124999999,
+          "tells": 0.9423076923076923,
+          "seconds": 5.8
         },
         "misata_schema": {
           "amount_ks": 0.050866666666666664,
@@ -37,7 +37,7 @@
           "category_gap": 0.4808765311655241,
           "detect_auc": 0.737632,
           "tells": 1.0,
-          "seconds": 2.6
+          "seconds": 2.5
         },
         "faker_script": {
           "amount_ks": 0.19069999999999998,
@@ -48,7 +48,7 @@
           "category_gap": 0.4997318365641834,
           "detect_auc": 0.79398836875,
           "tells": 0.3333333333333333,
-          "seconds": 4.5
+          "seconds": 4.2
         },
         "misata_mimic": {
           "amount_ks": 0.024133333333333333,
@@ -70,7 +70,7 @@
           "category_gap": 0.0027767816331989437,
           "detect_auc": 0.7090467111111111,
           "tells": 0.75,
-          "seconds": 5.3
+          "seconds": 8.1
         }
       }
     },
@@ -98,7 +98,7 @@
           "category_gap": null,
           "detect_auc": 0.8866347210163701,
           "tells": 1.0,
-          "seconds": 1.8
+          "seconds": 1.9
         },
         "misata_schema": {
           "amount_ks": 0.2507434653310377,
@@ -109,7 +109,7 @@
           "category_gap": 0.1296301827349523,
           "detect_auc": 0.9111258738985926,
           "tells": 0.6666666666666666,
-          "seconds": 1.3
+          "seconds": 1.6
         },
         "faker_script": {
           "amount_ks": 0.21709187666301455,
@@ -120,7 +120,7 @@
           "category_gap": 0.13953977177665233,
           "detect_auc": 0.8858676994952669,
           "tells": 0.4,
-          "seconds": 2.0
+          "seconds": 2.4
         },
         "misata_mimic": {
           "amount_ks": 0.025039123630672927,
@@ -131,7 +131,7 @@
           "category_gap": 0.009100503778195268,
           "detect_auc": 0.6633369334420713,
           "tells": 1.0,
-          "seconds": 1.4
+          "seconds": 1.7
         },
         "sdv_copula": {
           "amount_ks": 0.1352112676056338,
@@ -142,7 +142,7 @@
           "category_gap": 0.00339271999574442,
           "detect_auc": 0.8282192196825535,
           "tells": 0.6666666666666666,
-          "seconds": 2.8
+          "seconds": 3.0
         }
       }
     }
