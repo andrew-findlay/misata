@@ -167,6 +167,9 @@ misata = "misata.cli:main"
 misata-studio = "misata.studio:launch"
 misata-mcp = "misata.mcp.server:main"
 
+[project.entry-points.pytest11]
+misata = "misata_pytest"
+
 [build-system]
 requires = ["setuptools>=68.0.0", "wheel"]
 build-backend = "setuptools.build_meta"

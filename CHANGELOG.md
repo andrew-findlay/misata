@@ -135,6 +135,17 @@ returned zeros. Now:
   relationship; it was kept on the column and ignored, so validation failed
   on a relationship the file had just declared.
 
+### A pytest plugin, no conftest needed
+
+Installing misata now registers a pytest plugin (`pytest11` entry point).
+`@pytest.mark.misata(schema="misata.yaml", seed=7)` on a test or module gives
+it `misata_tables` (generated once per session per marker, copied per test)
+and `misata_sqlite` (a seeded SQLite URL in the test's tmp dir), alongside
+`misata_generate`, `misata_parse` and `misata_preview`. The fixtures used to
+need importing into `conftest.py` by hand. The plugin lives in a separate
+`misata_pytest` module that imports misata only when a fixture runs, so it
+adds about 0.1 s to pytest startup; `-p no:misata` disables it.
+
 ### In-memory generation is no longer quadratic
 
 `generate_from_schema` (and the dbt and seed CLI paths) concatenated each
