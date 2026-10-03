@@ -3028,9 +3028,11 @@ def _fix_email_from_name(df: pd.DataFrame, columns: set[str], rng: np.random.Gen
     if {"first_name", "last_name"}.issubset(columns):
         firsts = df["first_name"].astype(str)
         lasts = df["last_name"].astype(str)
-    elif "name" in columns:
+    elif any(c in columns for c in ("name", "full_name", "customer_name", "user_name")):
         # Only treat as personal names if most rows look like "First Last" (2+ tokens).
-        name_series = df["name"].astype(str)
+        name_col = next(c for c in ("name", "full_name", "customer_name", "user_name")
+                        if c in columns)
+        name_series = df[name_col].astype(str)
         looks_personal = name_series.str.strip().str.split().str.len().ge(2).mean()
         if looks_personal < 0.6:
             return

@@ -204,6 +204,26 @@ class GenerationResult:
 _MISSING = object()
 
 
+def _truncate_text(values: np.ndarray, max_len: int) -> np.ndarray:
+    """Cut strings longer than ``max_len``, at a word boundary when one is
+    close, so a VARCHAR(40) column holds 40 characters of its sentence rather
+    than failing the insert."""
+    arr = np.asarray(values, dtype=object)
+    lengths = np.fromiter((len(v) if isinstance(v, str) else 0 for v in arr),
+                          dtype=np.int64, count=len(arr))
+    long = lengths > max_len
+    if not long.any():
+        return values
+    out = arr.copy()
+    for i in np.flatnonzero(long):
+        cut = out[i][:max_len]
+        space = cut.rfind(" ")
+        if space >= max_len * 0.6:
+            cut = cut[:space]
+        out[i] = cut.rstrip(" ,;:-")
+    return out
+
+
 class DataSimulator:
     """
     High-performance synthetic data simulator.
@@ -1488,8 +1508,16 @@ class DataSimulator:
         Enforcing it here rather than at those four sites is deliberate: this is
         the one function every column passes through, so a branch added later
         cannot route around the guarantee.
+
+        A declared ``max_length`` (``VARCHAR(n)``, imported from DDL) is held
+        here for the same reason: a value one character too long is a rejected
+        insert, whichever branch produced it.
         """
-        return self._generate_column_raw(table_name, column, size, table_data)
+        values = self._generate_column_raw(table_name, column, size, table_data)
+        max_len = (column.distribution_params or {}).get("max_length")
+        if max_len and column.type in ("text", "categorical") and len(values):
+            values = _truncate_text(values, int(max_len))
+        return values
 
     def _enforce_unique_text(self, table_name: str, column: Column,
                              values: np.ndarray) -> np.ndarray:
@@ -1510,6 +1538,17 @@ class DataSimulator:
         is_uuid = (column.type == "uuid" or
                    column.distribution_params.get("text_type") == "uuid" or
                    getattr(column, "semantic", None) == "uuid")
+        max_len = column.distribution_params.get("max_length")
+        pattern = column.distribution_params.get("pattern")
+        pattern = pattern if isinstance(pattern, str) else None
+
+        def fit(base: str, suffix: str) -> str:
+            # A disambiguating suffix must not push the value past its
+            # declared width (VARCHAR(12) rejects "CUS-64120992 2").
+            if max_len and len(base) + len(suffix) > int(max_len):
+                base = base[: max(0, int(max_len) - len(suffix))]
+            return base + suffix
+
         for i, val in enumerate(out):
             if val is None or (isinstance(val, float) and pd.isna(val)):
                 continue
@@ -1517,28 +1556,43 @@ class DataSimulator:
             if text not in seen:
                 seen.add(text)
                 continue
-            # Suffix the repeat or draw fresh UUID
+            # Suffix the repeat, or draw a fresh UUID or code. A collided code
+            # gets another code of the same shape rather than " 2" appended,
+            # which is not a code at all.
+            fresh = (self._fresh_pattern_value(pattern, seen)
+                     if pattern is not None and not is_uuid else None)
             if is_uuid:
                 import uuid as _uuid
                 candidate = str(_uuid.UUID(bytes=self.rng.bytes(16), version=4))
                 while candidate in seen:
                     candidate = str(_uuid.UUID(bytes=self.rng.bytes(16), version=4))
+            elif fresh is not None:
+                candidate = fresh
             elif "@" in text:
                 n = 2
                 local, _, domain = text.partition("@")
-                candidate = f"{local}{n}@{domain}"
+                candidate = fit(local, f"{n}@{domain}")
                 while candidate in seen:
                     n += 1
-                    candidate = f"{local}{n}@{domain}"
+                    candidate = fit(local, f"{n}@{domain}")
             else:
                 n = 2
-                candidate = f"{text} {n}"
+                candidate = fit(text, f" {n}")
                 while candidate in seen:
                     n += 1
-                    candidate = f"{text} {n}"
+                    candidate = fit(text, f" {n}")
             seen.add(candidate)
             out[i] = candidate
         return np.array(out, dtype=object)
+
+    def _fresh_pattern_value(self, pattern: str, seen: set, tries: int = 50) -> Optional[str]:
+        """A pattern expansion not yet in ``seen``, or None if the pattern's
+        space looks exhausted."""
+        for _ in range(tries):
+            cand = self.realistic_text._expand_pattern(pattern)
+            if cand not in seen:
+                return cand
+        return None
 
     def _generate_column_raw(
         self,
@@ -2026,6 +2080,15 @@ class DataSimulator:
                 n = int(params.get("n", 10))
                 p = float(params.get("p", 0.5))
                 values = self.rng.binomial(n, p, size=size)
+            elif distribution == "exponential":
+                scale = float(params.get("scale", 1.0))
+                values = np.round(self.rng.exponential(scale, size=size)).astype(int)
+            elif distribution == "beta":
+                a = float(params.get("a", 2.0))
+                b = float(params.get("b", 5.0))
+                low = float(params.get("min", 0.0))
+                high = float(params.get("max", 1.0))
+                values = np.round(self.rng.beta(a, b, size=size) * (high - low) + low).astype(int)
             elif distribution == "empirical":
                 # Inverse-CDF sampling from stored quantiles — reproduces any
                 # marginal shape (used by mimic when no parametric fit is good).

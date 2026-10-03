@@ -41,6 +41,7 @@ class Column(BaseModel):
     def _normalize_distribution_params(
         col_type: Optional[str],
         params: Optional[Dict[str, Any]],
+        column_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Normalize common missing params so schema parsing stays forgiving."""
         normalized = dict(params or {})
@@ -65,6 +66,12 @@ class Column(BaseModel):
             normalized["distribution"] = "normal"
             normalized["_distribution_is_default"] = True  # sentinel: not user-set
 
+        if col_type in ["int", "float"]:
+            # Unknown names and misspelled parameters used to fall through to
+            # uniform(0, 1000); they are errors now (see misata.param_check).
+            from misata.param_check import check_distribution_params
+            normalized = check_distribution_params(col_type, normalized, column_name)
+
         return normalized
 
     @field_validator("distribution_params", mode="before")
@@ -72,7 +79,7 @@ class Column(BaseModel):
     def validate_params(cls, v: Any, info: Any) -> Dict[str, Any]:
         """Validate distribution parameters based on column type."""
         col_type = info.data.get("type")
-        return cls._normalize_distribution_params(col_type, v or {})
+        return cls._normalize_distribution_params(col_type, v or {}, info.data.get("name"))
 
     def validate_generation_ready(self) -> None:
         """Raise if the column still lacks required information for generation."""

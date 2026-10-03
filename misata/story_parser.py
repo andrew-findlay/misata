@@ -1268,6 +1268,7 @@ class StoryParser:
                 object.__setattr__(schema, "rate_curves", existing + detected_rate_curves)
 
         schema = self._enrich_schema_text_types(schema)
+        self._apply_explicit_counts(story, schema)
 
         # Say what could not be used. Silence here is how a story that asked
         # for six thousand invoices, a plan split and an unpaid rate came back
@@ -1310,6 +1311,64 @@ class StoryParser:
         "days", "day", "weeks", "week", "months", "month", "years", "year",
         "hours", "hour", "minutes", "minute", "seconds",
     })
+
+    # Story nouns that name a table under another name.
+    _COUNT_SYNONYMS = {
+        "receipt": ("orders", "transactions", "sales"),
+        "purchase": ("orders", "transactions"),
+        "sale": ("orders", "transactions"),
+        "client": ("customers", "users"),
+        "buyer": ("customers", "users"),
+        "shopper": ("customers", "users"),
+        "member": ("users", "customers"),
+        "sku": ("products",),
+        "item": ("products",),
+        "visit": ("appointments",),
+    }
+
+    def _apply_explicit_counts(self, story: str, schema: "SchemaConfig") -> None:
+        """An explicit "N <things>" sets the row count of the table built for
+        <things>.
+
+        Domain builders size tables from their own defaults, so "500
+        products" came back as 600 products with a warning that the count had
+        no effect, even though a products table was right there. The count is
+        the user's, so it wins. Unique integer key ranges sized for the old
+        count are widened to fit the new one.
+        """
+        if not story or not schema.tables:
+            return
+        by_name = {t.name.lower(): t for t in schema.tables}
+        low = story.lower()
+        for m in re.finditer(r"(\d[\d,]*)\s*(k\b)?\s+([a-z][a-z_]+)(?:\s+([a-z][a-z_]+))?", low):
+            raw, kilo, w1, w2 = m.groups()
+            try:
+                n = int(raw.replace(",", "")) * (1000 if kilo else 1)
+            except ValueError:
+                continue
+            if n <= 0 or (1900 <= n <= 2100 and "," not in raw and not kilo):
+                continue
+            nouns = ([f"{w1}_{w2}"] if w2 else []) + [w1]
+            table = None
+            for noun in nouns:
+                stem = noun[:-3] + "y" if noun.endswith("ies") else noun.rstrip("s")
+                for cand in (noun, stem, stem + "s", stem + "es",
+                             (stem[:-1] + "ies") if stem.endswith("y") else None,
+                             *self._COUNT_SYNONYMS.get(stem, ())):
+                    if cand and cand in by_name:
+                        table = by_name[cand]
+                        break
+                if table is not None:
+                    break
+            if table is None or table.row_count == n:
+                continue
+            table.row_count = n
+            for col in (schema.columns or {}).get(table.name, []):
+                p = col.distribution_params or {}
+                if (col.unique and col.type == "int" and isinstance(p.get("min"), (int, float))
+                        and isinstance(p.get("max"), (int, float))
+                        and p["max"] - p["min"] + 1 < n):
+                    p["max"] = int(p["min"]) + n
 
     def unhandled_claims(self, story: str, schema: "SchemaConfig") -> List[str]:
         """Fragments of the story carrying a number that reached no declaration."""

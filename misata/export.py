@@ -169,6 +169,9 @@ def to_sql(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    dialect = {"postgres": "postgresql", "pg": "postgresql"}.get(
+        str(dialect).lower(), str(dialect).lower())
+
     def _quote(name: str, dialect: str) -> str:
         # Escape the quote character itself inside the identifier to prevent
         # broken DDL from generated column/table names containing quotes.
@@ -188,7 +191,8 @@ def to_sql(
         if "int" in name_lower:
             return "INTEGER"
         if "float" in name_lower or "double" in name_lower:
-            return "DOUBLE PRECISION" if dialect == "postgresql" else "DOUBLE"
+            # DOUBLE alone is MySQL; ANSI and Postgres spell it DOUBLE PRECISION.
+            return "DOUBLE" if dialect == "mysql" else "DOUBLE PRECISION"
         if "bool" in name_lower:
             return "BOOLEAN"
         if "datetime" in name_lower or "timestamp" in name_lower:

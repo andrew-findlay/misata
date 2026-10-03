@@ -63,6 +63,64 @@ remaining warning (nulls stay opt-in, because NOT NULL seeding must work).
 All of the above change output bytes for the same seed. Declared outcomes,
 identities and integrity are unchanged.
 
+### Typos are errors, not uniform noise
+
+An unknown distribution name or a misspelled parameter used to fall through to
+`uniform(0, 1000)`: `distribution: "gumbel"`, `lamda: 3` and `mena: 40` all
+produced plausible numbers that matched nothing the schema said. They now
+raise when the column is built, naming the closest valid spelling ("unknown
+parameter 'lamda' for poisson; did you mean 'lambda'?"). So do values the
+sampler cannot honour: negative `std`/`sigma`, `min > max`, a binomial `p`
+outside 0..1, non-positive beta or Pareto shapes. Case and common aliases
+(`Gaussian`, `log-normal`, `power-law`) are accepted. Unrecognised keys that
+are not near-misses are left alone, because parameters carry many
+cross-cutting options. LLM-written schemas are repaired with a warning
+instead of failing the parse. int columns gain the `exponential` and `beta`
+samplers they were silently missing; `poisson` and `binomial` on a float
+column now say they are int-only.
+
+### Seeding a real database
+
+- **One transaction.** `seed_database` committed every batch, so a constraint
+  failure in the fifth table left the first four filled. Create, truncate and
+  every insert now commit together; a failure rolls all of it back (SQLite and
+  Postgres both roll back DDL). Probes that may fail run in savepoints, so
+  they no longer poison a Postgres transaction.
+- **`--truncate` works on Postgres with foreign keys.** Tables were truncated
+  one statement at a time, which Postgres refuses for any referenced table.
+  It is one `TRUNCATE` naming every schema table now; `CASCADE` is
+  deliberately not used, since it would also empty tables outside the schema.
+- **`sqlite:///dev.db` is `./dev.db`.** The URL path was used as-is, so the
+  CLI's own example opened `/dev.db` at the filesystem root. Three slashes
+  are relative and four absolute, as in SQLAlchemy.
+- **`from_ddl` reads the constraints the database will enforce**: single-column
+  primary keys and `UNIQUE` become unique, `VARCHAR(n)` becomes a held
+  `max_length`, `CHAR(2)` country/state/language and `CHAR(3)` currency
+  columns get ISO codes, `NUMERIC(p, s)` keeps its scale, and `CHECK` with
+  `IN`, `BETWEEN`, comparisons or `length()` becomes choices, bounds or a
+  width. Text primary keys are codes, not sentences. Untranslatable checks are
+  counted in a warning. A constraint-heavy schema that failed on its first
+  insert in five different ways now seeds into Postgres and reseeds with
+  `--truncate`.
+- **Unique values stay inside their width.** A collided unique value got
+  `" 2"` appended, which overflowed `VARCHAR(12)`; pattern columns now redraw
+  a fresh code, and suffixes trim the base to fit.
+- **`to_sql(dialect="postgres")` writes valid DDL.** Only the spelling
+  `postgresql` was recognised; `postgres` fell to the ANSI branch, which wrote
+  `DOUBLE`, valid in neither. ANSI now writes `DOUBLE PRECISION` too.
+- Emails are derived from a `full_name` column as well as `name` and
+  `first_name`/`last_name`.
+
+### Story counts that name a table are honoured
+
+"An ecommerce shop with 3000 customers, 500 products and 12000 orders" came
+back with 600 products and a warning that "500 products" had no effect,
+although the parser had built a products table. An explicit count now sets
+the row count of the table it names, through plurals, two-word names ("order
+items") and a few synonyms (receipts and purchases for orders, clients and
+buyers for customers). Unique key ranges widen to fit. A count for a table
+the parser did not build ("40 stores") still gets the warning.
+
 ## [0.9.6.60] - 2026-09-28
 
 ### The "Never Use Faker Again" Release: Text Realism & Vertical Supremacy
