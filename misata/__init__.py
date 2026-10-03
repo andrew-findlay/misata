@@ -718,10 +718,8 @@ from misata.reporting import (
     build_oracle_report,
     DataCard,
     FidelityChecker,
-    FidelityReport,
     GenerationReportBundle,
     PrivacyAnalyzer,
-    PrivacyReport,
     analyze_generation,
 )
 from misata.assets import (
@@ -771,6 +769,8 @@ from misata.profiler import mimic, DataProfiler
 from misata.fidelity import fidelity_report, FidelityReport, privacy_report, PrivacyReport
 from misata.tells import realism_report, RealismReport
 from misata.plugins import generator, register_generator, GenContext
+from misata.process import simulate_process, process_audit, to_xes
+from misata.schema import Process
 from misata.ddl import from_ddl
 from misata import spark as spark  # noqa: PLC0414 — re-export the submodule
 
@@ -794,6 +794,10 @@ __all__ = [
     "generator",
     "register_generator",
     "GenContext",
+    "Process",
+    "simulate_process",
+    "process_audit",
+    "to_xes",
     "from_dict_schema",
     "verify_integrity",
     "IntegrityReport",
@@ -865,7 +869,6 @@ __all__ = [
     "GenerationContext",
     # Exceptions
     "MisataError",
-    "SchemaValidationError",
     "ColumnGenerationError",
     "LLMError",
     "ConfigurationError",
@@ -882,9 +885,7 @@ __all__ = [
     "RunManifest",
     "load_recipe",
     "PrivacyAnalyzer",
-    "PrivacyReport",
     "FidelityChecker",
-    "FidelityReport",
     "DataCard",
     "GenerationReportBundle",
     "analyze_generation",

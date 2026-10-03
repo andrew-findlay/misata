@@ -575,7 +575,7 @@ def load_yaml_schema(
     # declaration is one line rather than another forgotten branch.
     from misata.schema import (Bitemporal, CohortRetention, DagEdges,
                                Duplicates, EventLog, LateArrival, Lifecycle,
-                               Missingness, Outliers, TimeGrid,
+                               Missingness, Outliers, Process, TimeGrid,
                                TransitiveClosure, Typos)
     _declared: Dict[str, List[Any]] = {}
     for key, model in (("lifecycles", Lifecycle),
@@ -589,7 +589,8 @@ def load_yaml_schema(
                        ("typos", Typos),
                        ("bitemporal", Bitemporal),
                        ("dag_edges", DagEdges),
-                       ("closures", TransitiveClosure)):
+                       ("closures", TransitiveClosure),
+                       ("processes", Process)):
         parsed: List[Any] = []
         for i, item in enumerate(raw.get(key) or []):
             try:
@@ -642,6 +643,7 @@ def load_yaml_schema(
         bitemporal=_declared["bitemporal"],
         dag_edges=_declared["dag_edges"],
         closures=_declared["closures"],
+        processes=_declared["processes"],
         noise_config=noise_config,
         vocabularies=vocabularies,
         realism=realism,

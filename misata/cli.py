@@ -187,7 +187,7 @@ def _resolve_recipe_schema(recipe: RecipeSpec, rows: int) -> SchemaConfig:
 def print_banner():
     """Print the Misata banner."""
     console.print(Panel.fit(
-        "[bold purple]🧠 Misata[/bold purple] [dim]- AI-Powered Synthetic Data Engine[/dim]",
+        "[bold purple]Misata[/bold purple] [dim]- declare the outcome, get data that matches it[/dim]",
         border_style="purple"
     ))
 
@@ -201,7 +201,7 @@ def print_banner():
                    "misata --plugin my_generators generate --config misata.yaml")
 def main(plugins: tuple = ()) -> None:
     """
-    Misata - AI-Powered Synthetic Data Engine
+    Misata - declare the outcome, get data that matches it
 
     Generate industry-realistic data from natural language stories.
     """
@@ -1372,7 +1372,7 @@ def template(template_name: str, output_dir: str, scale: float, validate: bool) 
         raise
 
 
-@main.command()
+@main.command("validate-data")
 @click.option(
     "--data-dir",
     "-d",
@@ -1399,14 +1399,18 @@ def template(template_name: str, output_dir: str, scale: float, validate: bool) 
     default=None,
     help="Optional per-table row limit when validating a database",
 )
-def validate_cmd(data_dir: Optional[str], db_url: Optional[str], config: Optional[str], limit: Optional[int]) -> None:
+def validate_data_cmd(data_dir: Optional[str], db_url: Optional[str], config: Optional[str],
+                      limit: Optional[int]) -> None:
     """
-    Validate existing CSV data files.
+    Validate a folder of CSVs or a live database against a schema.
+
+    (This was unreachable: it shared the name `validate` with the CSV
+    profiler below, and the later registration replaced it.)
 
     Example:
 
-        misata validate --data-dir ./generated_data
-        misata validate --db-url sqlite:///./misata.db --config schema.yaml
+        misata validate-data --data-dir ./generated_data
+        misata validate-data --db-url sqlite:///./misata.db --config schema.yaml
     """
     print_banner()
 

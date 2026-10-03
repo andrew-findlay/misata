@@ -412,6 +412,22 @@ weights are declared.
 
 ---
 
+### `processes` — how a history unfolds
+
+A semi-Markov chain per case: declared transition probabilities (loops
+allowed, bounded by `max_steps`) and per-state or per-transition dwell
+distributions, written out as an event table. See the
+[processes guide](docs/guides/processes.md).
+
+**Guarantees.** Every case starts in `initial` at or after its start column;
+only declared transitions occur; steps are `1..n`; timestamps never go
+backwards; every case ends terminal or at `max_steps`; an optional
+`final_state_column` agrees with the log. `process_audit` re-derives all of
+it from the rows.
+
+**Does not guarantee.** Path shares and durations are drawn, not exact. No
+queues or resources.
+
 ### `outliers` / `typos` — dirt with an answer key
 
 ```python

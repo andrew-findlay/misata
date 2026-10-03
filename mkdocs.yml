@@ -138,6 +138,7 @@ nav:
     - MCP Server (AI agents): guides/mcp.md
     - pytest Fixtures: guides/testing.md
     - Custom Generators: guides/custom-generators.md
+    - Processes and Event Logs: guides/processes.md
     - SQL DDL to Schema: guides/from-ddl.md
     - dbt Seed Integration: guides/dbt-seed.md
     - Streaming Large Datasets: guides/streaming.md

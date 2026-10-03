@@ -135,6 +135,22 @@ returned zeros. Now:
   relationship; it was kept on the column and ignored, so validation failed
   on a relationship the file had just declared.
 
+### Processes: event logs with loops and real durations
+
+`processes:` declares how each case moves through states: transition
+probabilities (with rework loops such as reopened tickets, bounded by
+`max_steps`) and dwell-time distributions per state or per transition. It
+writes an event table (`event_id`, case key, `step`, `activity`,
+`timestamp`) and can set the case's final state, from Python, YAML, dict
+schemas and the CLI. It is a vectorised semi-Markov chain, not a
+discrete-event simulator (200,000 cases in about a second, no SimPy).
+Structural guarantees are exact and `misata.process_audit` re-checks them
+from the rows; path shares and durations are drawn. `misata.to_xes` exports
+any event log as IEEE 1849 XES for ProM, PM4Py, Disco or Celonis.
+
+The lifecycle timestamps it complements used one uniform gap of up to 30
+days for every step; a process gives each step its own distribution.
+
 ### A pytest plugin, no conftest needed
 
 Installing misata now registers a pytest plugin (`pytest11` entry point).

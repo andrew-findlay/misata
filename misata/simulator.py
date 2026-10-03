@@ -6138,6 +6138,9 @@ class DataSimulator:
             s.table for s in (getattr(self.config, "lifecycles", None) or [])
             if s.table in set(sorted_tables)
         }
+        # A process reads its whole cases table and may write its final state.
+        dyn_tables |= {p.cases_table for p in (getattr(self.config, "processes", None) or [])
+                       if p.cases_table in set(sorted_tables)}
 
         # Cross-table clamps (refund <= its order's total; payments per order
         # never exceed the order) need both sides materialised too.
@@ -6372,6 +6375,14 @@ class DataSimulator:
             with self._anchor("identity", "event_logs"):
                 apply_event_logs(buffered, self.config, self.rng)
 
+        # Processes simulate event logs from the finished cases, before the
+        # dynamics pass so missingness or time grids can still apply to them.
+        process_tables: List[str] = []
+        if getattr(self.config, "processes", None):
+            from misata.process import apply_processes
+            with self._anchor("identity", "processes"):
+                process_tables = apply_processes(buffered, self.config, self.rng)
+
         if dyn_tables:
             from misata.dynamics import apply_dynamics
             with self._anchor("identity", "dynamics"):
@@ -6381,6 +6392,8 @@ class DataSimulator:
         for table_name in sorted_tables:
             if table_name in buffered:
                 yield table_name, buffered[table_name]
+        for table_name in process_tables:
+            yield table_name, buffered[table_name]
 
     def generate_with_reports(
         self,
