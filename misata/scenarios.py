@@ -78,6 +78,12 @@ def _fill(template: str, rng: np.random.Generator, slots: Dict[str, str]) -> str
     return _SLOT.sub(sub, template)
 
 
+def _pick(rng: np.random.Generator, pool):
+    """One entry of a list; ``rng.choice`` converts the list to an array on
+    every call, which dominated per-row rendering."""
+    return pool[int(rng.integers(len(pool)))]
+
+
 def _cap(text: str) -> str:
     return text[:1].upper() + text[1:] if text else text
 
@@ -608,14 +614,30 @@ def eligible(pool: Sequence[str], noun: str) -> List[str]:
     return out
 
 
+_CUM: Dict[int, List[float]] = {}
+
+
 def _weighted(rng, options):
-    w = np.array([o[0] for o in options], dtype=float)
-    return options[int(rng.choice(len(options), p=w / w.sum()))][1]
+    cum = _CUM.get(id(options))
+    if cum is None:
+        w = np.cumsum([float(o[0]) for o in options])
+        cum = (w / w[-1]).tolist()
+        _CUM[id(options)] = cum
+    import bisect
+    return options[min(bisect.bisect_right(cum, rng.random()), len(options) - 1)][1]
 
 
 def _distinct(rng, pool, k):
-    k = min(k, len(pool))
-    return list(rng.choice(np.array(pool, dtype=object), size=k, replace=False))
+    """``k`` distinct entries of ``pool`` (pool order randomised)."""
+    n = len(pool)
+    k = min(k, n)
+    out, seen = [], set()
+    while len(out) < k:
+        j = int(rng.integers(n))
+        if j not in seen:
+            seen.add(j)
+            out.append(pool[j])
+    return out
 
 
 _KNOWN_NOUNS: Optional[List[str]] = None
@@ -1094,16 +1116,41 @@ for _iss in ISSUES:
     _FAMILY_ISSUES.setdefault(_iss.family, []).append(_iss)
 
 
+_DEVICES = ["iPhone 15", "iPhone 13", "Pixel 8", "Galaxy S23", "Galaxy A54", "iPad",
+            "MacBook Air", "Windows laptop", "Chromebook", "work PC", "Android tablet"]
+_BROWSERS = ["Chrome", "Safari", "Firefox", "Edge", "the app", "Brave"]
+_WHENS = ["yesterday", "this morning", "last night", "Monday", "Tuesday", "the weekend",
+          "Friday", "last week", "two days ago", "the last update", "about an hour ago"]
+_PLANS = ["Basic", "Plus", "Pro", "Premium", "Business", "Family", "Starter", "Team"]
+
+
 def _ticket_slots(rng, item: Optional[str]) -> Dict[str, str]:
-    return {
-        "order": str(int(rng.integers(100000, 999999))),
-        "amount": f"{float(np.exp(rng.normal(3.6, 0.8))):.2f}",
-        "n": str(int(rng.integers(2, 6))),
-        "day": _day(int(rng.integers(1, 29))),
-        "code": str(rng.choice(["SPRING20", "WELCOME10", "SAVE15", "FREESHIP", "VIP25"])),
-        "version": f"{int(rng.integers(3, 9))}.{int(rng.integers(0, 15))}.{int(rng.integers(0, 6))}",
-        "item": item or "item",
-    }
+    return _ticket_slot_rows(rng, 1, [item])[0]
+
+
+def _ticket_slot_rows(rng, size: int, items: Optional[Sequence] = None) -> List[Dict[str, str]]:
+    """Per-row slot values, drawn as whole columns."""
+    def pick(pool):
+        idx = rng.integers(0, len(pool), size)
+        return [pool[i] for i in idx]
+    devices, browsers, whens, plans = pick(_DEVICES), pick(_BROWSERS), pick(_WHENS), pick(_PLANS)
+    codes = pick(["SPRING20", "WELCOME10", "SAVE15", "FREESHIP", "VIP25"])
+    mins = rng.integers(5, 90, size)
+    orders = rng.integers(100000, 999999, size)
+    amounts = np.exp(rng.normal(3.6, 0.8, size))
+    ns = rng.integers(2, 6, size)
+    days = rng.integers(1, 29, size)
+    va, vb, vc = rng.integers(3, 9, size), rng.integers(0, 15, size), rng.integers(0, 6, size)
+    out = []
+    for i in range(size):
+        it = items[i] if items is not None and i < len(items) and items[i] else None
+        out.append({
+            "device": devices[i], "browser": browsers[i], "when": whens[i], "plan": plans[i],
+            "mins": str(int(mins[i])), "order": str(int(orders[i])),
+            "amount": f"{float(amounts[i]):.2f}", "n": str(int(ns[i])), "day": _day(int(days[i])),
+            "code": codes[i], "version": f"{va[i]}.{vb[i]}.{vc[i]}", "item": it or "item",
+        })
+    return out
 
 
 def _day(d: int) -> str:
@@ -1125,29 +1172,49 @@ def draw_tickets(rng: np.random.Generator, size: int, *,
     pris = _clean_values(priorities, size)
     stats = _clean_values(statuses, size)
     items = _clean_values(items, size)
+    import bisect
     issues: List[Issue] = []
     urg: List[int] = []
+    fam_cache: Dict[str, Optional[str]] = {}
+    cum_cache: Dict[tuple, List[float]] = {}
+    draws = rng.random(size)
+    noise = rng.normal(0, 0.6, size)
     for i in range(size):
-        fam = issue_family_for(cats[i]) if cats else None
-        pool = _FAMILY_ISSUES.get(fam) if fam else None
-        pool = pool or ISSUES
+        c = cats[i] if cats else ""
+        if c not in fam_cache:
+            fam_cache[c] = issue_family_for(c) if c else None
+        fam = fam_cache[c]
+        pool = (_FAMILY_ISSUES.get(fam) if fam else None) or ISSUES
         u = _PRIORITY_RANK.get(pris[i].lower(), None) if pris else None
-        if u is None:
-            w = np.array([1.0 for _ in pool])
-        else:
-            # severity^(u-1.5): urgent rows favour severe issues, low rows mild ones
-            w = np.array([iss.severity ** (2.0 * (u - 1.5)) for iss in pool])
-        issues.append(pool[int(rng.choice(len(pool), p=w / w.sum()))])
+        key = (fam, u)
+        cum = cum_cache.get(key)
+        if cum is None:
+            # severity^(2(u-1.5)): urgent rows favour severe issues, low rows mild ones
+            w = np.array([1.0 if u is None else iss.severity ** (2.0 * (u - 1.5)) for iss in pool])
+            cum = np.cumsum(w / w.sum()).tolist()
+            cum_cache[key] = cum
+        issues.append(pool[min(bisect.bisect_right(cum, draws[i]), len(pool) - 1)])
         if u is None:
             sev = issues[-1].severity
-            u = int(np.clip(round(1 + (sev - 1) * 2.5 + rng.normal(0, 0.6)), 0, 3))
+            u = int(np.clip(round(1 + (sev - 1) * 2.5 + noise[i]), 0, 3))
         urg.append(int(u))
     open_ = [is_open_status(s) for s in stats] if stats else [False] * size
-    slots = [_ticket_slots(rng, (_noun_from_name(items[i]) if items and items[i] else None))
-             for i in range(size)]
+    slots = _ticket_slot_rows(rng, size, [(_noun_from_name(x) if x else None) for x in items]
+                              if items else None)
     subjects = []
     for i, iss in enumerate(issues):
-        s = _fill(str(rng.choice(iss.subjects)), rng, slots[i])
+        s = _fill(str(_pick(rng, iss.subjects)), rng, slots[i])
+        q = rng.random()
+        if q < 0.12 and "#" not in s and iss.family in ("billing", "shipping", "returns"):
+            s = f"{s} (order #{slots[i]['order']})"
+        elif q < 0.2 and iss.family == "technical":
+            s = f"{s} since {slots[i]['when']}"
+        elif q < 0.26 and iss.family in ("technical",):
+            s = f"{s} on {slots[i]['device']}"
+        elif q < 0.32 and items and items[i]:
+            s = f"{s} - {items[i] if len(items[i]) < 40 else slots[i]['item']}"
+        elif q < 0.36:
+            s = f"{_pick(rng, ['Help: ', 'Question: ', 'Issue: ', 'Problem: '])}{s[0].lower() + s[1:]}"
         r = rng.random()
         if r < 0.06:
             s = f"Re: {s}"
@@ -1161,7 +1228,28 @@ def draw_tickets(rng: np.random.Generator, size: int, *,
     return TicketFrame(issues, slots, urg, open_, subjects)
 
 
-_GREETINGS = ["Hi,", "Hello,", "Hi there,", "Hello team,", "Hey,", "Good morning,", "Dear support,"]
+_GREETINGS = ["Hi,", "Hello,", "Hi there,", "Hello team,", "Hey,", "Good morning,", "Dear support,",
+              "Hi support,", "Hello there,", "Good afternoon,", "To whom it may concern,", "Hiya,"]
+_LEADS = ["", "", "", "", "", "", "So, ", "Quick one: ", "For the second time, ", "Hoping you can help. ",
+          "Not sure who to ask, but ", "Following up on my chat: ", "As the title says, "]
+_CONTEXT_LINES = {
+    "any": ["This started {when}.", "I first noticed it {when}.", "I'm on the {plan} plan.",
+            "My account email is the one on this ticket.", "I've been a customer for {n} years.",
+            "I've waited {mins} minutes on chat already.", "This is my {n}th time asking."],
+    "technical": ["I'm using {browser} on a {device}.", "Same thing on my {device}.",
+                  "It started after the {version} update.", "Screenshot attached.",
+                  "Our whole team on the {plan} plan sees it.", "Happens every time, not just once."],
+    "account": ["I'm on a {device}.", "I tried from {browser} as well.",
+                "I'm travelling, so I can't get to my usual laptop."],
+    "billing": ["The charge was ${amount}.", "My order number is #{order}.",
+                "Statement screenshot attached.", "I'm on the {plan} plan."],
+    "shipping": ["My order number is #{order}.", "I paid ${amount} for it.",
+                 "The tracking link just says 'in transit'.", "It was a gift, so timing matters."],
+    "returns": ["Order #{order}.", "It cost ${amount}.", "I still have the original packaging.",
+                "I sent it back {when}."],
+    "product": ["We're on the {plan} plan.", "I'd happily pay more for this.",
+                "Using it on a {device} mostly."],
+}
 _TRIED = ["I've tried logging out and back in.", "I've already cleared my cache and cookies.",
           "I tried a different browser with the same result.", "Restarting didn't help.",
           "I checked the help centre but couldn't find an answer.",
@@ -1181,6 +1269,13 @@ _PREFACES = ["Spoke to the customer by phone. ", "Per chat with the customer: ",
              "Customer called back. ", "Reviewed the order history. ", "Confirmed with billing. ",
              "Looked into this with the warehouse. ", "Followed up by email. ",
              "Checked with the courier. ", "Pulled the payment logs. "]
+_RESOLUTION_NOTES_EXTRA = [
+    "Customer is on the {plan} plan.", "Handled in {mins} minutes.", "Order #{order}.",
+    "Amount involved: ${amount}.", "Reported on {device}.", "First reported {when}.",
+    "Second contact about this.", "Customer was polite and patient.",
+    "Customer was frustrated; offered a {n}0% voucher.", "No further action needed.",
+    "Checked for similar tickets: {n} others this week.", "Added an internal note to the account.",
+]
 _FOLLOWUPS = ["", "", "Customer confirmed the issue is resolved.",
               "Customer thanked us; marking solved.", "Will monitor for a week.",
               "Macro sent.", "Linked to the known-issue article.", "Tagged for the weekly review.",
@@ -1196,20 +1291,27 @@ def render_ticket_descriptions(rng: np.random.Generator, frame: TicketFrame) -> 
     for i in range(size):
         iss, sl, u = frame.issue[i], frame.slots[i], frame.urgency[i]
         parts = []
-        greeting = str(rng.choice(_GREETINGS)) if rng.random() < 0.4 else ""
-        parts.append(_fill(str(rng.choice(iss.symptoms)), rng, sl))
+        greeting = str(_pick(rng, _GREETINGS)) if rng.random() < 0.4 else ""
+        sym = _fill(str(_pick(rng, iss.symptoms)), rng, sl)
+        lead = str(_pick(rng, _LEADS))
+        if lead and not lead.endswith(". ") and not lead.endswith(": "):
+            sym = sym[0].lower() + sym[1:] if not sym.startswith("I ") and not sym.startswith("I'") else sym
+        parts.append(lead + sym)
         if rng.random() < 0.7:
-            parts.append(_fill(str(rng.choice(iss.details)), rng, sl))
+            parts.append(_fill(str(_pick(rng, iss.details)), rng, sl))
+        if rng.random() < 0.6:
+            pool = _CONTEXT_LINES.get(iss.family, []) + _CONTEXT_LINES["any"]
+            parts.append(_fill(str(_pick(rng, pool)), rng, sl))
         if iss.family in ("technical", "account") and rng.random() < 0.5:
-            parts.append(str(rng.choice(_TRIED)))
-        impact = str(rng.choice(_IMPACT[u]))
+            parts.append(str(_pick(rng, _TRIED)))
+        impact = str(_pick(rng, _IMPACT[u]))
         if impact:
             parts.append(impact)
         text = " ".join(parts)
         if greeting:
             text = f"{greeting}\n\n{text}"
         if rng.random() < 0.25:
-            text += f"\n\n{rng.choice(_SIGNOFFS)}"
+            text += f"\n\n{_pick(rng, _SIGNOFFS)}"
         out[i] = text
     return out
 
@@ -1234,8 +1336,10 @@ def render_ticket_resolutions(rng: np.random.Generator, frame: TicketFrame) -> n
             text = f"Root cause: {cause[0].lower() + cause[1:]}".rstrip(".") + f". {fix}"
         else:
             text = fix
-        follow = str(rng.choice(_FOLLOWUPS))
-        pre = str(rng.choice(_PREFACES)) if rng.random() < 0.3 else ""
+        if rng.random() < 0.5:
+            text = f"{text} {_fill(str(_pick(rng, _RESOLUTION_NOTES_EXTRA)), rng, sl)}"
+        follow = str(_pick(rng, _FOLLOWUPS))
+        pre = str(_pick(rng, _PREFACES)) if rng.random() < 0.3 else ""
         if pre and r >= 0.45:
             text = text[0].lower() + text[1:] if pre.endswith(": ") else text
         out[i] = f"{pre}{text} {follow}".strip()
@@ -1308,7 +1412,7 @@ def bios(rng: np.random.Generator, size: int, *, jobs: Optional[Sequence] = None
         city = (cities[i] if cities and cities[i] else None)
         comp = (companies[i] if companies and companies[i] else None)
         a, b = _distinct(rng, _INTERESTS, 2)
-        field = str(rng.choice(_FIELDS))
+        field = str(_pick(rng, _FIELDS))
         opts = [(2, f"{a.capitalize()} and {b}.")]
         if job:
             opts += [(3, f"{job}{f' at {comp}' if comp else ''}. Into {a} and {b}."),
@@ -1324,7 +1428,7 @@ def bios(rng: np.random.Generator, size: int, *, jobs: Optional[Sequence] = None
                  (1, f"{field.capitalize()} person. {a.capitalize()} fan.")]
         text = _weighted(rng, opts)
         if rng.random() < 0.08:
-            text += " " + str(rng.choice(["🌍", "☕", "🚴", "📚", "🎧", "🌱", "📷"]))
+            text += " " + str(_pick(rng, ["🌍", "☕", "🚴", "📚", "🎧", "🌱", "📷"]))
         out[i] = text
     return out
 
@@ -1364,24 +1468,24 @@ def street_lines(rng: np.random.Generator, size: int,
         num = 1 + int(rng.exponential(1800 if c in ("united states", "usa", "us") else 60))
         if c in ("united kingdom", "uk", "great britain", "england", "australia", "ireland",
                  "new zealand"):
-            line = f"{num} {rng.choice(_STREETS_EN)} {rng.choice(_SUFFIX_UK)}"
+            line = f"{num} {_pick(rng, _STREETS_EN)} {_pick(rng, _SUFFIX_UK)}"
             if rng.random() < 0.15:
                 line = f"Flat {int(rng.integers(1, 30))}, {line}"
         elif c in ("germany", "deutschland", "austria", "switzerland"):
-            line = f"{rng.choice(_STREETS_DE)}{rng.choice(_SUFFIX_DE)} {num}"
+            line = f"{_pick(rng, _STREETS_DE)}{_pick(rng, _SUFFIX_DE)} {num}"
         elif c in ("france", "belgium"):
-            line = f"{num} {rng.choice(_TYPE_FR)} {rng.choice(_STREETS_FR)}"
+            line = f"{num} {_pick(rng, _TYPE_FR)} {_pick(rng, _STREETS_FR)}"
         elif c in ("netherlands", "holland"):
-            line = f"{rng.choice(_STREETS_NL)}{rng.choice(_SUFFIX_NL)} {num}"
+            line = f"{_pick(rng, _STREETS_NL)}{_pick(rng, _SUFFIX_NL)} {num}"
         elif c in ("brazil", "brasil", "portugal"):
-            line = f"{rng.choice(_TYPE_BR)} {rng.choice(_STREETS_BR)}, {num}"
+            line = f"{_pick(rng, _TYPE_BR)} {_pick(rng, _STREETS_BR)}, {num}"
         elif c == "india":
-            line = f"{num}, {rng.choice(_STREETS_IN)}"
+            line = f"{num}, {_pick(rng, _STREETS_IN)}"
         elif c == "japan":
             line = (f"{int(rng.integers(1, 9))}-{int(rng.integers(1, 30))}-"
-                    f"{int(rng.integers(1, 20))} {rng.choice(_JP_WARDS)}")
+                    f"{int(rng.integers(1, 20))} {_pick(rng, _JP_WARDS)}")
         else:
-            line = f"{num} {rng.choice(_STREETS_EN)} {rng.choice(_SUFFIX_US)}"
+            line = f"{num} {_pick(rng, _STREETS_EN)} {_pick(rng, _SUFFIX_US)}"
             if rng.random() < 0.25:
                 line += str(rng.choice([f", Apt {int(rng.integers(1, 40))}{rng.choice(list('ABCDEF'))}",
                                         f", Unit {int(rng.integers(1, 300))}",

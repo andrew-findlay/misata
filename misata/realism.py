@@ -1469,7 +1469,8 @@ class RealisticTextGenerator:
         return np.array(codes)
 
     def _generate_short_review_title(self, *, size: int, table_data: Optional[pd.DataFrame] = None) -> np.ndarray:
-        return self.microtext.review_titles(size, ratings=self._ratings_from(table_data, size))
+        return self.microtext.review_titles(size, ratings=self._ratings_from(table_data, size),
+                                            context=self._review_context(table_data, size))
 
     def _ratings_from(self, table_data: Optional[pd.DataFrame], size: int):
         """The row's own rating column, if one has been generated already."""
@@ -1484,6 +1485,10 @@ class RealisticTextGenerator:
         # Sentiment is conditioned on the row's rating: a 1-star review reads
         # angry, a 5-star review reads delighted. Without a rating column the
         # grammar falls back to the J-shaped marginal real review sites show.
+        return self.microtext.reviews(size, ratings=self._ratings_from(table_data, size),
+                                      context=self._review_context(table_data, size))
+
+    def _review_context(self, table_data, size: int) -> dict:
         ctx = _prose_context(table_data, size)
         pc = self.parent_context or {}
         if "subject" not in ctx and pc.get("name") is not None:
@@ -1493,8 +1498,7 @@ class RealisticTextGenerator:
             names = list(pc["name"])[:size]
             if len({n for n in names[:500] if n}) >= 5:
                 ctx["subject"] = [subject_from_name(n) if n else "" for n in names]
-        return self.microtext.reviews(size, ratings=self._ratings_from(table_data, size),
-                                      context=ctx)
+        return ctx
 
     def _generate_email_body(self, *, size: int) -> np.ndarray:
         _GREETINGS = ["Hi", "Hello", "Hey", "Dear team", "Hi there", "Good morning"]

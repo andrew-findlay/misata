@@ -384,22 +384,269 @@ def _check_diversity(table: str, col: str, s: pd.Series) -> Optional[TellCheck]:
     return TellCheck("value_diversity", table, col, PASS, "values are diverse", ev)
 
 
-def _check_text_templates(table: str, col: str, s: pd.Series) -> Optional[TellCheck]:
-    v = s.dropna().astype(str)
-    if len(v) < 200 or v.str.len().mean() < 40 or not v.str.contains(" ").all():
+# Free text. Thresholds come from a local calibration on seven real English
+# corpora (product and hotel reviews, news, tweets, forum posts and titles) at
+# 2,000 rows each: every real corpus had gzip ratio <= 2.95, distinct-3 >=
+# 0.71, skeleton duplicates <= 0.16, near-duplicates <= 0.002, length CV >=
+# 0.29 and a top-10 opener share <= 0.28. Template text sat 5-50x outside
+# those bands, so each threshold below sits well inside the gap.
+_TEXT_SAMPLE = 2000
+_LOG_COL_RE = re.compile(r"(^|_)(log|logs|error|errors|trace|stack|sql|query|url|uri|path|"
+                         r"user_agent|useragent|hash|token|json|html|xml|code)(_|$)")
+_TOKEN_RE = re.compile(r"[a-z0-9']+")
+_STOPWORDS = frozenset(
+    "a an the and or but i i'm it it's is was are were be been to of in on for with this "
+    "that my me so at as very not no too just have has had do did they them you your we "
+    "our its".split())
+
+
+def _tokens(text: str) -> List[str]:
+    return _TOKEN_RE.findall(text.lower())
+
+
+# Short identifiers and labels (emails, addresses, names, codes) are not free
+# text: they are judged by the placeholder and diversity checks instead.
+_NOT_PROSE_RE = re.compile(r"(e-?mail|address|street|city|country|(^|_)name$|^name|company|"
+                           r"brand|phone|sku|(^|_)id$|uuid|slug|username|handle|tag)")
+_PROSE_NAME_RE = re.compile(r"(title|subject|headline|summary|description|body|text|review|"
+                            r"comment|note|feedback|message|bio|reason|resolution|details)")
+
+
+def _is_free_text(col: str, median_tokens: float) -> bool:
+    c = col.lower()
+    if _NOT_PROSE_RE.search(c) and not _PROSE_NAME_RE.search(c):
+        return False
+    return median_tokens >= 5 or bool(_PROSE_NAME_RE.search(c))
+
+
+def _text_sample(s: pd.Series) -> Optional[List[str]]:
+    v = s.dropna()
+    v = v[v.map(lambda x: isinstance(x, str))]
+    v = v[v.str.strip() != ""]
+    if len(v) < 200:
         return None
-    openers = v.str.lower().str.split().str[:3].str.join(" ")
-    top_opener = float(openers.value_counts(normalize=True).iloc[0])
+    if len(v) > _TEXT_SAMPLE:
+        v = v.sample(_TEXT_SAMPLE, random_state=0)
+    return v.tolist()
+
+
+def _skeleton(text: str) -> str:
+    """The sentence with its content removed: numbers to #, emails to @E,
+    every word that is not a stopword to W. Templates that swap the noun keep
+    the same skeleton; people almost never write the same one twice."""
+    t = re.sub(r"\S+@\S+", "@E", text)
+    t = re.sub(r"\d+([.,]\d+)?", "#", t)
+    out = []
+    for w in re.findall(r"[A-Za-z']+|#|@E|[^\sA-Za-z]", t):
+        lw = w.lower()
+        if w in ("#", "@E"):
+            out.append(w)
+        elif lw in _STOPWORDS or not w[0].isalpha():
+            out.append(lw)
+        else:
+            out.append("W")
+    return " ".join(out)
+
+
+def _near_duplicate_share(docs: Sequence[str], k: int = 5, perm: int = 64,
+                          bands: int = 16, threshold: float = 0.8) -> float:
+    """Share of texts with a near-copy (word 5-shingle Jaccard >= 0.8),
+    found with MinHash LSH. Exact duplicates are counted by the caller."""
+    import zlib
+
+    rng = np.random.default_rng(0)
+    rows = perm // bands
+    prime = (1 << 61) - 1
+    a = rng.integers(1, 1 << 31, perm, dtype=np.int64)
+    b = rng.integers(0, 1 << 31, perm, dtype=np.int64)
+    seen = set()
+    sets, sigs = [], []
+    for d in docs:
+        t = _tokens(d)
+        sh = {zlib.crc32(" ".join(t[i:i + k]).encode()) for i in range(max(1, len(t) - k + 1))}
+        sets.append(sh)
+        h = np.fromiter(sh, dtype=np.int64, count=len(sh))[:, None]
+        sigs.append(((h * a + b) % prime).min(0))
+    buckets: Dict[tuple, List[int]] = {}
+    near = set()
+    for i, sig in enumerate(sigs):
+        if docs[i] in seen:
+            continue
+        seen.add(docs[i])
+        for bd in range(bands):
+            key = (bd, sig[bd * rows:(bd + 1) * rows].tobytes())
+            for j in buckets.get(key, ()):
+                if i in near:
+                    break
+                inter = len(sets[i] & sets[j])
+                if inter / max(len(sets[i] | sets[j]), 1) >= threshold:
+                    near.add(i)
+            buckets.setdefault(key, []).append(i)
+    return len(near) / max(len(docs), 1)
+
+
+def _check_text_templates(table: str, col: str, s: pd.Series) -> Optional[TellCheck]:
+    """Repetition: exact duplicates, recurring openings, recurring sentence
+    skeletons, and near-copies."""
+    if _LOG_COL_RE.search(col.lower()):
+        return None
+    docs = _text_sample(s)
+    if docs is None:
+        return None
+    lens = np.array([len(_tokens(d)) for d in docs])
+    median = float(np.median(lens))
+    if median < 3 or not _is_free_text(col, median):
+        return None
+    v = pd.Series(docs)
     dup = float(v.duplicated().mean())
-    ev = {"n": int(len(v)), "top_opener_share": round(top_opener, 3),
-          "top_opener": openers.value_counts().index[0], "duplicate_share": round(dup, 3)}
-    if dup > 0.2 or top_opener > 0.10:
-        reason = (f"{dup:.0%} of texts are exact duplicates" if dup > 0.2 else
-                  f"{top_opener:.0%} of texts open with the same three words "
-                  f"({ev['top_opener']!r})")
+    openers = v.str.lower().str.split().str[:3].str.join(" ")
+    oc = openers.value_counts(normalize=True)
+    top10 = float(oc.iloc[:10].sum())
+    ev = {"n": int(len(v)), "median_tokens": median, "duplicate_share": round(dup, 3),
+          "top_opener": oc.index[0], "top_opener_share": round(float(oc.iloc[0]), 3),
+          "top10_opener_share": round(top10, 3)}
+    reasons = []
+    if dup > 0.2:
+        reasons.append(f"{dup:.0%} of texts are exact duplicates")
+    if top10 > 0.5:
+        reasons.append(f"{top10:.0%} of texts open with one of ten three-word openings "
+                       f"(most often {ev['top_opener']!r})")
+    if median >= 8:
+        skel = float(v.map(_skeleton).duplicated().mean())
+        near = _near_duplicate_share(docs)
+        ev.update(skeleton_duplicate_share=round(skel, 3), near_duplicate_share=round(near, 3))
+        if skel > 0.35:
+            reasons.append(f"{skel:.0%} of texts repeat another's sentence skeleton with "
+                           f"only the words swapped")
+        if near > 0.05:
+            reasons.append(f"{near:.0%} of texts are near-copies of another")
+    if reasons:
         return TellCheck("text_templates", table, col, WARN,
-                         f"{reason}; free text reads as templated", ev)
-    return TellCheck("text_templates", table, col, PASS, "text openings vary", ev)
+                         "; ".join(reasons) + "; free text reads as templated", ev)
+    return TellCheck("text_templates", table, col, PASS, "texts do not repeat each other", ev)
+
+
+def _check_text_diversity(table: str, col: str, s: pd.Series) -> Optional[TellCheck]:
+    """Vocabulary: compressibility, distinct trigrams, length spread, and the
+    word-frequency curve (natural text is Zipfian; word salad is flat)."""
+    import gzip
+
+    if _LOG_COL_RE.search(col.lower()):
+        return None
+    docs = _text_sample(s)
+    if docs is None:
+        return None
+    toks = [_tokens(d) for d in docs]
+    lens = np.array([len(t) for t in toks], dtype=float)
+    median = float(np.median(lens))
+    if median < 3 or not _is_free_text(col, median):
+        return None
+    raw = "\n".join(docs).encode("utf-8")
+    cr = len(raw) / max(len(gzip.compress(raw, 9)), 1)
+    tri, total = set(), 0
+    for t in toks:
+        g = list(zip(t, t[1:], t[2:]))
+        total += len(g)
+        tri.update(g)
+    d3 = len(tri) / max(total, 1)
+    cv = float(lens.std() / lens.mean()) if lens.mean() else 0.0
+    ev = {"n": len(docs), "median_tokens": median, "gzip_ratio": round(cr, 2),
+          "distinct_3": round(d3, 3), "length_cv": round(cv, 2)}
+    reasons = []
+    if cr > 4.0:
+        reasons.append(f"the column compresses {cr:.0f}x (real text: under 3x)")
+    if total >= 500 and d3 < 0.40:
+        reasons.append(f"only {d3:.0%} of word trigrams are distinct (real text: over 70%)")
+    if median >= 8 and cv < 0.15:
+        reasons.append(f"lengths barely vary (CV {cv:.2f}; real text: over 0.29)")
+    if median >= 10:
+        from collections import Counter
+        counts = np.array(sorted(Counter(w for t in toks for w in t).values(), reverse=True),
+                          dtype=float)
+        if len(counts) >= 200:
+            r = np.arange(1, min(1000, len(counts)) + 1)
+            slope = float(np.polyfit(np.log(r), np.log(counts[:len(r)]), 1)[0])
+            ev["zipf_slope"] = round(slope, 2)
+            if slope > -0.5:
+                reasons.append(f"word frequencies are flat (Zipf slope {slope:.2f}; real text: "
+                               f"-0.8 to -1.2), the mark of random word salad")
+    if reasons:
+        return TellCheck("text_diversity", table, col, WARN,
+                         "; ".join(reasons) + "; the vocabulary is too small or too even", ev)
+    return TellCheck("text_diversity", table, col, PASS, "vocabulary looks natural", ev)
+
+
+_RATING_COL_RE = re.compile(r"^(rating|stars|score|review_score|rating_given|star_rating)$")
+_TEXT_PAIRS = (
+    ("review_title", "review_text"), ("title", "body"), ("subject", "description"),
+    ("subject", "body"), ("ticket_subject", "ticket_body"), ("title", "description"),
+    ("product_name", "description"), ("name", "description"), ("summary", "description"),
+)
+
+
+def _content_words(text: str) -> set:
+    return {w.rstrip("s") for w in _tokens(text) if w not in _STOPWORDS and len(w) > 2}
+
+
+def _check_text_context(table: str, df: pd.DataFrame) -> List[TellCheck]:
+    """Text that ignores its own row: a review whose tone does not follow its
+    rating, a description that shares no words with its title."""
+    out: List[TellCheck] = []
+    rating = next((c for c in df.columns if _RATING_COL_RE.match(str(c).lower())), None)
+    review = next((c for c in df.columns if str(c).lower() in
+                   ("review", "review_text", "review_body", "comment", "feedback", "text")), None)
+    if rating is not None and review is not None:
+        sub = df[[rating, review]].dropna()
+        sub = sub[sub[review].map(lambda x: isinstance(x, str))]
+        r = pd.to_numeric(sub[rating], errors="coerce")
+        sub = sub[r.notna()]
+        if len(sub) >= 200 and r.nunique() >= 3:
+            from misata.microtext import detect_sentiment
+            pol = sub[review].map(lambda t: {"positive": 1, "negative": -1}.get(
+                detect_sentiment(t), 0))
+            if (pol != 0).mean() >= 0.2:
+                rho = float(pd.Series(pd.to_numeric(sub[rating])).rank().corr(pol.rank()))
+                ev = {"n": int(len(sub)), "rating_column": rating, "text_column": review,
+                      "spearman": round(rho, 3)}
+                if rho < 0.10:
+                    out.append(TellCheck("text_context", table, review, WARN,
+                                         f"review tone does not follow {rating} (Spearman "
+                                         f"{rho:.2f}; real reviews: about 0.4)", ev))
+                else:
+                    out.append(TellCheck("text_context", table, review, PASS,
+                                         f"review tone follows {rating}", ev))
+    cols = {str(c).lower(): c for c in df.columns}
+    for a, b in _TEXT_PAIRS:
+        if a not in cols or b not in cols:
+            continue
+        sub = df[[cols[a], cols[b]]].dropna()
+        sub = sub[sub.apply(lambda r: isinstance(r.iloc[0], str) and isinstance(r.iloc[1], str),
+                            axis=1)]
+        if len(sub) < 200:
+            continue
+        sub = sub.sample(min(len(sub), _TEXT_SAMPLE), random_state=0)
+        ta = [_content_words(x) for x in sub.iloc[:, 0]]
+        tb = [_content_words(x) for x in sub.iloc[:, 1]]
+
+        def overlap(xs, ys):
+            return float(np.mean([len(x & y) / max(len(x), 1) for x, y in zip(xs, ys)]))
+        paired = overlap(ta, tb)
+        perm = np.random.default_rng(0).permutation(len(tb))
+        shuffled = overlap(ta, [tb[i] for i in perm])
+        ratio = paired / shuffled if shuffled > 0 else (float("inf") if paired > 0 else 1.0)
+        ev = {"n": int(len(sub)), "pair": [cols[a], cols[b]], "overlap": round(paired, 3),
+              "shuffled_overlap": round(shuffled, 3),
+              "ratio": round(ratio, 2) if np.isfinite(ratio) else None}
+        if paired < 0.05 or ratio < 1.5:
+            out.append(TellCheck("text_context", table, cols[b], WARN,
+                                 f"{cols[b]} shares no more words with its own {cols[a]} than "
+                                 f"with a random row's (overlap {paired:.2f} vs {shuffled:.2f}); "
+                                 f"the two were written independently", ev))
+        else:
+            out.append(TellCheck("text_context", table, cols[b], PASS,
+                                 f"{cols[b]} is about its {cols[a]}", ev))
+        break
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -516,7 +763,7 @@ def _check_fanout(parent: str, pkey: str, child: str, ckey: str,
 ALL_CHECKS = (
     "amount_shape", "benford", "category_balance", "weekday_rhythm", "daily_rhythm",
     "placeholder_values", "email_domains", "value_diversity", "text_templates",
-    "too_clean", "name_email", "fanout_skew",
+    "text_diversity", "text_context", "too_clean", "name_email", "fanout_skew",
 )
 
 
@@ -580,10 +827,12 @@ def realism_report(
                 add(_check_placeholders(table, name, s))
                 add(_check_diversity(table, name, s))
                 add(_check_text_templates(table, name, s))
+                add(_check_text_diversity(table, name, s))
                 if _EMAIL_RE.search(name):
                     add(_check_email_domains(table, name, s))
         add(_check_too_clean(table, df))
         add(_check_name_email(table, df))
+        add(_check_text_context(table, df))
 
     rels = _schema_relationships(schema) or _infer_relationships(tables)
     for parent, pkey, child, ckey in rels:

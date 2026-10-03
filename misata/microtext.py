@@ -24,6 +24,7 @@ do not guarantee.
 
 from __future__ import annotations
 
+import bisect
 import re
 from typing import Dict, List, Optional, Sequence, Union
 
@@ -71,6 +72,7 @@ class Grammar:
         self.capitalise = capitalise
         self._templates: Dict[str, List[str]] = {}
         self._weights: Dict[str, np.ndarray] = {}
+        self._cum: Dict[str, List[float]] = {}
         for symbol, options in rules.items():
             templates, weights = [], []
             for option in options:
@@ -83,12 +85,20 @@ class Grammar:
             w = np.array(weights)
             self._templates[symbol] = templates
             self._weights[symbol] = w / w.sum()
+            # Cumulative weights as a plain list: one rng.random() and a
+            # bisect per node is ~20x cheaper than rng.choice(p=...).
+            cum = np.cumsum(w / w.sum()).tolist()
+            cum[-1] = 1.0
+            self._cum[symbol] = cum
 
     def expand(self, symbol: str, _depth: int = 0, **slots: str) -> str:
         if _depth > self.MAX_DEPTH:
             raise RecursionError(f"grammar too deep at '{symbol}'")
-        idx = self.rng.choice(len(self._templates[symbol]), p=self._weights[symbol])
-        template = self._templates[symbol][idx]
+        templates = self._templates[symbol]
+        if len(templates) == 1:
+            template = templates[0]
+        else:
+            template = templates[bisect.bisect_right(self._cum[symbol], self.rng.random())]
 
         def _fill(match: re.Match) -> str:
             name = match.group(1)
@@ -347,27 +357,78 @@ _REVIEW_RULES: Dict[str, List[Rule]] = {
 }
 
 _TITLE_RULES: Dict[str, List[Rule]] = {
+    # Real review titles are short and repeat a lot ("Love it!"), so a few
+    # fixed favourites carry weight; the rest compose around the product.
     "title_5": [
-        "Outstanding in every way", "Exceeded all expectations", "Absolutely loved it",
-        "Best purchase this year", "Five stars, easily", "A hidden gem",
-        "Perfect from start to finish", "Couldn't ask for more",
+        (2, "{fixed5}"), (3, "{love} {the_subject}{bang}"), (2, "{best} {subject} {ever}"),
+        (2, "{adv_pos} {adj_pos}{bang}"), (2, "{adj_pos} {subject}{bang}"),
+        (1, "{adj_pos}, {adj_pos2} and {adj_pos3}"), (1, "{adj_pos}{bang}"),
     ],
+    "fixed5": ["Outstanding in every way", "Exceeded all expectations", "Absolutely loved it",
+               "Best purchase this year", "Five stars, easily", "A hidden gem",
+               "Perfect from start to finish", "Couldn't ask for more", "Love it",
+               "Highly recommend", "Worth every penny", "So happy with this", "Obsessed",
+               "Buy it", "Exactly what I wanted"],
+    "love": ["Love", "Loving", "Absolutely love", "Really love", "In love with", "Big fan of"],
+    "best": ["Best", "The best", "Easily the best", "Hands down the best", "Finally, a good"],
+    "ever": ["ever", "I've owned", "I've bought", "so far", "in years", "at this price", ""],
+    "adv_pos": ["Really", "Very", "Super", "So", "Seriously", "Incredibly", "Just"],
+    "adj_pos": ["Great", "Excellent", "Fantastic", "Brilliant", "Perfect", "Amazing", "Superb",
+                "Lovely", "Gorgeous", "Solid", "Sturdy", "Comfy", "Beautiful", "Wonderful"],
+    "adj_pos2": ["well made", "great value", "fast delivery", "easy to use", "looks great",
+                 "fits perfectly", "works well"],
+    "adj_pos3": ["highly recommended", "would buy again", "no complaints", "worth it",
+                 "a great gift", "five stars"],
     "title_4": [
-        "Really solid choice", "Great value for money", "Very happy with it",
-        "Works great, minor quibbles", "Almost perfect", "Would buy again",
+        (2, "{fixed4}"), (2, "{good} {subject}{bang}"), (2, "{good}, {but4}"),
+        (2, "{adv_mid} {good_l}"), (1, "{good} {subject}, {but4}"), (1, "{pretty} happy with {it}"),
     ],
+    "fixed4": ["Really solid choice", "Great value for money", "Very happy with it",
+               "Works great, minor quibbles", "Almost perfect", "Would buy again", "Good buy",
+               "Does the job", "Nice", "Happy with it", "Good quality", "Pleasantly surprised"],
+    "good": ["Good", "Nice", "Solid", "Great", "Decent", "Very good", "Pretty good", "Lovely"],
+    "good_l": ["good", "nice", "solid", "pleased", "happy", "impressed"],
+    "adv_mid": ["Pretty", "Mostly", "Really", "Overall", "Quite", "Very"],
+    "pretty": ["Pretty", "Mostly", "Very", "Really", "Quite"],
+    "it": ["it", "this", "the purchase", "my order", "the {subject}"],
+    "but4": ["a few small issues", "but not perfect", "one small gripe", "slightly pricey",
+             "runs a bit small", "delivery was slow", "minor flaws", "almost five stars"],
     "title_3": [
-        "Decent but could be better", "Average at best", "Mixed feelings",
-        "Good but not great", "A little overrated", "Middle of the road",
+        (2, "{fixed3}"), (2, "{ok} {subject}"), (2, "{ok}, {but3}"), (1, "{subject} is {ok_l}"),
+        (1, "Not bad, {but3}"),
     ],
+    "fixed3": ["Decent but could be better", "Average at best", "Mixed feelings",
+               "Good but not great", "A little overrated", "Middle of the road", "It's ok",
+               "Fine", "Meh", "Does what it says", "Okay for the price", "Not bad"],
+    "ok": ["OK", "Okay", "Average", "Decent", "Fine", "Alright", "Passable"],
+    "ok_l": ["ok", "fine", "average", "just okay", "decent enough", "alright"],
+    "but3": ["nothing special", "could be better", "not sure yet", "expected more",
+             "it'll do", "some issues", "not amazing"],
     "title_2": [
-        "Disappointing — expected more", "Not worth the price", "Below average",
-        "Wouldn't buy again", "Falls short",
+        (2, "{fixed2}"), (2, "{disappointing} {subject}"), (2, "{not_great}, {why2}"),
+        (1, "{subject} {broke}"), (1, "Not {worth} it"),
     ],
+    "fixed2": ["Disappointing — expected more", "Not worth the price", "Below average",
+               "Wouldn't buy again", "Falls short", "Meh", "Not great", "Underwhelming",
+               "Returned it", "Could be better"],
+    "disappointing": ["Disappointing", "Underwhelming", "Mediocre", "Poor", "Flimsy", "Cheap"],
+    "not_great": ["Not great", "Disappointed", "Not impressed", "Hmm", "Not for me"],
+    "why2": ["poor quality", "too small", "not as pictured", "stopped working", "overpriced",
+             "smaller than expected", "arrived late"],
+    "broke": ["broke after a week", "stopped working", "fell apart", "didn't last",
+              "is not as described"],
+    "worth": ["worth", "really worth", "worth the money for"],
     "title_1": [
-        "Complete waste of money", "Avoid this one", "Terrible experience",
-        "Nothing like the listing", "One star is generous",
+        (2, "{fixed1}"), (2, "{awful} {subject}{bang}"), (2, "Do not buy{bang}"),
+        (1, "{subject} {broke}{bang}"), (1, "{awful}, {why1}"),
     ],
+    "fixed1": ["Complete waste of money", "Avoid this one", "Terrible experience",
+               "Nothing like the listing", "One star is generous", "Avoid", "Rubbish",
+               "Awful", "Junk", "Total disappointment", "Never again", "Returned immediately"],
+    "awful": ["Terrible", "Awful", "Useless", "Horrible", "Junk", "Garbage", "Dreadful"],
+    "why1": ["broke on day one", "never arrived", "complete rip-off", "doesn't work",
+             "fake product", "waste of money"],
+    "bang": [(6, ""), (3, "!"), (1, "!!"), (1, "!!!")],
 }
 
 from misata.vocab_seeds import (
@@ -559,9 +620,28 @@ class MicrotextGenerator:
             out.append(t if t and t.lower() not in ("nan", "none", "") else fallback[0])
         return out
 
-    def review_titles(self, size: int, ratings: Optional[Sequence] = None) -> np.ndarray:
+    _TITLE_SUBJECT = ("product", "purchase", "quality", "item", "buy", "value")
+
+    def review_titles(self, size: int, ratings: Optional[Sequence] = None,
+                      context: Optional[Dict[str, Sequence]] = None) -> np.ndarray:
+        """Short review titles that follow the rating and, when the row says
+        what was bought, name it ("Love this rain jacket!")."""
         levels = self.normalize_ratings(ratings, size, self.rng)
-        return np.array([self._title.expand(f"title_{lvl}") for lvl in levels], dtype=object)
+        subjects = self._slot_series(context, "subject", size, self._TITLE_SUBJECT)
+        out = []
+        for i, lvl in enumerate(levels):
+            from misata.scenarios import _soft_lower
+            subj = _soft_lower(subjects[i])
+            t = self._title.expand(f"title_{lvl}", subject=subj, the_subject=f"this {subj}")
+            t = re.sub(r"\s+", " ", t).strip()
+            t = t[:1].upper() + t[1:]
+            r = self.rng.random()
+            if r < 0.06:
+                t = t.lower()
+            elif r < 0.08:
+                t = t.upper()
+            out.append(t)
+        return np.array(out, dtype=object)
 
     def notes(self, size: int) -> np.ndarray:
         return np.array([self._note.expand("note") for _ in range(size)], dtype=object)
@@ -710,11 +790,20 @@ NEGATIVE_MARKERS = (
 )
 
 
+_NEGATED_POSITIVE = re.compile(
+    r"\b(not|never|isn't|wasn't|hardly)\s+(so\s+|very\s+|that\s+|really\s+)?("
+    + "|".join(re.escape(m) for m in POSITIVE_MARKERS) + r")")
+
+
 def detect_sentiment(text: str) -> Optional[str]:
     """Crude lexicon-based polarity check for conformance verification."""
     lower = str(text).lower()
-    pos = any(m in lower for m in POSITIVE_MARKERS)
     neg = any(m in lower for m in NEGATIVE_MARKERS)
+    # "not great", "never happy": a negated positive is a negative.
+    negated = _NEGATED_POSITIVE.sub(" ", lower)
+    if negated != lower:
+        neg = True
+    pos = any(m in negated for m in POSITIVE_MARKERS)
     if pos and not neg:
         return "positive"
     if neg and not pos:
