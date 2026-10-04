@@ -100,6 +100,24 @@ tickets schema:
   causes and fixes. The declared category picks the family, the declared
   priority leans the draw toward severe issues, and the status decides
   whether there is a resolution. None of those columns are changed.
+- **Every other free-text kind is a grammar conditioned on one profile per
+  row** (`misata/textkit.py`): business notes, survey feedback, churn,
+  cancellation, return, delivery and audit reasons, memos, chief complaints,
+  clinical notes, discharge advice, social captions, post titles and bodies,
+  email subjects and bios. A clinical note draws one of 36 cases, so its
+  complaint, findings, diagnosis, medicines and advice agree; a blog post
+  draws one of 55 topics and stays in its vocabulary; feedback and churn
+  draw one of 23 product kinds with their own features, integrations and
+  users; cancellations one booking, deliveries one property, and return
+  reasons use the faults buyers of that kind of product report. Bios are
+  composed from facets (job, place, interests, history) in any order.
+- **A paraphrase layer** (`misata/paraphrase.py`) varies the rendered text
+  per register (casual, business, product, clinical, patient-facing):
+  meaning-preserving phrase swaps, contractions expanded only, intensifiers,
+  terse and formal styles, shorthand and light typing noise. Ambiguous words
+  ("came", "just", "light") are never matched, hashtags and the row's own
+  product noun or job title are never rewritten, and a/an is repaired after
+  every swap.
 - **Declared vocabulary wins, built-in defaults lose.** Capsule vocabulary
   tagged `misata-defaults` is now a last resort everywhere, not data: it had
   let eight generic sentences outrank the category-aware grammar.
@@ -137,9 +155,11 @@ New free-text tells in `realism_report`:
 
 Thresholds come from a local calibration on seven real English corpora at
 2,000 rows each, and sit well outside every one of them. They are strict on
-purpose: Misata's own grammar prose passes the repetition and context checks
-but not `text_diversity`, because its vocabulary is still far smaller than
-people's (see LIMITATIONS.md).
+purpose. Misata's own text passes the repetition and context checks for every
+kind, and `text_diversity` for reviews, ticket text, notes, feedback, audit
+reasons, posts, captions, email subjects and bios. Product descriptions,
+clinical text, delivery instructions and churn, cancellation and return
+reasons still compress 4.0-4.9x (real text: under 3x); see LIMITATIONS.md.
 
 ### Realism report: the statistical tells of generated data
 

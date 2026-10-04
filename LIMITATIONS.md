@@ -23,21 +23,22 @@ bug worth reporting.
   Locale packs adjust names, phones, and formats, not economic distributions.
 - **Free text is grammar-generated, not written.** It agrees with its row:
   reviews follow their rating and name their product, ticket subjects,
-  descriptions and resolutions describe one issue, descriptions describe the
-  product named. It does not repeat itself: Misata's prose passes the
-  exact-duplicate, skeleton and near-copy checks. Its vocabulary is still far
-  smaller than people's, and `realism_report` says so: on 2,000 rows, review
-  and ticket text compresses 9-14x under gzip and 13-18% of its word trigrams
-  are distinct, where real text compresses under 3x with over 70% distinct.
-  A reader skimming a few rows will not notice; a classifier trained on word
-  n-grams would. Closing that gap needs much larger phrase banks or a
-  language model in the data path; Misata keeps generation deterministic,
-  seedable and offline instead.
-- **Notes, feedback, error messages and clinical text use smaller pools.**
-  Products, tickets, reviews and bios render from row-level scenarios; the
-  remaining free-text kinds (business notes, survey feedback, error
-  messages, memos, clinical notes, delivery and return reasons) are still
-  drawn from smaller grammars or lists and do not condition on their row.
+  descriptions and resolutions describe one issue, a clinical note keeps one
+  case (complaint, findings, diagnosis, medicine and advice agree), a blog
+  post stays on one topic, feedback talks about one product's features. It
+  does not repeat itself: every kind passes the exact-duplicate, skeleton and
+  near-copy checks. On vocabulary, measured by `realism_report` at 2,000 rows
+  (real text compresses under 3x under gzip; the check warns above 4x):
+  reviews, review titles, ticket text, notes, survey feedback, audit reasons,
+  post titles and bodies, captions, email subjects and bios pass. Still above
+  4x: churn, cancellation and return reasons (4.0-4.3), clinical notes (about
+  4.1), product descriptions (4.3-4.5), delivery instructions (about 4.7),
+  chief complaints (about 4.8) and discharge instructions (about 4.9, with
+  34% distinct trigrams). Short, formulaic fields are the hardest to vary
+  without inventing content. A reader skimming rows will not notice; a
+  classifier trained on word n-grams still could. Closing the rest needs
+  larger phrase banks or a language model in the data path; Misata keeps
+  generation deterministic, seedable and offline instead.
 - **Fictional entities are the point, not a bug.** Company names, people, and
   products do not exist. Anything needing real-world facts in the values
   (actual ticker prices, real addresses) is out of scope by design.

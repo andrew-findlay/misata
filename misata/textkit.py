@@ -76,7 +76,10 @@ _RULES: Dict[str, list] = {
                  "Pricing to follow", "No further action", "Check back in {month}", "{fname} to confirm"],
 
     # ── survey / NPS feedback, by sentiment ─────────────────────────────
-    "feedback_pos": ["((As a|Speaking as a)) {pp_role}, {pp_feat_l} is ((the bit I use most|a lifesaver|what sold me))((.|!)) {pp_win_cap}.",
+    "feedback_pos": ["((Our|The)) {pp_int} ((integration|connection)) ((took|needed)) ((five minutes|one click|no developer time)) to set up((.|!)) ((Now|These days)) {pp_win}.",
+             "((Swapped|Replaced|Ditched)) ((three|two|four)) tools for this {pp_kind} - {pp_feat_l}, {pp_feat2_l} and the {pp_int} ((link|sync)) ((cover|handle)) ((everything|it all))((.|!))",
+             "((Shout out|Thanks|Kudos)) to {fname} for ((walking us through|setting up|fixing)) {pp_feat_l} - {pp_win}((.|!))",
+             "((As a|Speaking as a)) {pp_role}, {pp_feat_l} is ((the bit I use most|a lifesaver|what sold me))((.|!)) {pp_win_cap}.",
              "{pp_win_cap} ((since|after)) ((we|our team)) ((moved|switched)) ((from|off)) ((spreadsheets|{company}|our old {pp_kind})) in {month}((.|!))",
              "((Ten|Six|Four)) months in: {pp_feat_l} ((just works|is rock solid|keeps getting better)), and the {pp_int} ((sync|link)) ((never|rarely)) ((drops|breaks))((.|!))",
              
@@ -88,7 +91,9 @@ _RULES: Dict[str, list] = {
              "{fb_open_pos} ((Especially|Particularly|Mostly)) {fb_area_l}((.|!))",
              "((Switched|Moved|Came over)) from ((spreadsheets|a competitor|{company}'s old system)) ((in {month}|last year|{n} months ago)) - {fb_point_pos_l}",
              "((Shout out|Thanks|Kudos)) to ((the support team|{fname}|onboarding)) - {fb_point_pos_l}"],
-    "feedback_mid": ["{pp_feat} is ((great|solid|excellent)), {pp_feat2_l} ((less so|not so much|needs work))((.|; {pp_pain} is the main gripe.))",
+    "feedback_mid": ["((Works|Does the job)) for {pp_role}s, ((less|not so much)) for ((admins|managers|finance)). {pp_feat2} ((needs|could use)) ((a rethink|bulk actions|better search|keyboard shortcuts))((.|!))",
+             "((Six|Seven|5|6)) out of ten: ((solid|reliable)) {pp_feat_l}, ((patchy|weak|thin)) ((docs|reporting|mobile support))((.|; {pp_pain} now and then.))",
+             "{pp_feat} is ((great|solid|excellent)), {pp_feat2_l} ((less so|not so much|needs work))((.|; {pp_pain} is the main gripe.))",
              "((Good|Decent|Fine)) {pp_kind} ((overall|for the price)), but ((we keep hitting|there's still|we see)) {pp_pain}((.| - please fix.))",
              "((Our|The)) {pp_role}s ((like|are fine with)) {pp_feat_l}; ((the|our)) ((managers|finance team|admins)) ((find|say)) {pp_feat2_l} ((clunky|confusing|slow))((.|.))",
              
@@ -97,7 +102,10 @@ _RULES: Dict[str, list] = {
              "((Mostly|Generally|On the whole)) ((good|fine|happy)), but {fb_point_neg_l} {fb_wish}",
              "{fb_area} ((is|has been)) ((ok|fine|decent)) ((but|though)) ((could be faster|needs work|feels dated))((.| since {month}.))",
              "((Three|3)) out of five: {fb_point_pos_l}"],
-    "feedback_neg": ["{pp_pain_cap} ((again|for the third time|every week since {month})). ((Our|The)) {pp_role}s ((are fed up|have given up|are back on spreadsheets))((.|!))",
+    "feedback_neg": ["((Three|Two|Four)) {pp_role}s ((quit using|gave up on|stopped trusting)) {pp_feat_l} ((after|because of)) {pp_pain}((.|!))",
+             "((Raised|Logged|Reported)) {pp_pain} ((in|back in|on)) (({month}|{date}|ticket #{ticket})). ((Still|Nothing|No fix)) ((broken|happening|yet))((.|!))",
+             "((Honestly|Frankly)), {pp_feat_l} ((feels|is)) ((years behind|half-finished|like a beta)) for a {pp_kind} at ${amount} ((a month|per seat))((.|!))",
+             "{pp_pain_cap} ((again|for the third time|every week since {month})). ((Our|The)) {pp_role}s ((are fed up|have given up|are back on spreadsheets))((.|!))",
              "((Paying|We pay)) for a {pp_kind} and ((still|yet)) {pp_pain}((.|?| - not good enough.)) {fb_close_neg}",
              "((Since|After)) the {month} ((update|release)), {pp_feat_l} ((is|has been)) ((unusable|painfully slow|unreliable)) ((for|across)) ((our {pp_role}s|the whole team|{n}0 users))((.|!))",
              
@@ -176,7 +184,8 @@ _RULES: Dict[str, list] = {
              "the template library",
              "the Xero sync",
              "the iPad app"],
-    "fb_wish": ["((Please fix|Could you look at|Hoping you'll sort)) {pp_pain}((.| before renewal.| soon.))",
+    "fb_wish": ["((Fix|Sort out|Look at)) {pp_feat2_l} and ((you'd|you would)) ((get|have)) ((five stars|a customer for life|our renewal))((.|!))",
+             "((Please fix|Could you look at|Hoping you'll sort)) {pp_pain}((.| before renewal.| soon.))",
              "((Would love|We'd pay more for|Please add)) ((a {pp_int} integration|a better {pp_feat2_l}|bulk editing in {pp_feat_l}))((.|!))",
              "((Would love|Please add|We need|Wish there was)) ((dark mode|better exports|SSO|an Android app|bulk editing|more integrations|offline mode))((.|!| soon.))",
                 "((Would be|It'd be)) ((perfect|five stars|ten out of ten)) with ((better reporting|faster support|a lower price)).",
@@ -188,7 +197,9 @@ _RULES: Dict[str, list] = {
                      "((Not recommending ((you|this)) to anyone|Not renewing this year|No longer expanding our plan|Not renewing until it's fixed))."],
 
     # ── reasons ──────────────────────────────────────────────────────────
-    "churn": ["{pp_feat_l} ((too limited|too clunky|missing basics)) for ((our|a)) ((growing|{n}0-person|multi-site)) team((| - {pp_role}s complained))",
+    "churn": ["((Budget|Spend)) ((review|cut)) - {pp_kind} ((was|seen as)) ((nice to have|duplicating {company}|the easiest thing to cut))((| in {month}))",
+             "((Champion|Main user|Our admin)) {fname} ((left|moved teams|went on leave)) and ((nobody|no one)) ((else ever|ever)) ((used|understood)) {pp_feat_l}",
+             "{pp_feat_l} ((too limited|too clunky|missing basics)) for ((our|a)) ((growing|{n}0-person|multi-site)) team((| - {pp_role}s complained))",
              "((Moved|Switched)) to {company} ((because of|over|after)) {pp_pain}((| - {k} tickets, no fix))",
              "((Cheaper|Simpler|Better)) {pp_kind} ((bundled with|included in|free with)) ((our bank account|{company}'s suite|the new {pp_int} plan))",
              "{pp_pain} ((every week|most weeks|since {month})) - ((moved|switched)) to {company}((| for {pp_feat_l}))",
@@ -222,7 +233,8 @@ _RULES: Dict[str, list] = {
              "((The|Our)) ((pilot|trial|project)) ((with|for)) ((the {city} office|our {fname} team|{company})) ((ended|wrapped up|was cancelled)) ((in {month}|on {date}|early))",
              "((Too|Way too)) ((complicated|fiddly|much admin)) for ((a small team|non-technical staff|our volunteers|{n} people))",
              "((Billing|Invoicing|Payment)) ((errors|problems|mix-ups)) ((three months running|again in {month}|on invoice {ref}))((| - lost trust| - final straw))"],
-    "cancel": ["{bk_thing} - {bk_reason}; ((also|plus)) {bk_reason2}. {bk_ask_cap}",
+    "cancel": ["{bk_reason_cap} - ((really|so)) sorry((.|!)) ((We'll|I'll|Hope to)) ((rebook|come back|try again)) ((in {month}|soon|next year))",
+             "{bk_thing} - {bk_reason}; ((also|plus)) {bk_reason2}. {bk_ask_cap}",
              "((Cancelling|Calling off|Pulling out of)) the {bk_thing} ((as|because|since)) {bk_reason}((.| - {bk_ask}.))",
              "{bk_reason_cap} - ((cancelling|please cancel)) the {bk_thing}((| on {date}))",
              "((Cancel|Please cancel)) ((my|our|the)) {bk_thing}: {bk_reason}((. {bk_ask_cap}|))",
@@ -239,7 +251,7 @@ _RULES: Dict[str, list] = {
              "((Double|Duplicate)) booking ((made|placed)) ((on {date}|at {time}|by my partner))",
              "((Venue|Hotel|Host)) ((cancelled|changed the dates|closed)) ((on us|last minute|for {month}))",
              "((Price|Total|Fee)) ((was higher than shown|went up to ${amount}|included hidden charges))",
-             "((Kids|Partner|Colleague)) ((got ill|has covid|broke a leg)), ((sorry|will rebook|hopefully next time))",
+             "((The kids ((got ill|have covid|have chickenpox))|My partner ((got ill|has covid|broke a leg))|A colleague ((is off sick|has covid)) and I'm covering)), ((sorry|will rebook|hopefully next time))",
              "((Going|Travelling|Moving)) to {city} ((instead|now|that week))((| - will rebook| - sorry))",
              "((Ordered|Booked)) the {item} ((by mistake|twice|in the wrong size)) on {date}",
              "((Accidentally|Mistakenly)) ((booked|ordered|chose)) (({n} nights|the wrong room|two tickets|express delivery)) ((instead of|rather than)) (({k} nights|a twin|one|standard))",
@@ -247,7 +259,13 @@ _RULES: Dict[str, list] = {
              "((Car|Train|Flight)) ((broke down|was cancelled|was delayed {n} hours)) ((on the way|this morning|on {date})), ((missed|can't make|too late for)) the ((booking|slot|check-in))",
              "((Found|Booked)) ((somewhere|something)) ((closer to {city}|cheaper|with parking|more central)) ((instead|after all|last minute))",
              "((Group|Party|Booking)) ((size changed|is now smaller|dropped to {n})), ((need|want)) to ((rebook|reduce|change)) ((the order|it|the reservation))"],
-    "return": ["{item} ((went back|is going back|returned)) - ((it|the item)) ((didn't|did not)) ((suit|work for|fit)) ((my|our)) ((flat|kitchen|routine|kid|partner))((| - ordered {date}))",
+    "return": ["((Ordered|Bought)) {item_p} ((in|as)) ((a {c_colour} one|size {n}|the large|the starter set)) - ((wrong|not what I expected|doesn't work for me))((| - {date}))",
+             "((Partner|Mum|My flatmate)) ((already had|bought|got me)) ((one|the same {item}|a better one)) ((for {occasion}|last week|in the sale))",
+             "((Returning|Sending back)) ((because|as)) ((the reviews warned me|a friend warned me|the reviews were right)) about ((the size|the quality|the battery|the smell|the noise))",
+             "((Kept|Keeping)) the {c_colour} one, ((returning|sending back)) the ((other|second|spare)) {item}((| - {date}))",
+             "((Too|Far too|A bit too)) ((heavy|bulky|small|loud|bright|fiddly)) for ((daily use|my flat|a {k}-year-old|travel|my desk))((| - {item}))",
+             "((Description|Listing|Photos)) ((said|showed)) ((cotton|metal|a lid|two pieces|a case)), ((got|received|it came with)) ((polyester|plastic|no lid|one piece|nothing))",
+             "{item} ((went back|is going back|returned)) - ((it|the item)) ((didn't|did not)) ((suit|work for|fit)) ((my|our)) ((flat|kitchen|routine|kid|partner))((| - ordered {date}))",
              "((Second|Third|Another)) {item} ((with the same fault|that arrived damaged|in a row with this issue))((| - want a refund this time| - please send a different batch))",
              "((Bought|Ordered)) for {occasion}, ((arrived|turned up)) ((after|too late for)) it((| - {date})), {item} ((unused|still sealed|in original box))",
              "((Too small|Too big|Wrong size|Doesn't fit))((| - need a size up| - ordered a {n}| in the shoulders))",
@@ -335,16 +353,16 @@ _RULES: Dict[str, list] = {
              " - ((contract|term|renewal)) ((ends|ended|due)) {date}",
              " ((- NPS|, NPS score)) {n}",
              " - ((feedback|exit survey)) ((sent|completed|ignored))"],
-    "cancel_detail": [" - ((rebooked for|moving to|maybe)) {date}", " (order #{order})", " - ((refund to card {last4}|please refund ${amount}|credit is fine))",
-                      ", ((sorry|thanks|apologies for the hassle))",
+    "cancel_detail": [" - ((rebooked for|moving to|maybe)) {date}", " (order #{order})", " - ((refund to card {last4}|please refund ${amount}|credit is fine|voucher accepted|refund less the ${k} admin fee))",
+                      ", ((sorry|thanks|apologies for the hassle|sorry for the short notice|thanks for understanding|cheers))",
              " - booking ref {ref}",
              " - ((guests|party of)) {n}",
              " - ((called|emailed|messaged)) on {date} at {time}",
-             " - ((happy to|will|might)) ((rebook|come back|try again)) in {month}",
+             " - ((happy to|will|might|hope to)) ((rebook|come back|try again|book again)) ((in {month}|next {weekday}|after {date}|later in the year))",
              " - ((charged|paid)) ${amount} ((already|upfront|deposit))",
              " ((- {fname} {lname}|, booked under {fname} {lname}))",
-             " - ((first|second|third)) ((cancellation|change)) this ((year|month))",
-             " - ((no-show|late cancel|within 24h)) fee ((waived|applies|disputed))",
+             " - ((first|second|third)) ((cancellation|change)) ((this year|this month|since {month}|on this account))",
+             " - ((no-show|late cancel|within 24h|{k}0% cancellation)) ((fee|charge)) ((waived|applies|disputed|refunded|queried))",
              " - ((hotel|venue|airline)) in {city}"],
     "return_detail": [" - ((ordered|bought)) {item}, ((need|want)) ((a refund|an exchange|store credit))", " (order #{order})",
                       " - ((photos attached|box kept|tags still on))", ", arrived {date}", " - ${amount} ((back to card {last4}|as credit))",
@@ -456,7 +474,9 @@ _RULES: Dict[str, list] = {
                   "heart failure", "IBS", "psoriasis", "rheumatoid arthritis", "gout", "epilepsy", "anaemia",
                   "hyperlipidaemia", "obesity", "sleep apnoea", "PCOS", "angina", "previous stroke", "glaucoma",
                   "coeliac disease", "Crohn's disease", "hepatitis B"],
-    "clinical": ["{age}{sex} ((with|presenting with|c/o)) {symptom_l}. ((Hx|Background)): {condition}. O/E {cs_exam}. ((Ix|Tests)): {cs_test}. ((Imp|Dx)): {dx}. ((Plan|Mx)): {cs_plan}; {med} {dose}. ((Safety-net|SN|Red flags)): {cs_flag}, {cs_flag2}.",
+    "clinical": ["((Ward round|WR|Morning review)): {dx}, day {k}. ((Overnight|Since yesterday)) ((settled|comfortable|febrile x1|pain controlled)). O/E {cs_exam}. {cs_test} ((improving|stable|chased)). ((Plan|Today)): {cs_plan}; ((?home tomorrow|continue|step down to oral {med})).",
+             "((Triage|Streaming|Front door)) note: {symptom_l} x {dur}, ((walked in|self-presented|brought by family)). {vitals} ((Streamed to|Seen in|Sent to)) ((minors|majors|SDEC|UTC)). ((Likely|?)) {dx}.",
+             "{age}{sex} ((with|presenting with|c/o)) {symptom_l}. ((Hx|Background)): {condition}. O/E {cs_exam}. ((Ix|Tests)): {cs_test}. ((Imp|Dx)): {dx}. ((Plan|Mx)): {cs_plan}; {med} {dose}. ((Safety-net|SN|Red flags)): {cs_flag}, {cs_flag2}.",
              "((Follow-up|F/u|Review)) of {dx}. ((Pt|Patient)) ((reports|says)) {symptom_l} ((is|has been)) ((better|easing|no different|worse)) ((since|on)) {med}. {cs_exam}. {cs_plan}. ((Advised|Reminded)) to {cs_adv2}.",
              "((Called|Phoned|Rang)) pt re {cs_test} result - ((consistent with|confirms|in keeping with)) {dx}. ((Plan|Next steps)): {cs_plan}. {fu}",
              "{pt} ((describes|reports)) {symptom_l} and {symptom2} ((since|for)) {dur}; ((no|denies)) {cs_flag}. O/E {cs_exam}. ((Likely|Probable|Impression)) {dx}. {med} {dose} ((started|advised|prescribed)). {fu}",
@@ -842,11 +862,28 @@ _RULES: Dict[str, list] = {
              "((Moved|Relocated)) from {city2} to {city}((.|, no regrets.)) {job_l}.",
              "((Writing|Talking|Thinking)) about {field} and {int1}((.| since {since_year}.))",
              "((Recovering|Former|Ex)) {prev_short}((. Now|, now|. Currently|, currently)) {job_l}((| at {company}))."],
-    "bio_job": ["{job}", "{job}{at_co}", "{job_l} at {company}", "{job} @ {company}", "((Currently|Now|Mostly)) {job_l}[[ at {company}]]", "{job_l} by day", "{job} ((for|of)) {n} years", "Professional {job_l}", "{job} ((in|at)) {city}", "{job_l}, ((mostly|sometimes|occasionally)) ((tired|caffeinated|on time|organised))"],
-    "bio_loc": ["{city}", "Based in {city}", "{city2} → {city}", "📍 {city}", "{city}-based", "Living in {city}[[ with {pet}]]", "{city} ((born and bred|for now|since {since_year}|for {k} years))", "((Happily|Proudly|Reluctantly)) in {city}"],
-    "bio_int": ["{int_cap}", "{int_cap} & {int2}", "Into {int1}[[ and {int2}]]", "{int_cap} ((at weekends|on Sundays|whenever possible|when it's not raining))", "((Talks|Posts)) ((too much|a lot|mainly)) about {int1}", "{int_cap} ((nerd|fan|obsessive|beginner|enthusiast))", "{int_cap}, {int2}, ((repeat|in that order|mostly the first one))", "((Ask me about|Will talk about)) {int1}", "((Weekend|Part-time|Lifelong)) {int1} ((person|enthusiast|addict))"],
+    "bio_job": ["{job} ((in training|in progress|by trade))",
+             "((Part-time|Full-time|Freelance)) {job_l}",
+             "{job}((, | · )){company}",
+             "{job}", "{job}{at_co}", "{job_l} at {company}", "{job} @ {company}", "((Currently|Now|Mostly)) {job_l}[[ at {company}]]", "{job_l} by day", "{job} ((for|of)) {n} years", "Professional {job_l}", "{job} ((in|at)) {city}", "{job_l}, ((mostly|sometimes|occasionally)) ((tired|caffeinated|on time|organised))"],
+    "bio_loc": ["((Somewhere|Usually|Mostly)) ((in|around|near)) {city}",
+             "{city} ((local|resident|regular))",
+             "((Calling|Writing|Working)) from {city}",
+             "{citytag} ((bound|lifer|transplant))",
+             "{city}", "Based in {city}", "{city2} → {city}", "📍 {city}", "{city}-based", "Living in {city}[[ with {pet}]]", "{city} ((born and bred|for now|since {since_year}|for {k} years))", "((Happily|Proudly|Reluctantly)) in {city}"],
+    "bio_int": ["((Weekends|Evenings|Sundays)): {int1}((| and {int2}))",
+             "{int_cap} ((convert|evangelist|devotee|apprentice))",
+             "((Currently|Lately|This year)) ((obsessed with|learning|into)) {int1}",
+             "{int_cap} ((badly|enthusiastically|competitively|slowly))",
+             "Will ((drop everything|cancel plans|travel)) for {int1}",
+             "{int_cap}", "{int_cap} & {int2}", "Into {int1}[[ and {int2}]]", "{int_cap} ((at weekends|on Sundays|whenever possible|when it's not raining))", "((Talks|Posts)) ((too much|a lot|mainly)) about {int1}", "{int_cap} ((nerd|fan|obsessive|beginner|enthusiast))", "{int_cap}, {int2}, ((repeat|in that order|mostly the first one))", "((Ask me about|Will talk about)) {int1}", "((Weekend|Part-time|Lifelong)) {int1} ((person|enthusiast|addict))"],
     "bio_pet": ["((Cat|Dog|Plant)) person", "Owned by {pet}", "Human to {pet}", "((Living|Sharing a flat)) with {pet}", "{pet} ((at home|on the sofa|in charge))"],
-    "bio_quip": ["Professional overthinker",
+    "bio_quip": ["{k} ((cats|kids|plants|bikes)), {n} ((hobbies|half-finished projects|tabs open))",
+             "((Coffee|Tea|Cake)) ((snob|addict|connoisseur))",
+             "((Runs|Lives|Works)) on ((coffee|tea|optimism|lists))",
+             "Not ((a bot|a morning person|very good at bios))",
+             "((Ex|Recovering)) perfectionist",
+             "Professional overthinker",
              "Amateur everything",
              "Fuelled by {food}",
              "Mostly {int2}",
@@ -1567,6 +1604,7 @@ def _booking_slots(g: Grammar, rng: np.random.Generator, slots: List[Dict[str, s
 
 
 _TIDY_SPACE = re.compile(r" {2,}")
+_DOUBLE_STOP = re.compile(r"(?<=\w\.)\.(?!\.)")
 _TIDY_COMMA = re.compile(r" +,")
 
 
@@ -1642,10 +1680,11 @@ def render(kind: str, rng: np.random.Generator, size: int, *,
     detail = {"churn": "churn_detail", "cancel": "cancel_detail", "return": "return_detail",
               "delivery": "delivery_detail", "discharge": "discharge_detail", "audit": "audit_detail"}.get(kind)
     if detail:
-        p = 0.85 if kind != "discharge" else 0.35
+        p = {"discharge": 0.35, "churn": 0.65, "return": 0.6}.get(kind, 0.85)
+        p2 = 0.4 if p > 0.7 else 0.25
         def _two(o, s):
             a = g.expand(detail, **s) if rng.random() < p else ""
-            b = g.expand(detail, **s) if rng.random() < 0.4 else ""
+            b = g.expand(detail, **s) if rng.random() < p2 else ""
             return o + a + (b if b[:14] != a[:14] else "")
         out = [_two(o, s) for o, s in zip(out, slots)]
     sign = {"note": "note_sign", "clinical": "clin_sign", "discharge": "dis_sign"}.get(kind)
@@ -1667,4 +1706,6 @@ def render(kind: str, rng: np.random.Generator, size: int, *,
     elif reg:
         sentences = kind in ("feedback", "note", "clinical")
         out = vary(out, rng, reg, styles=sentences)
+        # "twice a day." swapped to "b.i.d." must not end in two stops
+        out = [_DOUBLE_STOP.sub("", o) for o in out]
     return np.array(out, dtype=object)
