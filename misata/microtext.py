@@ -370,7 +370,7 @@ _REVIEW_RULES: Dict[str, List[Rule]] = {
     # ── context: who it was for, why, when ──
     "context_pos": [
         "((Bought|Got|Ordered|Picked up)) ((this|one|it)) for my {relation}[[ for {occasion}]] and ((it went down a treat|it was a hit|it's been a big hit|it got used straight away)).",
-        "((Bought|Got|Ordered)) ((this|it)) ((after my old one died|to replace a cheaper one|after reading the reviews|on a whim|for our {place}|for the {place})) {timing}.",
+        "((Bought|Got|Ordered)) ((this|it)) ((after my old one wore out|to replace a cheaper one|after reading the reviews|on a whim|for our {place}|for the {place})) {timing}.",
         "((We've|I've)) ((used|had)) it ((every day|daily|most days|twice a week|every weekend|on my commute|at work)) for ((about|nearly|over|just under)) {num} ((weeks|months)).",
         "((Second|Third)) one I've ((bought|ordered))((, the first was for my {relation}|, which says it all|)).",
         "My {relation} ((recommended|suggested|swore by)) ((it|this)) and ((they were right|I'm glad I listened|I can see why)).",
@@ -597,7 +597,7 @@ _REVIEW_RULES: Dict[str, List[Rule]] = {
                       "((two|three)) weeks and still no resolution."],
     "an_delivery": ["{n_delivery} was {t_delivery_neg}"],
     "t_delivery_neg": ["late and the box ((arrived damaged|was crushed|was torn)).",
-                       "a ((fortnight|week|good ten days)) past the estimate.",
+                       "((a fortnight|a week|ten days|twelve days)) past the estimate.",
                        "left in the rain with no notice.",
                        "((split open|soaked|dented)) on arrival."],
     "an_perf": ["{n_perf} {v_drops} {t_perf_neg}"],
@@ -636,7 +636,7 @@ _REVIEW_RULES: Dict[str, List[Rule]] = {
     "escalation": [
         "I've ((asked for|requested|demanded)) a refund.", "Reporting this to the ((marketplace|seller|site)).",
         "Save your money((.|!))", "Still waiting on ((a resolution|a refund|a reply)).",
-        "((Going|Sending)) it back((.|, obviously.| tomorrow.))",
+        "((Sending it back|Returning it|It's going back))((.|, obviously.| tomorrow.))",
     ],
     # ── connectors, nits, closers ──
     "but": ["That said,", "However,", "On the other hand,", "But", "Then again,", "Sadly,",
@@ -707,7 +707,10 @@ _TITLE_RULES: Dict[str, List[Rule]] = {
         (1, "((My|Our)) new favourite {subject}"),
         (1, "{subject} ((is|was)) ((worth it|a winner|perfect|spot on|amazing)){bang}"),
         (1, "((Bought|Got)) for {use} - ((love it|perfect|ideal|spot on)){bang}"),
-        (1, "{adv_pos} {adj_pos} {subject}, ((would buy again|five stars|no regrets))")],
+        (1, "{adv_pos} {adj_pos} {subject}, ((would buy again|five stars|no regrets))"),
+        (1, "((Gorgeous|Lovely|Beautiful|Great)) {material}((, love it|, so soft|, premium feel|))"),
+        (1, "((Perfect|Ideal|Brilliant)) {subject} for {use}((!|))"),
+        (1, "((10/10|5 stars|A+)) {subject}")],
     "fixed5": ["Outstanding in every way", "Exceeded all expectations", "Absolutely loved it",
                "Best purchase this year", "Five stars, easily", "A hidden gem",
                "Perfect from start to finish", "Couldn't ask for more", "Love it",
@@ -730,7 +733,9 @@ _TITLE_RULES: Dict[str, List[Rule]] = {
         (1, "{good} {subject}, {but4}"),
         (1, "{subject}: {good_l} ((overall|so far|for the price))"),
         (1, "((Solid|Good|Nice)) for {use}, {but4}"),
-        (1, "((Mostly|Pretty|Really)) {good_l} with the {subject}")],
+        (1, "((Mostly|Pretty|Really)) {good_l} with the {subject}"),
+        (1, "((Nice|Good|Decent)) {material}, ((runs small|pricey|slow delivery|minor flaws))"),
+        (1, "{subject} - ((good|solid|nice)) for {use}")],
     "fixed4": ["Really solid choice", "Great value for money", "Very happy with it",
                "Works great, minor quibbles", "Almost perfect", "Would buy again", "Good buy",
                "Does the job", "Nice", "Happy with it", "Good quality", "Pleasantly surprised"],
@@ -746,7 +751,9 @@ _TITLE_RULES: Dict[str, List[Rule]] = {
         (1, "Not bad, {but3}"),
         (2, "{ok} {subject} for {use}"),
         (1, "{subject}: {but3}"),
-        (1, "((Fine|OK|Okay)) for {use}, {but3}")],
+        (1, "((Fine|OK|Okay)) for {use}, {but3}"),
+        (1, "{material} ((feels|looks)) ((ok|average|cheap-ish))"),
+        (1, "((Average|So-so|Middling)) {subject}")],
     "fixed3": ["Decent but could be better", "Average at best", "Mixed feelings",
                "Good but not great", "A little overrated", "Middle of the road", "It's ok",
                "Fine", "Meh", "Does what it says", "Okay for the price", "Not bad"],
@@ -759,7 +766,9 @@ _TITLE_RULES: Dict[str, List[Rule]] = {
         (1, "{subject} {broke}"), (1, "Not {worth} it"),
         (2, "((Poor|Disappointing|Not great)) {subject} for {use}"),
         (1, "{subject}: {why2}"),
-        (1, "((Not great|Disappointing)) for {use}: {why2}")],
+        (1, "((Not great|Disappointing)) for {use}: {why2}"),
+        (1, "{material} ((feels|looks)) ((cheap|thin|flimsy))"),
+        (1, "{subject} ((let me down|disappointed|wasn't great))")],
     "fixed2": ["Disappointing — expected more", "Not worth the price", "Below average",
                "Wouldn't buy again", "Falls short", "Meh", "Not great", "Underwhelming",
                "Returned it", "Could be better"],
@@ -775,7 +784,9 @@ _TITLE_RULES: Dict[str, List[Rule]] = {
         (1, "{subject} {broke}{bang}"), (1, "{awful}, {why1}"),
         (2, "((Useless|Terrible|Awful)) {subject}{bang}"),
         (1, "{subject}: {why1}"),
-        (1, "((Useless|Rubbish|Awful)) for {use}: {why1}")],
+        (1, "((Useless|Rubbish|Awful)) for {use}: {why1}"),
+        (1, "((Cheap|Nasty|Flimsy)) {material}{bang}"),
+        (1, "((Avoid|Don't buy)) this {subject}{bang}")],
     "fixed1": ["Complete waste of money", "Avoid this one", "Terrible experience",
                "Nothing like the listing", "One star is generous", "Avoid", "Rubbish",
                "Awful", "Junk", "Total disappointment", "Never again", "Returned immediately"],
@@ -1033,12 +1044,13 @@ class MicrotextGenerator:
         levels = self.normalize_ratings(ratings, size, self.rng)
         subjects = self._slot_series(context, "subject", size, self._TITLE_SUBJECT)
         uses = self._slot_series(context, "use", size, self._GENERIC_USE)
+        mats = self._slot_series(context, "material", size, self._GENERIC_MATERIAL)
         out = []
         for i, lvl in enumerate(levels):
             from misata.scenarios import _soft_lower
             subj = _soft_lower(subjects[i])
             t = self._title.expand(f"title_{lvl}", subject=subj, the_subject=f"this {subj}",
-                                   use=uses[i])
+                                   use=uses[i], material=mats[i])
             t = re.sub(r"\s+", " ", t).strip()
             t = t[:1].upper() + t[1:]
             r = self.rng.random()
@@ -1207,11 +1219,13 @@ NEGATIVE_MARKERS = (
 
 
 _NEGATED_POSITIVE = re.compile(
-    r"\b(not|never|isn't|wasn't|won't|wouldn't|don't|doesn't|didn't|can't|cannot|couldn't|hardly|no)"
+    r"\b(not|never|isn't|wasn't|won't|wouldn't|don't|doesn't|didn't|can't|cannot|couldn't|hardly|no|"
+    r"cant|dont|wont|isnt|wasnt|doesnt|didnt|couldnt|wouldnt)"
     r"\s+(so\s+|very\s+|that\s+|really\s+|be\s+|exactly\s+)?("
     + "|".join(re.escape(m) for m in POSITIVE_MARKERS) + r")")
 
 
+_POSITIVE_WORDS = re.compile(r"(?<![\w])(" + "|".join(re.escape(m) for m in POSITIVE_MARKERS) + r")(?![\w])")
 _NEGATED_NEGATIVE = re.compile(
     r"\b(never|not|no|wasn't|isn't|without)\s+(been\s+|once\s+|ever\s+)?("
     + "|".join(re.escape(m) for m in NEGATIVE_MARKERS) + r")")
@@ -1227,7 +1241,8 @@ def detect_sentiment(text: str) -> Optional[str]:
     negated = _NEGATED_POSITIVE.sub(" ", lower)
     if negated != lower:
         neg = True
-    pos = any(m in negated for m in POSITIVE_MARKERS)
+    # Whole words only: "recommendation" is not "recommend".
+    pos = bool(_POSITIVE_WORDS.search(negated))
     if pos and not neg:
         return "positive"
     if neg and not pos:

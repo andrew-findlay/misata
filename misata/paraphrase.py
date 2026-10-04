@@ -98,7 +98,6 @@ _COMMON: List[Tuple[str, ...]] = [
     ("though", "however", "mind you"),
     ("also", "plus", "on top of that", "as well"),
     ("still", "even now", "to this day"),
-    ("already", "by now"),
     ("almost", "nearly", "just about"),
     ("immediately", "straight away", "right away", "at once"),
     ("recently", "lately", "of late"),
@@ -125,8 +124,8 @@ _COMMON: List[Tuple[str, ...]] = [
     ("support", "customer service", "the help desk"),
     ("team", "staff", "people"),
     ("price", "cost", "price tag"),
-    ("instructions", "manual", "directions", "guide"),
-    ("manual", "instructions", "user guide"),
+    ("instructions", "directions"),
+    ("manual", "user guide", "instruction booklet"),
     ("setup", "set-up", "installation", "getting started"),
     ("quality", "build quality", "workmanship", "craftsmanship"),
     ("finish", "surface", "coating"),
@@ -144,12 +143,11 @@ _COMMON: List[Tuple[str, ...]] = [
     ("arrived", "came", "showed up", "turned up", "got here"),
     ("bought", "purchased", "ordered"),
     ("ordered", "bought", "purchased"),
-    ("tried", "tested", "gave a go to"),
+    ("tried", "tested"),
     ("noticed", "spotted", "saw", "realised"),
     ("replied", "responded", "got back to me", "answered"),
     ("helped", "assisted", "sorted me out"),
     ("fixed", "resolved", "sorted", "sorted out"),
-    ("broke", "snapped", "stopped working", "gave up"),
     ("stopped working", "died", "packed in", "quit on me"),
     ("returned", "sent back"),
     ("switched", "changed", "moved"),
@@ -187,7 +185,6 @@ _COMMON: List[Tuple[str, ...]] = [
     ("try", "attempt", "have a go"),
     ("think", "reckon", "feel", "believe"),
     ("guess", "suppose", "imagine"),
-    ("wish", "hope", "would prefer"),
     ("says", "states", "shows"),
     ("shows", "displays", "says"),
     ("keeps", "continues to"),
@@ -257,6 +254,25 @@ _PRODUCT: List[Tuple[str, ...]] = [
     ("the office", "work", "the workplace", "office days"),
 ]
 
+_PRODUCT_MORE: List[Tuple[str, ...]] = [
+    ("design", "silhouette", "shape", "form"), ("finish", "surface finish", "coating"),
+    ("fabric", "material", "cloth"), ("handle", "grip"), ("pockets", "storage pockets"),
+    ("reinforced seams", "double-stitched seams", "strengthened seams", "taped seams"),
+    ("a relaxed fit", "an easy fit", "a loose fit", "a laid-back fit"),
+    ("lightweight", "light", "airy", "featherlight"), ("durable", "hard-wearing", "long-lasting", "rugged"),
+    ("soft", "supple", "smooth", "cosy"), ("warm", "insulating", "toasty"), ("breathable", "airy", "ventilated"),
+    ("waterproof", "weatherproof", "water-resistant"), ("rechargeable", "USB-rechargeable", "battery-powered"),
+    ("everyday", "daily", "go-to", "all-purpose"), ("versatile", "adaptable", "multi-purpose", "flexible"),
+    ("sturdy", "solid", "robust", "stable"), ("easy to clean", "simple to clean", "wipe-clean", "low-maintenance"),
+    ("comes in", "is available in", "is offered in"), ("perfect", "ideal", "spot-on", "just right"),
+    ("keeps", "holds", "maintains"), ("helps", "lets you", "makes it easy to"),
+    ("stylish", "smart", "good-looking", "handsome"), ("compact", "space-saving", "neat", "pared-back"),
+    ("premium", "high-quality", "top-quality", "quality"), ("sustainable", "responsibly made", "eco-conscious"),
+    ("handmade", "hand-finished", "made by hand"), ("timeless", "classic", "enduring"),
+    ("thoughtful", "considered", "well-thought-out", "clever"), ("guarantee", "warranty", "promise"),
+    ("included", "supplied", "in the box"), ("recommended", "advised", "suggested"),
+]
+
 _CASUAL_EXTRA: List[Tuple[str, ...]] = [
     ("would buy again", "would order again", "will buy again", "would definitely buy again"),
     ("would not buy again", "won't be buying again", "would never buy again", "not buying again"),
@@ -281,10 +297,10 @@ _CASUAL_EXTRA: List[Tuple[str, ...]] = [
 
 _CASUAL_MORE: List[Tuple[str, ...]] = [
     ("packaging", "packing", "wrapping", "box it came in"),
-    ("instructions", "directions", "leaflet", "instruction sheet"),
+    ("instructions", "directions"),
     ("recommended", "suggested", "pointed me to", "raved about"),
     ("nice", "lovely", "pleasant", "cute", "neat"),
-    ("love it", "adore it", "really like it", "am obsessed with it"),
+    ("love it", "adore it", "really like it"),
     ("I love", "I adore", "I really like"),
     ("loves it", "adores it", "is obsessed with it"),
     ("brilliant", "fab", "smashing", "cracking", "ace"),
@@ -453,12 +469,16 @@ _BUSINESS_MARKERS = ("Note: ", "Update: ", "FYI: ", "Per call: ", "Per email: ",
 _REGISTERS = {
     "casual": _CASUAL_MORE + _CASUAL_TICKET + _COMMON + _CASUAL_EXTRA,
     "business": _BUSINESS,
-    "product": _PRODUCT + [g for g in _COMMON if g[0] in (
+    "product": _PRODUCT + _PRODUCT_MORE + [g for g in _COMMON if g[0] in (
         "great", "good", "easy", "smooth", "small", "light", "strong", "reliable", "helpful",
         "beautiful", "quickly", "fast", "comfortable", "also", "every day", "lots of",
         "really", "slightly", "quite", "completely", "premium", "sturdy")],
     "clinical": _CLINICAL,
 }
+# Patient-facing clinical text (discharge advice): the clinical swaps
+# without the abbreviations a patient would not be handed.
+_REGISTERS["patient"] = [g for g in (tuple(o for o in grp if not re.search(r"[A-Z]{2,}|\.\w|\bpt\b|/", o))
+                                     for grp in _CLINICAL) if len(g) >= 2]
 
 # Words with more than one sense are offered as replacements but never
 # matched: "came" in "came back", "just" in "just before", "order" in "in
@@ -471,7 +491,7 @@ purchase delivery parcel keeps stays remains looks seems appears used tested sha
 listing description surface simple little big tiny huge awful dated hard pain costly
 steep budget quality craftsmanship people staff thing box regret glad kind fair
 mind you daily four weeks seven days week weeks month months review raised set told
-open done d mod known worse ache cost user ta had but although ended strong tough durable absolutely new a little a bit thought slightly picked though quick fix refund fault love small quite helped serious significant big
+open done d mod known worse ache cost user ta had but although ended strong tough durable absolutely new a little a bit thought slightly picked though quick fix refund fault love small quite helped serious significant big suggest clear obvious come arrive
 """.split())
 
 # Expanding a contraction is always grammatical; contracting is not ("where
@@ -479,6 +499,7 @@ open done d mod known worse ache cost user ta had but although ended strong toug
 _REPLACE_ONLY = _REPLACE_ONLY | frozenset("""
 cannot
 """.split()) | frozenset([
+    "showed up", "turned up", "got here",
     "it is", "that is", "there is", "i am", "i have", "i would", "i will", "we have", "we are",
     "you are", "do not", "does not", "did not", "is not", "was not", "will not", "would not",
     "have not", "has not", "could not", "can not"])
@@ -497,7 +518,7 @@ def _compiled(register: str):
                 continue
             index.setdefault(phrase.lower(), group)
     keys = sorted(index, key=len, reverse=True)
-    pat = re.compile(r"(?<![\w'-])(" + "|".join(re.escape(k) for k in keys) + r")(?![\w'-])",
+    pat = re.compile(r"(?<![\w'#@/-])(" + "|".join(re.escape(k) for k in keys) + r")(?![\w'-])",
                      re.IGNORECASE)
     _COMPILED[register] = (pat, index)
     return _COMPILED[register]
@@ -506,6 +527,7 @@ def _compiled(register: str):
 _INTENS_RE = re.compile(r"(?<![\w'-])(is|was|feels|looks|seems|are|were|felt|looked|seemed)"
                         r" (" + "|".join(_INTENSIFIABLE) + r")\b", re.IGNORECASE)
 _OPENS_WITH_CONNECTOR = re.compile(r"^[A-Z][\w']*(?: [\w']+){0,4}[,:] ")
+_PLAIN_CONNECTORS = ("But ", "And ", "So ", "However", "Yet ", "Or ", "Also ", "Plus ", "Then ", "Though")
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
 
 
@@ -611,7 +633,7 @@ def vary(texts: Sequence[str], rng: np.random.Generator, register: str = "casual
     None and empty values pass through unchanged."""
     pat, index = _compiled(register)
     if rate is None:
-        rate = {"casual": 0.75, "business": 0.6, "clinical": 0.5}.get(register, 0.4)
+        rate = {"casual": 0.75, "business": 0.6, "clinical": 0.5, "patient": 0.5}.get(register, 0.55)
     casual = register == "casual"
     out: List[str] = []
     for text in texts:
@@ -652,7 +674,8 @@ def vary(texts: Sequence[str], rng: np.random.Generator, register: str = "casual
             parts = _SENT_SPLIT.split(t)
             for j in range(len(parts)):
                 if (j > 0 and nxt() < 0.12 and parts[j][:1].isupper() and not parts[j].startswith("I ")
-                        and not _OPENS_WITH_CONNECTOR.match(parts[j])):
+                        and not _OPENS_WITH_CONNECTOR.match(parts[j])
+                        and not parts[j].startswith(_PLAIN_CONNECTORS)):
                     mk = _MARKERS[int(nxt() * len(_MARKERS)) % len(_MARKERS)]
                     parts[j] = mk + parts[j][0].lower() + parts[j][1:]
             t = " ".join(parts)
@@ -696,8 +719,13 @@ def vary(texts: Sequence[str], rng: np.random.Generator, register: str = "casual
 
 
 _TRAILING_ADJUNCT = re.compile(
-    r"^([A-Z][^.!?;:]{8,}?) ((?:on|at|in|after|before|since|during|by|last|this|next|from) "
+    r"^([A-Z][^.!?;:]{8,}?) ((?:on|at|in|after|before|since|during|by) "
     r"[^,.!?;:]{3,40})([.!?])$")
+# Only time and date phrases move: "waiting on a reply" is not an adjunct.
+_TIMEY = re.compile(r"\d|\b(Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day|\b(January|February|March|April|May|"
+                    r"June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|"
+                    r"Aug|Sep|Oct|Nov|Dec)\b|\b(morning|afternoon|evening|week|weekend|month|year|"
+                    r"spring|summer|autumn|winter|yesterday|today|tonight|Christmas|holidays?)\b")
 
 
 def _front_adjuncts(t: str, nxt, p: float = 0.3) -> str:
@@ -706,7 +734,7 @@ def _front_adjuncts(t: str, nxt, p: float = 0.3) -> str:
     parts = _SENT_SPLIT.split(t)
     for j, sent in enumerate(parts):
         m = _TRAILING_ADJUNCT.match(sent)
-        if m and nxt() < p:
+        if m and _TIMEY.search(m.group(2)) and nxt() < p:
             head, adj, end = m.groups()
             first = head.split(" ", 1)[0]
             keep_case = first in ("I",) or (first[1:2].isupper()) or first in _PROPER_HINTS
@@ -736,3 +764,22 @@ def _fix_articles(t: str) -> str:
             return m.group(0)
         return (want.capitalize() if art[0].isupper() else want) + " " + word
     return _ARTICLE.sub(fix, t)
+
+
+def vary_keeping(texts: Sequence[str], keep: Sequence[str], rng: np.random.Generator,
+                 register: str = "casual", **kwargs) -> List[str]:
+    """``vary`` that leaves each row's ``keep`` phrase (a product noun, a job
+    title) exactly as written, in whatever case it appears."""
+    held, found_all = [], []
+    for t, k in zip(texts, keep):
+        found = re.findall(re.escape(k), t, re.I) if k else []
+        for j, f in enumerate(found[:8]):
+            t = t.replace(f, chr(j + 1), 1)
+        held.append(t)
+        found_all.append(found[:8])
+    out = []
+    for t, found in zip(vary(held, rng, register, **kwargs), found_all):
+        for j, f in enumerate(found):
+            t = t.replace(chr(j + 1), f, 1)
+        out.append(t)
+    return out

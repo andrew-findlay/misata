@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import re
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Dict, List, Optional, Sequence
 
 import numpy as np
@@ -192,7 +192,7 @@ PRODUCT_FAMILIES: Dict[str, ProductFamily] = {f.key: f for f in [
         "Smart Plug", "Action Camera", "Tablet", "Smartwatch", "E-Reader", "Dash Cam",
         "Portable SSD", "Wi-Fi Router", "USB-C Hub", "Soundbar", "Phone Charger",
         "Fitness Tracker", "Smart Thermostat", "Video Doorbell", "Microphone",
-        "Graphics Tablet", "Projector", "Security Camera"],
+        "Graphics Tablet", "Projector", "Security Camera", "Smart Speaker", "Bluetooth Turntable", "Mesh Wi-Fi System", "Mirrorless Camera", "Drone", "E-Ink Tablet", "Noise Machine", "Smart Bulb", "Ring Light", "Gaming Headset", "Streaming Stick", "Wireless Charger", "Label Printer", "Air Quality Monitor", "Electric Scooter"],
        ["Compact", "Portable", "Ultra-Slim", "Noise-Cancelling@Headphones|Earbuds|Microphone", "Rechargeable", "Smart",
         "Wireless", "Pro", "Waterproof@Speaker|Camera|Earbuds|Smartwatch|Tracker", "Foldable@Stand|Headphones|Keyboard|Lamp", "Fast-Charging@Charger|Power Bank|Hub", "Low-Latency@Headphones|Earbuds|Mouse|Keyboard|Microphone|Webcam"],
        ["anodised aluminium@Stand|Hub|Monitor|Lamp|Tablet|SSD|Speaker|Keyboard|Microphone", "recycled plastic", "matte polycarbonate", "brushed steel@Stand|Lamp|Speaker|Smartwatch|Microphone",
@@ -201,12 +201,12 @@ PRODUCT_FAMILIES: Dict[str, ProductFamily] = {f.key: f for f in [
         "a magnetic mount@Camera|Charger|Lamp|Webcam|Dash", "voice-assistant support@Speaker|Smart|Soundbar|Doorbell|Thermostat", "an app for firmware updates@Smart|Router|Camera|Doorbell|Thermostat|Headphones|Earbuds|Speaker|Smartwatch|Tracker|Soundbar",
         "a fold-flat hinge@Stand|Headphones|Lamp|Tablet", "dual microphones@Headphones|Earbuds|Webcam|Speaker|Doorbell|Camera", "an IPX{n:4-7} rating@Speaker|Earbuds|Camera|Smartwatch|Tracker|Doorbell", "a carry pouch@Headphones|Earbuds|SSD|Speaker|Power Bank|Mouse|Camera",
         "a {n:1-3}-year warranty", "automatic standby", "multipoint pairing@Headphones|Earbuds|Keyboard|Mouse|Speaker",
-        "a backlit control panel@Keyboard|Router|Thermostat|Projector|Soundbar", "a {n:2-4}-port design@Hub|Charger|Power Bank|Router"],
+        "a backlit control panel@Keyboard|Router|Thermostat|Projector|Soundbar", "a {n:2-4}-port design@Hub|Charger|Power Bank|Router", "a {n:2-5}K sensor@Camera|Webcam|Drone|Doorbell", "{n:2-6} hours of playback@Speaker|Headphones|Earbuds|Turntable|Soundbar", "a {n:10-30}W output@Speaker|Charger|Soundbar|Light", "a matte anti-glare screen@Tablet|Monitor|Reader", "{n:16-64} GB of storage@Tablet|Camera|Smartwatch", "an auto-dimming display@Smartwatch|Thermostat|Monitor", "a fold-out kickstand@Tablet|Speaker|Stand", "Matter and Alexa support@Smart|Bulb|Plug|Thermostat|Speaker", "a {n:30-90}-minute flight time@Drone", "a spill-resistant design@Keyboard|Mouse|Speaker"],
        ["working from home", "long commutes", "travel", "gaming sessions", "video calls",
         "a small desk", "streaming", "the home office", "students", "content creators"],
-       ["Charges fully in about {n:1-3} hours.@Headphones|Speaker|Earbuds|Power Bank|Smartwatch|Tracker|Camera|Mouse", "Weighs {n:90-900} g.",
-        "Works with Windows, macOS, iOS and Android.@Keyboard|Mouse|Webcam|Hub|SSD|Headphones|Earbuds|Microphone|Tablet|Speaker", "Cable and quick-start guide included.",
-        "Supports firmware updates over the companion app.@Smart|Router|Camera|Doorbell|Thermostat|Headphones|Earbuds|Speaker|Smartwatch|Tracker|Soundbar", "Plug-and-play, no drivers needed.@Keyboard|Mouse|Webcam|Hub|SSD|Microphone",
+       ["Charges fully in about {n:1-3} hours.@Headphones|Speaker|Earbuds|Power Bank|Smartwatch|Tracker|Camera|Mouse", "Weighs {n:90-900} g.@Headphones|Speaker|Mouse|Keyboard|Webcam|Power Bank|Earbuds|Plug|Action Camera|Tablet|Smartwatch|E-Reader|Dash Cam|SSD|Router|Hub|Charger|Tracker|Thermostat|Doorbell|Microphone|Security Camera|Bulb|Headset|Stick|Mirrorless|Drone|Noise Machine|Label Printer", "Weighs {n:2-9} kg.@4K Monitor|Projector|Soundbar|Turntable", "Weighs {n:11-19} kg.@Scooter",
+        "((Works|Compatible)) with ((Windows, macOS, iOS and Android|Mac and PC|iPhone and Android|most laptops and phones)).@Keyboard|Mouse|Webcam|Hub|SSD|Headphones|Earbuds|Microphone|Tablet|Speaker", "((Cable|USB-C cable|Charging cable)) and ((quick-start guide|manual|setup card)) ((included|in the box|supplied)).",
+        "((Gets|Supports|Receives)) ((firmware|software)) updates ((over|through|via)) the ((companion|free)) app.@Smart|Router|Camera|Doorbell|Thermostat|Headphones|Earbuds|Speaker|Smartwatch|Tracker|Soundbar", "Plug-and-play, no drivers needed.@Keyboard|Mouse|Webcam|Hub|SSD|Microphone",
         "Ships with a {n:1-2} m USB-C cable.@Keyboard|Mouse|Webcam|Hub|SSD|Microphone|Headphones|Speaker|Power Bank|Camera"],
        ["- Black", "- White", "- Graphite", "- Silver", "2nd Gen", "Mini", "Max", "Lite",
         "(2025)", "128GB@Tablet|SSD|Smartwatch|Reader", "256GB@Tablet|SSD|Reader", "- Midnight Blue"],
@@ -218,19 +218,19 @@ PRODUCT_FAMILIES: Dict[str, ProductFamily] = {f.key: f for f in [
         "Summer Dress", "Running Shorts", "Puffer Jacket", "Graphic Tee", "Straight-Leg Jeans",
         "Midi Skirt", "Hoodie", "Blazer", "Cargo Shorts", "Scarf", "Beanie", "Polo Shirt",
         "Cardigan", "Joggers", "Denim Jacket", "Wrap Dress", "Fleece Pullover", "Tank Top",
-        "Overshirt", "Trench Coat", "Sweatpants"],
+        "Overshirt", "Trench Coat", "Sweatpants", "Quilted Gilet", "Linen Shirt", "Wide-Leg Trousers", "Knitted Vest", "Utility Jacket", "Rugby Shirt", "Pleated Skirt", "Shacket", "Turtleneck", "Swim Shorts", "Bomber Jacket", "Corduroy Trousers", "Lounge Set", "Shirt Dress", "Wool Coat"],
        ["Classic", "Relaxed", "Slim-Fit", "Lightweight", "Oversized", "Cropped", "Everyday",
         "Waterproof@Jacket|Coat", "Stretch@Jeans|Trousers|Leggings|Chino|Shorts|Joggers", "Vintage-Wash@Jeans|Tee|Jacket|Hoodie", "Tailored@Blazer|Trousers|Shirt|Coat", "Ribbed@Sweater|Beanie|Tank|Cardigan|Dress"],
        ["organic cotton", "merino wool@Sweater|Beanie|Scarf|Cardigan|Pullover|Tee", "linen@Shirt|Dress|Trousers|Shorts|Overshirt|Skirt|Blazer", "recycled polyester@Jacket|Leggings|Shorts|Puffer|Coat|Tank|Pullover", "French terry@Hoodie|Joggers|Sweatpants|Pullover", "cotton twill@Chino|Trousers|Shorts|Overshirt|Trench|Jacket|Blazer", "TENCEL lyocell@Dress|Shirt|Skirt|Tee|Tank", "brushed fleece@Pullover|Hoodie|Joggers|Jacket|Sweatpants", "stretch denim@Jeans|Jacket|Skirt|Shorts", "cashmere blend@Sweater|Scarf|Beanie|Cardigan|Coat"],
        ["a relaxed fit@Shirt|Tee|Hoodie|Sweater|Trousers|Jeans|Joggers|Cardigan|Dress|Overshirt|Pullover", "reinforced seams", "side pockets@Jacket|Trousers|Shorts|Hoodie|Joggers|Dress|Coat|Cardigan|Skirt|Jeans|Sweatpants|Blazer",
         "a two-way zip@Jacket|Hoodie|Pullover|Coat", "an adjustable hood@Jacket|Hoodie|Coat", "a soft brushed interior@Hoodie|Joggers|Sweatpants|Pullover|Jacket|Leggings", "flatlock stitching@Leggings|Shorts|Tank|Tee|Joggers",
         "a drawstring waist@Shorts|Joggers|Sweatpants|Trousers|Leggings", "a dropped shoulder@Tee|Hoodie|Sweater|Pullover|Cardigan|Shirt|Overshirt", "a hidden phone pocket@Leggings|Shorts|Joggers|Jacket|Sweatpants",
-        "moisture-wicking fabric@Leggings|Shorts|Tank|Tee|Joggers|Polo", "a curved hem@Shirt|Tee|Overshirt|Tank|Polo", "ribbed cuffs@Sweater|Hoodie|Cardigan|Joggers|Pullover|Sweatpants|Jacket"],
+        "moisture-wicking fabric@Leggings|Shorts|Tank|Tee|Joggers|Polo", "a curved hem@Shirt|Tee|Overshirt|Tank|Polo", "ribbed cuffs@Sweater|Hoodie|Cardigan|Joggers|Pullover|Sweatpants|Jacket", "a {n:2-4}-button cuff@Shirt|Blazer|Coat", "a contrast lining@Jacket|Coat|Blazer|Gilet", "a regular rise@Trousers|Jeans|Chino", "an elasticated back@Trousers|Skirt|Joggers|Shorts", "a stand-up collar@Jacket|Coat|Gilet|Turtleneck", "patch pockets@Shirt|Jacket|Shacket|Overshirt", "a longline cut@Cardigan|Coat|Hoodie|Shirt", "tonal stitching", "a {n:60-80} cm length@Dress|Skirt|Coat", "a back vent@Blazer|Coat"],
        ["everyday wear", "the office", "weekend trips", "layering in autumn", "warm evenings",
         "the gym@Leggings|Shorts|Tank|Joggers|Hoodie|Tee", "travel", "rainy commutes@Jacket|Coat", "lounging at home@Hoodie|Joggers|Sweatpants|Pullover|Cardigan|Tee"],
-       ["Machine wash cold, tumble dry low.", "Hand wash recommended.",
-        "True to size; size up for a looser fit.", "Model is {n:170-190} cm and wears a size M.@Jacket|Shirt|Trousers|Sweater|Dress|Tee|Jeans|Hoodie|Blazer|Cardigan|Coat|Polo",
-        "Pre-shrunk.", "Made in Portugal.", "Made in Vietnam.", "Dry clean only.@Blazer|Coat|Cashmere"],
+       ["((Machine wash|Wash)) ((cold|at 30°C|at 40°C)), ((tumble dry low|line dry|dry flat)).", "((Hand wash|Gentle wash|Hand wash only)) ((recommended|is best|to keep it looking new)).",
+        "((True to size|Fits true to size|Runs true to size)); ((size up|go a size up|take the next size)) for a ((looser|relaxed|roomier)) fit.", "Model is {n:170-190} cm and wears a size M.@Jacket|Shirt|Trousers|Sweater|Dress|Tee|Jeans|Hoodie|Blazer|Cardigan|Coat|Polo",
+        "((Pre-shrunk|Pre-washed|Garment-washed))((.| for a soft feel.| so it keeps its size.))", "((Made|Sewn|Knitted)) in ((Portugal|Turkey|Italy|Lithuania|Peru|the UK)).", "((Made|Produced|Manufactured)) ((responsibly |))in ((Vietnam|India|Bangladesh|China|Cambodia)).", "Dry clean only.@Blazer|Coat|Cashmere"],
        ["- Navy", "- Black", "- Olive", "- Heather Grey", "- Ivory", "- Rust", "- Sage",
         "- Size S", "- Size M", "- Size L", "- Size XL"],
        ["Northfold", "Marlowe", "Juniper & Co", "Aster", "Fennick", "Calder", "Wren",
@@ -257,16 +257,16 @@ PRODUCT_FAMILIES: Dict[str, ProductFamily] = {f.key: f for f in [
        ["Throw Blanket", "Sheet Set", "Memory Foam Pillow", "Aroma Diffuser", "Air Purifier",
         "Cordless Vacuum", "Table Lamp", "Bath Towel Set", "Duvet Cover", "Wall Mirror",
         "Storage Basket", "Scented Candle", "Blackout Curtains", "Area Rug", "Photo Frame",
-        "Laundry Hamper", "Doormat", "Shower Curtain", "Cushion Cover", "Wall Clock"],
+        "Laundry Hamper", "Doormat", "Shower Curtain", "Cushion Cover", "Wall Clock", "Linen Napkins", "Plant Pot", "Bath Mat", "Bedspread", "Floor Cushion", "Wall Art Print", "Bud Vase", "Throw Pillow", "Jute Rug", "Coat Hooks", "Room Spray", "Draught Excluder", "Weighted Blanket", "Mattress Topper", "Hanging Planter"],
        ["Soft@Blanket|Towel|Pillow|Throw|Cushion|Sheet|Duvet|Rug", "Minimalist", "Handwoven@Rug|Basket|Throw|Blanket|Doormat", "Washable@Rug|Pillow|Cushion|Blanket", "Compact@Vacuum|Purifier|Diffuser|Lamp", "Oversized@Throw|Blanket|Mirror|Clock|Pillow", "Quiet@Vacuum|Purifier|Diffuser|Clock", "Modern", "Rustic@Frame|Clock|Mirror|Basket|Candle|Lamp", "Plush@Blanket|Throw|Rug|Pillow|Towel"],
-       ["cotton percale@Sheet|Duvet|Pillow", "linen@Sheet|Duvet|Cushion|Curtain|Throw|Blanket", "jute@Rug|Basket|Doormat|Hamper", "bamboo@Towel|Basket|Hamper|Frame|Sheet", "ceramic@Lamp|Diffuser|Candle", "oak@Frame|Mirror|Clock|Lamp", "recycled glass@Candle|Lamp|Diffuser", "velvet@Cushion|Curtain|Throw", "wool@Throw|Blanket|Rug|Cushion", "recycled plastic@Vacuum|Purifier|Hamper|Diffuser|Curtain", "organic cotton@Towel|Blanket|Throw|Sheet|Rug"],
+       ["cotton percale@Sheet|Duvet|Pillow", "linen@Sheet|Duvet|Cushion|Curtain|Throw|Blanket", "jute@Rug|Basket|Doormat|Hamper", "bamboo@Towel|Basket|Hamper|Frame|Sheet", "ceramic@Lamp|Diffuser|Candle", "oak@Frame|Mirror|Clock|Lamp", "recycled glass@Candle|Lamp|Diffuser", "velvet@Cushion|Curtain|Throw", "wool@Throw|Blanket|Rug|Cushion", "recycled plastic@Vacuum|Purifier|Hamper|Diffuser|Curtain", "organic cotton@Towel|Blanket|Throw|Sheet|Rug", "natural fibres", "recycled cotton", "stoneware", "rattan", "FSC-certified wood"],
        ["a neutral colourway", "easy-care materials", "a {n:1-5}-year guarantee", "a neutral finish@Lamp|Mirror|Frame|Clock|Basket|Hamper|Candle|Diffuser", "hidden fixings@Mirror|Clock|Frame|Curtains", "a non-slip base@Rug|Doormat|Lamp|Basket|Hamper|Board|Scale|Mixer|Blender|Bed|Bowl", "a removable cover@Pillow|Cushion|Duvet|Hamper",
         "a hand-finished edge@Rug|Towel|Blanket|Throw|Mirror|Frame|Doormat|Basket|Cushion", "a timer function@Diffuser|Purifier|Lamp", "a whisper-quiet motor@Vacuum|Purifier|Diffuser",
-        "a washable filter@Vacuum|Purifier", "pre-drilled holes@Mirror|Clock|Frame", "a soft-touch weave@Blanket|Towel|Sheet|Rug|Cushion|Duvet|Throw"],
+        "a washable filter@Vacuum|Purifier", "pre-drilled holes@Mirror|Clock|Frame", "a soft-touch weave@Blanket|Towel|Sheet|Rug|Cushion|Duvet|Throw", "a {n:200-600} thread count@Sheet|Duvet|Pillow", "a {n:3-10} kg weight@Blanket", "{n:30-60} hours of burn time@Candle", "a zip closure@Cushion|Pillow|Duvet", "an anti-slip backing@Rug|Mat|Doormat", "a drainage hole@Pot|Planter", "a reversible design@Rug|Blanket|Duvet|Throw", "{n:2-6} hanging hooks@Hooks|Rack", "a fade-resistant print@Print|Art|Curtains", "a quilted top@Topper|Bedspread"],
        ["the living room", "small flats", "guest rooms", "everyday use", "the bedroom",
         "entryways", "rentals"],
-       ["Machine washable at 40°C.@Blanket|Sheet|Towel|Duvet|Cushion|Curtain|Throw|Pillow", "Spot clean only.@Rug|Cushion|Throw|Curtains|Basket|Doormat|Pillow|Hamper", "Assembly takes about {n:5-30} minutes.@Mirror|Hamper|Lamp|Clock|Rack",
-        "Measures {n:30-200} x {n:30-200} cm.", "Covered by a {n:1-5}-year warranty."],
+       ["Machine washable at 40°C.@Blanket|Sheet|Towel|Duvet|Cushion|Curtain|Throw|Pillow", "((Spot clean|Sponge clean|Spot-clean)) ((only|with mild soap|where needed)).@Rug|Cushion|Throw|Curtains|Basket|Doormat|Pillow|Hamper", "Assembly takes about {n:5-30} minutes.@Mirror|Hamper|Lamp|Clock|Rack",
+        "Measures {n:60-240} x {n:90-300} cm.@Rug|Curtain|Throw|Blanket|Bedspread|Topper|Shower Curtain", "Measures {n:20-60} x {n:20-60} cm.@Cushion|Pillow|Print|Mirror|Frame|Bath Mat|Doormat|Clock", "Covered by a {n:1-5}-year warranty."],
        ["- Set of 2", "- Set of 4", "- Large", "- Small", "- Natural", "- Charcoal",
         "- Oatmeal", "- Queen", "- King"],
        ["Hearthwell", "Oakline", "Nordhaus", "Casa Verde", "Linden", "Tidewater",
@@ -276,12 +276,12 @@ PRODUCT_FAMILIES: Dict[str, ProductFamily] = {f.key: f for f in [
        ["Cast Iron Skillet", "Knife Set", "Cookware Set", "Cutting Board", "French Press",
         "Pour-Over Kettle", "Dinnerware Set", "Food Storage Containers", "Baking Mat",
         "Kitchen Scale", "Stand Mixer", "Blender", "Air Fryer", "Toaster", "Coffee Grinder",
-        "Spice Rack", "Dutch Oven", "Water Bottle", "Travel Mug", "Salad Spinner"],
+        "Spice Rack", "Dutch Oven", "Water Bottle", "Travel Mug", "Salad Spinner", "Chopping Board Set", "Pasta Maker", "Garlic Press", "Measuring Cups", "Mixing Bowls", "Pizza Stone", "Milk Frother", "Cocktail Shaker", "Bread Bin", "Utensil Set", "Wok", "Tea Infuser", "Oven Gloves", "Rolling Pin", "Spiraliser"],
        ["Non-Stick@Skillet|Cookware|Mat|Air Fryer", "Pre-Seasoned@Skillet|Dutch Oven", "Stainless@Knife|Kettle|Bottle|Mug|Rack|Cookware", "Insulated@Bottle|Mug", "Compact", "Professional@Knife|Mixer|Blender|Grinder|Cookware", "Stackable@Containers|Dinnerware", "Leak-Proof@Containers|Bottle|Mug", "Digital@Scale|Air Fryer|Toaster|Kettle"],
-       ["18/10 stainless steel@Knife|Cookware|Kettle|Bottle|Mug|Rack|Toaster|Press|Mixer|Grinder|Scale|Spinner", "cast iron@Skillet|Dutch Oven", "acacia wood@Board|Rack", "borosilicate glass@Containers|Press|Kettle|Bottle", "stoneware@Dinnerware|Mug|Dutch Oven", "BPA-free plastic@Containers|Spinner|Bottle|Blender|Air Fryer", "carbon steel@Knife|Skillet", "enamelled cast iron@Dutch Oven|Skillet", "silicone@Mat|Rack|Containers"],
+       ["18/10 stainless steel@Knife|Cookware|Kettle|Bottle|Mug|Rack|Toaster|Press|Mixer|Grinder|Scale|Spinner", "cast iron@Skillet|Dutch Oven", "acacia wood@Board|Rack", "borosilicate glass@Containers|Press|Kettle|Bottle", "stoneware@Dinnerware|Mug|Dutch Oven", "BPA-free plastic@Containers|Spinner|Bottle|Blender|Air Fryer", "carbon steel@Knife|Skillet", "enamelled cast iron@Dutch Oven|Skillet", "silicone@Mat|Rack|Containers", "food-grade stainless steel", "heat-resistant glass", "beech wood", "silicone"],
        ["a {n:1-10}-year guarantee", "easy-clean surfaces", "a compact footprint", "stay-cool handles@Skillet|Cookware|Dutch Oven|Kettle", "a non-slip base@Board|Scale|Mixer|Blender|Rack|Spinner|Grinder", "a pour spout@Kettle|Press|Skillet|Blender|Cookware", "a tempered glass lid@Cookware|Dutch Oven|Skillet",
         "an induction-ready base@Skillet|Cookware|Dutch Oven|Kettle", "measurement markings@Blender|Containers|Kettle|Press|Bottle|Mixer", "a locking lid@Containers|Bottle|Mug|Blender|Lunch",
-        "{n:3-12} speed settings@Mixer|Blender|Grinder", "a removable blade@Blender|Grinder", "an auto shut-off@Kettle|Air Fryer|Toaster|Blender|Mixer|Grinder"],
+        "{n:3-12} speed settings@Mixer|Blender|Grinder", "a removable blade@Blender|Grinder", "an auto shut-off@Kettle|Air Fryer|Toaster|Blender|Mixer|Grinder", "a {n:3-7}-piece set@Set|Bowls|Cups|Utensil", "a {n:20-35} cm diameter@Wok|Skillet|Stone|Bowls", "a heat-proof silicone grip@Gloves|Utensil|Wok", "{n:6-9} thickness settings@Pasta|Spiraliser", "a bamboo lid@Bin|Containers", "a built-in strainer@Shaker|Infuser", "a fine-mesh basket@Infuser|Spinner", "a one-touch froth button@Frother", "nesting storage@Bowls|Cups|Containers|Set"],
        ["weeknight cooking", "small kitchens", "meal prep", "baking@Mat|Mixer|Scale|Dutch Oven", "camping@Bottle|Mug|Skillet|Press|Kettle",
         "the morning coffee@Press|Kettle|Grinder|Mug", "entertaining"],
        ["Dishwasher safe.@Board|Dinnerware|Containers|Mat|Bottle|Mug|Spinner|Cookware", "Hand wash to keep the finish.", "Oven safe to {n:200-260}°C.@Skillet|Dutch Oven|Cookware|Mat|Dinnerware",
@@ -310,14 +310,14 @@ PRODUCT_FAMILIES: Dict[str, ProductFamily] = {f.key: f for f in [
         "Cleansing Water", "Clay Mask", "Hair Oil", "Shampoo", "Conditioner", "Lipstick",
         "Eyeshadow Palette", "Mascara", "Setting Powder", "Tinted Moisturiser",
         "Brow Pencil", "Sheet Masks", "Body Lotion", "Hand Cream", "Eye Cream",
-        "Face Cleanser", "Toner"],
+        "Face Cleanser", "Toner", "Lip Balm", "Bronzer", "Concealer", "Face Oil", "Body Scrub", "Dry Shampoo", "Nail Polish", "Foundation", "Eyeliner", "Cleansing Balm", "Hair Mask", "Deodorant", "Primer", "Exfoliating Toner", "Retinol Serum"],
        ["Hydrating", "Brightening@Serum|Mask|Cream|Toner|Moisturiser", "Fragrance-Free", "Gentle", "Long-Wear@Lipstick|Mascara|Eyeshadow|Powder|Pencil", "Matte@Lipstick|Powder|Eyeshadow|Sunscreen", "Nourishing", "Lightweight", "Overnight@Cream|Mask|Serum"],
        ["hyaluronic acid", "niacinamide@Serum|Moisturiser|Toner|Cream", "shea butter@Cream|Lotion|Lipstick|Conditioner", "squalane", "aloe vera", "jojoba oil", "ceramides@Cream|Moisturiser|Lotion|Cleanser", "green tea extract"],
        ["a non-greasy finish", "a pump bottle@Serum|Moisturiser|Cleanser|Shampoo|Conditioner|Lotion|Oil|Toner", "a fresh citrus scent@Shampoo|Conditioner|Lotion|Hand Cream|Cleanser", "no added fragrance",
-        "a recyclable tube@Cream|Sunscreen|Cleanser|Lotion|Moisturiser|Mascara", "a buildable formula@Lipstick|Eyeshadow|Mascara|Powder|Tinted|Brow", "a travel-size option"],
+        "a recyclable tube@Cream|Sunscreen|Cleanser|Lotion|Moisturiser|Mascara", "a buildable formula@Lipstick|Eyeshadow|Mascara|Powder|Tinted|Brow", "a travel-size option", "SPF {n:15-50}@Moisturiser|Tinted|Lip|Foundation|Primer", "{n:2-12}% active ingredients@Serum|Toner|Cream", "a {n:12-24}-hour wear@Foundation|Concealer|Lipstick|Mascara|Eyeliner", "a refillable case@Lipstick|Bronzer|Powder|Palette", "{n:8-40} shades@Foundation|Concealer|Lipstick|Nail", "a dropper bottle@Serum|Oil", "a vitamin E boost", "a non-comedogenic formula", "a cooling applicator@Eye|Mask", "a reef-safe formula@Sunscreen|SPF"],
        ["dry skin", "sensitive skin", "daily use", "oily skin@Cleanser|Toner|Mask|Powder|Moisturiser|Sunscreen", "a morning routine", "a night routine@Cream|Serum|Mask|Oil", "all skin types"],
-       ["Dermatologist tested.", "Vegan and cruelty-free.", "Contains {n:30-200} ml.",
-        "Patch test before first use.", "Apply morning and evening to clean skin.@Serum|Moisturiser|Cream|Toner"],
+       ["((Dermatologist|Clinically|Independently)) tested((.| on sensitive skin.| by {n:20-80} volunteers.))", "((Vegan|100% vegan|Plant-based)) and ((cruelty-free|never tested on animals)).", "Contains {n:30-200} ml.",
+        "((Patch test|Always patch test|Test on a small area)) before ((first use|use|applying widely)).", "Apply morning and evening to clean skin.@Serum|Moisturiser|Cream|Toner"],
        ["30ml", "50ml", "100ml", "Travel Size", "- Shade 02", "- Shade 05", "Unscented"],
        ["Lumière", "Botanica", "Velour", "Pure Theory", "Saffron Lane", "Dewy Days"],
        24.0),
@@ -325,13 +325,13 @@ PRODUCT_FAMILIES: Dict[str, ProductFamily] = {f.key: f for f in [
        ["Resistance Bands", "Adjustable Dumbbells", "Yoga Mat", "Pull-Up Bar", "Jump Rope",
         "Foam Roller", "Cycling Helmet", "Tennis Racket", "Basketball", "Football",
         "Swim Goggles", "Gym Bag", "Kettlebell", "Camping Tent", "Sleeping Bag",
-        "Hiking Backpack", "Trekking Poles", "Water Bottle", "Bike Light", "Climbing Chalk Bag"],
+        "Hiking Backpack", "Trekking Poles", "Water Bottle", "Bike Light", "Climbing Chalk Bag", "Running Vest", "Climbing Shoes", "Paddle Board", "Skipping Rope", "Exercise Bike", "Boxing Gloves", "Hydration Pack", "Head Torch", "Ski Goggles", "Wetsuit", "Badminton Set", "Grip Trainer", "Weighted Vest", "Balance Board", "Cycling Gloves"],
        ["Non-Slip@Mat", "Lightweight", "Adjustable@Dumbbells|Helmet|Poles|Rope|Bar", "Heavy-Duty", "Packable@Tent|Sleeping|Backpack|Bag", "Anti-Fog@Goggles", "Insulated@Bottle|Sleeping", "Pro", "Compact"],
-       ["natural rubber@Bands|Mat|Basketball|Football|Goggles", "TPE foam@Mat|Roller", "ripstop nylon@Tent|Sleeping|Backpack|Bag", "cast iron@Kettlebell|Dumbbells", "aluminium alloy@Poles|Bar|Racket|Light|Bottle", "recycled polyester@Bag|Backpack|Sleeping|Bands"],
+       ["natural rubber@Bands|Mat|Basketball|Football|Goggles", "TPE foam@Mat|Roller", "ripstop nylon@Tent|Sleeping|Backpack|Bag", "cast iron@Kettlebell|Dumbbells", "aluminium alloy@Poles|Bar|Racket|Light|Bottle", "recycled polyester@Bag|Backpack|Sleeping|Bands", "recycled nylon", "technical fabric", "EVA foam", "neoprene", "lightweight alloy"],
        ["a durable build", "a {n:1-2}-year guarantee", "a lightweight design", "a carry strap@Mat|Bag|Tent|Sleeping|Roller|Backpack", "anti-slip texture@Mat|Bar|Dumbbells|Kettlebell|Racket|Poles", "{n:3-6} resistance levels@Bands", "a ventilated shell@Helmet",
-        "a quick-release buckle@Helmet|Backpack|Bag|Light", "a rain cover@Backpack|Bag|Tent", "reflective details@Helmet|Backpack|Bag|Light", "a padded grip@Racket|Rope|Poles|Bar|Dumbbells|Kettlebell"],
+        "a quick-release buckle@Helmet|Backpack|Bag|Light", "a rain cover@Backpack|Bag|Tent", "reflective details@Helmet|Backpack|Bag|Light", "a padded grip@Racket|Rope|Poles|Bar|Dumbbells|Kettlebell", "{n:1-3} litres of capacity@Bottle|Pack|Vest|Backpack", "a {n:200-800}-lumen beam@Torch|Light", "a {n:3-5} mm neoprene shell@Wetsuit|Gloves", "{n:8-16} resistance levels@Bike|Trainer", "a breathable mesh back@Vest|Backpack|Pack", "a magnetic lens system@Goggles", "a non-slip deck@Board", "gel-padded palms@Gloves", "an adjustable chest strap@Vest|Backpack|Pack", "a {n:10-25} kg load@Vest|Kettlebell|Dumbbells"],
        ["home workouts@Bands|Dumbbells|Mat|Bar|Rope|Roller|Kettlebell", "the gym@Bands|Dumbbells|Mat|Bag|Rope|Roller|Kettlebell|Bottle", "weekend hikes@Backpack|Poles|Bottle|Tent", "yoga classes@Mat|Roller|Bands", "camping trips@Tent|Sleeping|Backpack|Light|Bottle", "training sessions", "commuting by bike@Helmet|Light|Backpack"],
-       ["Weighs {n:200-2500} g.", "Supports up to {n:80-150} kg.@Bar|Roller|Mat", "Wipe clean after use.",
+       ["Weighs {n:200-2500} g.@Bands|Mat|Rope|Roller|Helmet|Racket|Basketball|Football|Goggles|Gym Bag|Sleeping Bag|Backpack|Poles|Bottle|Light|Chalk|Running Vest|Shoes|Gloves|Hydration|Torch|Wetsuit|Badminton|Grip|Balance Board|Tent", "Weighs {n:5-24} kg.@Dumbbells|Kettlebell|Weighted Vest", "Weighs {n:9-35} kg.@Exercise Bike|Paddle Board", "Supports up to {n:80-150} kg.@Bar|Roller|Mat", "((Wipe|Simply wipe|Just wipe)) ((it |))clean ((after use|with a damp cloth|after each session)).",
         "Packs down to {n:20-45} cm.@Tent|Sleeping|Backpack|Poles"],
        ["- Blue", "- Red", "- Black", "- Size 5@Football|Basketball", "- Medium@Bands|Helmet|Backpack|Bag|Tent", "- Large@Bands|Helmet|Backpack|Bag|Tent", "- 6mm@Mat", "- 15kg@Kettlebell|Dumbbells"],
        ["Peakform", "Stride", "Trailborn", "Vantage", "Ironbark", "Swiftline", "Summitry"],
@@ -340,16 +340,16 @@ PRODUCT_FAMILIES: Dict[str, ProductFamily] = {f.key: f for f in [
        ["Building Blocks Set", "Wooden Train Set", "Plush Bear", "Jigsaw Puzzle",
         "Board Game", "Remote Control Car", "Doll House", "Art Kit", "Science Kit",
         "Stacking Rings", "Kite", "Play Kitchen", "Card Game", "Marble Run", "Ride-On Scooter",
-        "Magnetic Tiles", "Puppet Theatre", "Drum Set"],
+        "Magnetic Tiles", "Puppet Theatre", "Drum Set", "Dolls Pram", "Toy Kitchen Set", "Tea Set", "Ball Pit", "Shape Sorter", "Robot Kit", "Dinosaur Figures", "Musical Keyboard", "Balance Bike", "Sticker Book", "Craft Box", "Toy Garage", "Play Tent", "Water Table", "Bath Toys"],
        ["Classic", "Wooden@Blocks|Train|Puzzle|Kitchen|House|Rings|Theatre", "Educational", "Glow-in-the-Dark@Puzzle|Tiles|Kite|Blocks", "Rainbow", "Junior",
         "Deluxe", "Travel"],
-       ["FSC-certified wood@Blocks|Train|Kitchen|House|Rings|Theatre|Marble", "recycled plastic@Car|Scooter|Tiles|Kite|Drum|Blocks|Rings", "soft plush@Bear|Puppet", "cardboard@Puzzle|Board|Card|Kit"],
+       ["FSC-certified wood@Blocks|Train|Kitchen|House|Rings|Theatre|Marble", "recycled plastic@Car|Scooter|Tiles|Kite|Drum|Blocks|Rings", "soft plush@Bear|Puppet", "cardboard@Puzzle|Board|Card|Kit", "child-safe plastic", "sustainable rubberwood", "soft-touch silicone", "recycled card"],
        ["{n:24-1000} pieces@Blocks|Puzzle|Tiles|Marble|Train", "a storage tin@Blocks|Puzzle|Card|Art|Tiles|Marble", "rounded edges", "rechargeable batteries@Car|Scooter|Drum",
-        "illustrated instructions", "{n:2-6} play modes@Car|Kitchen|Drum|Science|Tiles", "a carry case"],
+        "illustrated instructions", "{n:2-6} play modes@Car|Kitchen|Drum|Science|Tiles", "a carry case", "{n:10-60} accessories@Kitchen|Set|Kit|Garage|Box", "a {n:3-12}-song playlist@Keyboard|Drum", "{n:4-12} dinosaurs@Dinosaur", "a fold-flat frame@Pram|Tent|Bike", "an easy-grip handle@Sorter|Pram|Rings", "{n:50-500} stickers@Sticker", "a pop-up design@Tent|Ball Pit", "a coding app@Robot", "a water-safe finish@Bath|Water", "a quiet motor@Car|Robot"],
        ["rainy afternoons", "family game night@Board|Card|Puzzle", "toddlers@Blocks|Rings|Bear|Train|Tiles|Drum", "budding scientists@Science|Marble|Blocks|Tiles",
         "birthday gifts", "travel"],
-       ["Recommended for ages {n:3-10} and up.", "Not suitable for children under 3.",
-        "Batteries included.@Car|Drum|Science", "Contains small parts.", "For {n:2-6} players.@Board|Card"],
+       ["Recommended for ages {n:3-10} and up.", "((Not suitable for|Unsuitable for|Keep away from)) children under ((3|36 months))((.| - small parts.))",
+        "Batteries included.@Car|Drum|Science", "((Contains|Includes)) small parts((.| - adult supervision advised.))", "For {n:2-6} players.@Board|Card"],
        ["- 100 Pieces", "- 500 Pieces", "- Pastel", "- Primary Colours", "Mini", "XL"],
        ["Little Oak", "Tumbletown", "Brightbox", "Kitebird", "Pip & Pals"],
        29.0),
@@ -481,7 +481,7 @@ PRODUCT_FAMILIES: Dict[str, ProductFamily] = {f.key: f for f in [
         "{n:20-120} pieces", "a soft-grip handle"],
        ["DIY projects", "the garage", "flat-pack furniture", "small repairs", "trades"],
        ["Battery and charger included.", "Covered by a {n:2-5}-year warranty.",
-        "Weighs {n:300-2000} g."],
+        "Weighs {n:300-2000} g.@Drill|Screwdriver|Tape|Level|Socket|Work Light|Knife|Stud|Glue Gun", "Weighs {n:4-25} kg.@Ladder|Workbench|Tool Box"],
        ["- 18V", "- 32-Piece", "- 5m", "- Yellow", "- Kit"],
        ["Ironbark", "Forgewell", "Torque & Co", "Benchmark Tools"],
        48.0),
@@ -499,6 +499,71 @@ PRODUCT_FAMILIES: Dict[str, ProductFamily] = {f.key: f for f in [
        ["Wayfarer", "Common Thread", "Meridian Goods", "Harbor & Pine"],
        25.0),
 ]}
+
+# More features and spec lines for the smaller families, so a catalogue of a
+# few thousand books or groceries does not keep repeating the same handful.
+_FAMILY_EXTRA = {
+    "books": (["a new introduction by the author", "{n:20-120} recipes@Cookbook", "{n:8-40} walking routes@Guide", "{n:12-30} stories@Collection",
+               "an author's note", "a glossary@History|Atlas|Guide|Workbook", "{n:40-200} illustrations@Picture|Graphic|Field|Cookbook",
+               "answers at the back@Workbook|Puzzle", "{n:30-120} puzzles@Puzzle", "a reading group guide@Novel|Memoir|Collection|Biography",
+               "fold-out maps@Atlas|Travel|Field", "a timeline@History|Biography", "black-and-white photographs@Memoir|Biography|History",
+               "{n:10-40} full-page spreads@Picture|Atlas|Cookbook"],
+              ["Translated from the ((French|Spanish|Japanese|Norwegian|Italian)).@Novel|Collection|Poetry|Memoir",
+               "((Shortlisted|Longlisted)) for the {n:2016-2024} ((Costa|Booker|Wainwright|Baillie Gifford)) Prize.@Novel|Memoir|Biography|History|Collection",
+               "Suitable for ages {n:3-8} and up.@Picture|Sticker", "Printed on FSC-certified paper.", "Signed first edition while stocks last."]),
+    "grocery": (["notes of ((caramel|cocoa|citrus|dark berries|toasted nuts))@Coffee|Chocolate|Tea", "a medium roast@Coffee", "{n:55-85}% cocoa@Chocolate",
+                 "a peppery finish@Olive Oil", "{n:8-20} g of protein per bar@Bars", "a light, floral taste@Honey|Tea|Syrup", "a crunchy texture@Granola|Mix|Butter",
+                 "a slow-roasted flavour@Coffee|Almond|Peanut|Mix", "bronze-die cutting@Pasta", "a {n:3-9}-month ageing@Rice", "a habanero kick@Hot Sauce",
+                 "a compostable pouch@Coffee|Tea|Granola|Oats|Rice|Mix", "a vegan recipe", "single-estate sourcing@Coffee|Tea|Olive|Chocolate|Honey",
+                 "a low-sugar recipe@Granola|Bars|Butter|Chocolate", "a recyclable tin@Coffee|Tea|Salt"],
+                ["Suitable for vegans.", "Made in a factory that handles nuts and sesame.", "Once opened, use within {n:4-12} weeks.",
+                 "Grown in ((Colombia|Ethiopia|Kenya|Sicily|Andalusia|Kerala|Assam|Peru)).@Coffee|Tea|Olive|Chocolate|Rice",
+                 "((Brew|Steep)) for {n:2-5} minutes.@Tea|Coffee"]),
+    "pets": (["a waterproof base@Bed|Carrier", "bolstered sides@Bed", "{n:2-4} scratching levels@Tree|Post", "a dangling toy@Tree|Post", "a squeaker inside@Toy",
+              "a lightweight design", "a padded chest plate@Harness", "a 2 m length@Lead", "a non-tip design@Bowl", "a self-cleaning button@Brush",
+              "a front clip@Harness", "low-dust granules@Litter", "a treat compartment@Toy|Pouch", "a breathable mesh panel@Carrier|Bed"],
+             ["Spot clean only.@Tree|Post", "Dishwasher safe.@Bowl", "Vet-approved recipe.@Food", "Feed {n:2-3} times a day.@Food"]),
+    "garden": (["a {n:15-50} m length@Hose", "a soft-grip handle@Shears|Can|Gloves", "a built-in reservoir@Planter|Pot", "a dusk-to-dawn sensor@Lights",
+                "{n:6-12} hours of light@Lights", "a squirrel-proof cage@Feeder", "a {n:5-12} litre capacity@Can", "a fold-flat frame@Chair",
+                "a {n:200-400} litre capacity@Compost", "{n:12-40} seed cells@Starter", "touchscreen-friendly fingertips@Gloves", "a rust-proof finish"],
+               ["Assembly takes about {n:10-30} minutes.@Planter|Chair|Compost|Feeder", "Bring indoors over winter.@Lights|Chair|Pot",
+                "Charges in direct sunlight.@Lights", "Fits standard hose connectors.@Hose|Sprinkler"]),
+    "office": (["a ribbon bookmark@Notebook|Planner", "numbered pages@Notebook|Planner", "a back pocket@Notebook|Planner", "a fine 0.5 mm tip@Pens|Pen",
+                "a non-slip base@Organiser|Stapler|Mat", "{n:4-8} compartments@Organiser|Box", "a {n:20-40}-sheet capacity@Stapler",
+                "a magnetic surface@Whiteboard", "a converter and {n:3-6} cartridges@Fountain", "smudge-proof ink@Pens|Highlighters|Pen",
+                "monthly and weekly views@Planner", "a stitched edge@Mat"],
+               ["Fits A4 sheets.@Box|Organiser", "Refills available.@Pens|Pen|Planner|Notebook", "Includes {n:2-5} marker pens.@Whiteboard"]),
+    "automotive": (["a {n:150-1500} A peak current@Jump", "auto shut-off at the set pressure@Inflator", "a 360° swivel@Mount", "a wet-and-dry nozzle@Vacuum",
+                    "raised edges@Mats", "a {n:400-600} litre capacity@Roof", "{n:2-4} USB ports@Charger", "airbag-compatible seams@Seat",
+                    "a night-vision lens@Dash", "a one-touch release@Mount", "a beam-blade design@Wiper"],
+                   ["Fits most roof bars.@Roof", "Charges from a 12 V socket.@Vacuum|Inflator|Charger", "Sold as a pair.@Wiper|Seat"]),
+    "jewelry": (["a {n:8-20} mm drop@Earrings", "an extender chain@Necklace|Chain|Anklet|Bracelet", "a slim profile@Ring|Bracelet|Cufflinks",
+                 "a sapphire-crystal face@Watch", "a hand-hammered texture", "a {n:1-3} mm band@Ring", "an engravable plate@Bracelet|Cufflinks|Pendant",
+                 "a box-chain style@Chain|Necklace", "a {n:30-40} mm case@Watch", "a tarnish-resistant coating"],
+                ["Water-resistant to {n:3-10} ATM.@Watch", "Comes in a recycled gift box.", "Made to order in {n:3-10} days.", "Free resizing within 30 days.@Ring"]),
+    "health": (["{n:1000-4000} IU per tablet@Vitamin", "a pleasant citrus taste@Electrolyte|Multivitamin|Protein", "{n:20-30} g of protein per scoop@Protein",
+                "{n:4-10} billion cultures@Probiotic", "{n:60-120} plasters and dressings@First Aid", "a 10-second reading@Thermometer|Monitor",
+                "an auto-off timer@Heating|Massage", "{n:4-8} massage heads@Massage", "irregular heartbeat detection@Monitor", "a fever alert@Thermometer",
+                "a travel pouch@First Aid|Massage|Thermometer"],
+               ["Take one a day with food.@Tablets|Capsules|Multivitamin", "Mix one scoop with 300 ml of water.@Protein|Electrolyte",
+                "Clinically validated.@Monitor|Thermometer", "Batteries included.@Thermometer|Monitor"]),
+    "baby": (["a {n:3-5}-point harness@Chair|Carrier|Seat", "a wipe-clean tray@Chair", "two-way zips@Sleepsuit", "a slow-flow teat@Bottle",
+              "a two-way talkback@Monitor", "a temperature sensor@Monitor", "a padded edge@Mat", "{n:4-8} hanging toys@Play", "a lumbar support belt@Carrier",
+              "a textured surface@Teething", "a suction base@Seat"],
+             ["Suitable from {n:3-6} months.@Chair|Seat|Teething", "Supports babies up to {n:9-15} kg.@Carrier|Seat|Chair", "Sterilise before first use.@Bottle|Teething",
+              "Range up to {n:200-300} m.@Monitor"]),
+    "tools": (["a {n:2-3}-speed gearbox@Drill", "a magnetic bit holder@Drill|Screwdriver", "{n:1-3} bubble vials@Level", "a {n:5-10} m blade@Tape",
+               "a quick-release blade@Knife", "AC wire detection@Stud", "a {n:7-11} mm nozzle@Glue", "{n:3-6} steps@Ladder", "a lockable lid@Box",
+               "a clamping top@Workbench", "a {n:1000-3000} lumen output@Work Light", "a ratcheting handle@Socket|Screwdriver"],
+              ["Includes {n:10-30} glue sticks.@Glue", "Supports up to {n:100-150} kg.@Ladder|Workbench", "Spare blades included.@Knife"]),
+    "generic": (["a padded laptop sleeve@Backpack", "a {n:15-30} L capacity@Backpack|Box|Bag", "a windproof frame@Umbrella", "{n:10-18} functions@Multi-Tool",
+                 "RFID blocking@Wallet", "a leak-proof lid@Bottle|Lunch", "a waterproof backing@Picnic", "a magnetic clasp@Case|Wallet", "{n:3-6} compartments@Lunch|Kit|Organiser|Box",
+                 "a reinforced base@Tote|Box|Backpack"],
+                ["Keeps drinks cold for {n:12-24} hours.@Bottle", "Folds to {n:20-30} cm.@Umbrella|Picnic", "Dishwasher safe.@Lunch|Bottle"]),
+}
+for _k, (_feat, _spec) in _FAMILY_EXTRA.items():
+    _f = PRODUCT_FAMILIES[_k]
+    PRODUCT_FAMILIES[_k] = replace(_f, features=list(_f.features) + _feat, specs=list(_f.specs) + _spec)
 
 # Category label -> family, first match wins. Ordered so "kids clothing"
 # reads as clothing and "kitchen appliances" as kitchen, not electronics.
@@ -612,27 +677,29 @@ def draw_products(rng: np.random.Generator, size: int,
 
 # (weight, template, features it consumes)
 _DESC_OPENERS = [
-    (3, "{A_attr_noun} {made} {material}.", 0),
-    (2, "{This} {attr} {noun} {is} {made} {material}.", 0),
-    (2, "{Brand}'s {attr} {noun}, in {material}.", 0),
-    (2, "The {noun} you reach for every day, now in {material}.", 0),
-    (2, "A {attr} take on the classic {noun}.", 0),
-    (1, "Our best-selling {noun}, refined.", 0),
-    (1, "Meet the {brand} {noun}.", 0),
-    (2, "{A_noun} built around {f1}.", 1),
-    (1, "{Noun} with {f1} and {f2}.", 2),
+    (3, "{A_attr_noun} {made} {material}((.|, ((finished|made|built)) to last.|, ((designed|made)) for everyday use.))", 0),
+    (2, "{This} {attr} {noun} {is} {made} {material}((.| and ((built|made|designed)) to last.))", 0),
+    (2, "{Brand}'s {attr} {noun}((, in {material}.|, now in {material}.| - {material}, ((reimagined|done right|made better)).))", 0),
+    (2, "The {noun} ((you reach for every day|you'll actually use|that goes everywhere|we couldn't stop using)), ((now in|made in|crafted from)) {material}.", 0),
+    (2, "((A|An honest|A thoughtful|A modern)) ((take|spin|update)) on the ((classic|everyday|humble|trusty)) {noun}.", 0),
+    (1, "((Our best-selling|Our most-loved|The customer favourite)) {noun}((, refined.|, improved.|, now even better.| is back.))", 0),
+    (1, "((Meet|Say hello to|Introducing)) the {brand} {noun}((.|!))", 0),
+    (2, "{A_noun} ((built|designed|made)) around {f1}.", 1),
+    (1, "{Noun} with {f1} and {f2}((.|, nothing more, nothing less.))", 2),
+    (1, "((Simple|Clever|Honest|Considered)) {noun}((s|)) ((for|built for|made for)) {use}.".replace("{noun}((s|))", "{noun}"), 0),
+    (1, "((Everything|All) you need|Exactly what you need|Just what you need)) in ((a|one)) {attr} {noun}.".replace("((Everything|All) you need|", "((Everything you need|All you need|"), 0),
 ]
 _DESC_FEATURES = {
-    1: [(2, "Comes with {f1}."), (2, "Includes {f1}."), (2, "Features {f1}.")],
-    2: [(3, "Features {f1} and {f2}."), (2, "Designed with {f1} and {f2}."),
-        (1, "Comes with {f1} and {f2}.")],
-    3: [(2, "It has {f1}, {f2} and {f3}."), (1, "{F1}, {f2} and {f3} come as standard."),
-        (1, "Features {f1}, {f2} and {f3}.")],
+    1: [(2, "((Comes|Arrives)) with {f1}."), (2, "((Includes|Also has|With)) {f1}((.|, as standard.))"), (2, "((Features|Look out for|Finished with)) {f1}.")],
+    2: [(3, "((Features|Has|Offers)) {f1} and {f2}."), (2, "((Designed|Made|Finished)) with {f1} and {f2}."),
+        (1, "((Comes|Arrives)) with {f1} ((and|plus)) {f2}.")],
+    3: [(2, "((It has|You get|There's)) {f1}, {f2} and {f3}."), (1, "{F1}, {f2} and {f3} ((come as standard|are included|are built in))."),
+        (1, "((Features|Details|Highlights)): {f1}, {f2} ((and|plus)) {f3}.")],
 }
 _DESC_USES = [
-    (3, "Ideal for {use}."), (2, "Made for {use}."), (2, "A good pick for {use}."),
-    (1, "Works well for {use}."), (1, "Great for {use} and {use2}."),
-    (1, "Perfect for {use}."),
+    (3, "((Ideal|Perfect|Great)) for {use}((.|, and more.))"), (2, "((Made|Designed|Built)) for {use}."),
+    (2, "((A good|A smart|A solid)) ((pick|choice|bet)) for {use}."), (1, "((Works well|Shines)) ((for|in)) {use}."),
+    (1, "((Great|Ideal)) for {use} and {use2}."), (1, "((Whether it's|From)) {use} ((to|or)) {use2}, ((it's ready|it delivers|it's up to it))."),
 ]
 _NOT_PLURAL = {"atlas", "canvas", "glass", "dress", "harness", "press", "gloss"}
 
@@ -674,6 +741,23 @@ def eligible(pool: Sequence[str], noun: str) -> List[str]:
             plain.append(e)
     out = tagged + plain
     _ELIGIBLE[k] = out
+    _SPECIFIC[k] = len(tagged)
+    return out
+
+
+_SPECIFIC: Dict[tuple, int] = {}
+
+
+def _specific_first(rng, pool: Sequence[str], noun: str, k: int) -> List[str]:
+    """``k`` distinct entries that fit ``noun``, three in four drawn from the
+    ones written for it, so a lipstick is not sold on "a durable build"."""
+    fits = eligible(pool, noun)
+    n_tag = _SPECIFIC[(id(pool), noun)]
+    tagged, plain = list(range(n_tag)), list(range(n_tag, len(fits)))
+    out = []
+    while len(out) < min(k, len(fits)):
+        src = tagged if tagged and (not plain or rng.random() < 0.75) else plain
+        out.append(fits[src.pop(int(rng.integers(len(src))))])
     return out
 
 
@@ -723,6 +807,56 @@ def _noun_from_name(name: str) -> str:
     return " ".join(words[-2:]).lower() if words else "product"
 
 
+_COLOURS = ["charcoal", "sage", "oat", "navy", "terracotta", "ivory", "forest green", "slate", "rust",
+            "sand", "dusty pink", "ochre", "midnight blue", "stone", "olive", "burgundy", "teal", "mustard",
+            "graphite", "cream", "pebble grey", "clay", "moss", "ink", "blush", "copper", "sky blue",
+            "black", "white", "natural", "walnut", "smoke", "lilac", "chalk", "pine", "tan"]
+_ORIGINS = ["Portugal", "Denmark", "Japan", "Italy", "Vietnam", "India", "Turkey", "Poland", "Sweden",
+            "the UK", "Spain", "Germany", "Morocco", "Peru", "Taiwan", "Lithuania", "Mexico", "Ireland"]
+_STORIES = ["long walks on the coast", "our founder's grandmother's kitchen", "city commuting", "rainy Scottish summers",
+            "small flats with big ideas", "weekends in the hills", "the way people actually live", "a decade of customer feedback",
+            "mid-century Scandinavian design", "Japanese minimalism", "the first cold morning of autumn", "busy family mornings",
+            "workshops in {origin}", "years of testing with real users", "the simple things done well"]
+_DESC_EXTRAS = [
+    "((Available|Comes|Offered)) in {c1}, {c2} and {c3}.", "((Shown|Pictured)) in {c1}.",
+    "((Designed|Made|Crafted)) in {origin} ((by a family-run workshop|in small batches|by a team of {k} makers|to order)).",
+    "((Inspired by|Designed for|Born from)) {story}.", "((Packaged|Shipped|Sent)) in ((recycled|plastic-free|compostable|minimal)) ((card|packaging|paper)).",
+    "((Each piece|Every one|Each unit)) is ((slightly different|hand-checked|individually numbered|inspected before dispatch)).",
+    "((Pair it|Team it|Use it)) with ((our matching|the {c1}|the coordinating)) ((range|collection|set)) for ((a complete look|the full set|extra storage)).",
+    "((Part of|From)) our {season} ((collection|range|edit)).", "((Over|More than)) {k},{k}00 ((sold|happy customers|five-star reviews)) ((since {year}|and counting|this year)).",
+    "((Ships|Dispatches|Leaves us)) within ((24 hours|2 working days|{k} days))((.|; free returns within 30 days.))",
+    "((Rated|Voted)) ((best in class|a top pick|editor's choice)) by ((our customers|{origin}-based testers|a leading home magazine)) in {year}.",
+    "{k}-((year|month)) ((guarantee|warranty)) ((included|as standard|on parts and labour)).",
+    "((Our|The)) {c1} ((colourway|shade|finish)) ((sold out twice|is the most popular|was a customer request)) ((last {season}|in {year}|this year)).",
+    "((Restocked|Back in stock|Now shipping)) ((after a {k}-week wait|for {season}|in {c1} and {c2})).",
+    "((We|Our team)) ((tested|lived with|used)) it for {k} months ((before launch|in real homes|on real commutes)) - ((it held up|no complaints|it stayed in rotation)).",
+    "((Made|Produced|Finished)) in a ((solar-powered|family-run|{k}-person|B Corp-certified)) ((factory|workshop|studio)) in {origin}.",
+    "((Reviewers|Customers|Testers)) ((call it|say it's|describe it as)) ((“the one worth paying for”|“better than expected”|“a proper upgrade”|“quietly brilliant”)).",
+    "((Free|Complimentary)) ((engraving|gift wrap|monogramming|next-day delivery)) ((on request|over $50|this {season}|at checkout)).",
+    "((Designed|Drawn up|Developed)) ((with|alongside|by)) ((a {origin}-based studio|our in-house team|{k} independent designers)).",
+    "((Look for|Spot|Find)) the ((small|stitched|embossed)) {brand} ((logo|tag|stamp)) ((on the base|inside|on the back)).",
+    "((Ten|{k}0)) per cent of ((profits|sales)) from this ((range|piece|line)) ((goes to|supports)) ((local repair cafés|tree planting in {origin}|a community workshop)).",
+    "((Spare parts|Replacement parts|Refills)) ((available|sold separately|in stock)) ((for {k} years|for life|on our site)).",
+    "((Arrives|Ships|Comes)) ((fully assembled|ready to use|charged and ready|gift-wrapped on request))((.|, in {c1} tissue paper.))",
+    "((The|This)) {c1} version ((pairs well with|sits nicely next to|goes with)) ((oak|walnut|white walls|{c2} accents|darker tones)).",
+    "((Limited|Small|Seasonal)) run of {k}00 ((pieces|units|made)) ((for {season}|this year|in {year})).",
+    "((Thoughtfully|Carefully|Responsibly)) ((made|sourced|packed)) - ((see|read)) our ((impact report|supplier list|materials guide)) ((for details|online|on the label)).",
+    "((Questions|Not sure about sizing|Need advice))? ((Our|The)) ((team|customer care team|{origin} studio)) ((replies within the hour|is on chat {k} days a week|will help)).",
+    "((Rated|Scored)) {k}.{k}/10 ((by|across)) ((over {k},{k}00 reviews|{k}00 verified buyers|our testers)).",
+    "((Upgraded|Improved|Refined)) for {year}: ((a sturdier build|softer edges|less packaging|a lower price|new colours)).",
+    "((Originally|First)) ((designed|made|sold)) in {origin} in ((the 1970s|the 80s|{year}|the 1990s)), ((and|now)) ((still made the same way|updated for today|back by demand)).",
+]
+
+
+def _desc_slots(rng) -> Dict[str, str]:
+    cs = _distinct(rng, _COLOURS, 3)
+    return {"c1": cs[0], "c2": cs[1], "c3": cs[2], "w": str(int(rng.integers(8, 180))), "h": str(int(rng.integers(5, 120))),
+            "d": str(int(rng.integers(3, 80))), "g": str(int(rng.integers(40, 9000))), "origin": _pick(rng, _ORIGINS),
+            "story": _fill(_pick(rng, _STORIES), rng, {"origin": _pick(rng, _ORIGINS)}), "k": str(int(rng.integers(2, 9))),
+            "season": _pick(rng, ["spring", "summer", "autumn", "winter", "holiday", "everyday", "core"]),
+            "year": str(int(rng.integers(2019, 2026)))}
+
+
 def render_product_descriptions(rng: np.random.Generator, frame: ProductFrame,
                                 names: Optional[Sequence] = None) -> np.ndarray:
     """Descriptions of the products in ``frame``.
@@ -733,16 +867,18 @@ def render_product_descriptions(rng: np.random.Generator, frame: ProductFrame,
     size = len(frame.family)
     names = _clean_values(names, size)
     out = np.empty(size, dtype=object)
-    n_sent = rng.choice([1, 2, 3, 4], size=size, p=[0.12, 0.33, 0.38, 0.17])
+    n_sent = rng.choice([1, 2, 3, 4, 5], size=size, p=[0.08, 0.25, 0.32, 0.22, 0.13])
     bullet = rng.random(size) < 0.1
+    kept: List[str] = []
     for i in range(size):
         F = PRODUCT_FAMILIES[frame.family[i]]
         key_noun = frame.noun[i]
         if names is not None and names[i] and names[i] != frame.name[i]:
             key_noun = _noun_from_name(names[i]).title()
         noun = _soft_lower(key_noun)
+        kept.append(noun)
         plural = is_plural(noun)
-        feats = [_fill(f, rng, {}) for f in _distinct(rng, eligible(F.features, key_noun), 3)]
+        feats = [_fill(f, rng, {}) for f in _specific_first(rng, F.features, key_noun, 3)]
         uses = _distinct(rng, eligible(F.uses, key_noun), 2) or ["everyday use"]
         uses += uses[:1]
         specs = eligible(F.specs, key_noun)
@@ -784,12 +920,16 @@ def render_product_descriptions(rng: np.random.Generator, frame: ProductFrame,
             tail.append(lambda fs=fs, n=len(rest): _fill(_weighted(rng, _DESC_FEATURES[n]), rng, fs))
         tail.append(lambda: _fill(_weighted(rng, _DESC_USES), rng, slots))
         tail.append(spec)
-        order = rng.permutation(len(tail)) if rng.random() < 0.3 else np.arange(len(tail))
+        tail.append(lambda: _fill(_pick(rng, _DESC_EXTRAS), rng, dict(slots, **_desc_slots(rng))))
+        tail.append(lambda: _fill(_pick(rng, _DESC_EXTRAS), rng, dict(slots, **_desc_slots(rng))))
+        order = rng.permutation(len(tail)) if rng.random() < 0.5 else np.arange(len(tail))
         for k in order[: int(n_sent[i]) - 1]:
             sentences.append(tail[k]())
+        if rng.random() < 0.7:
+            sentences.append(_fill(_pick(rng, _DESC_EXTRAS), rng, dict(slots, **_desc_slots(rng))))
         out[i] = " ".join(sentences)
-    from misata.paraphrase import vary
-    return np.array(vary(list(out), rng, "product"), dtype=object)
+    from misata.paraphrase import vary_keeping
+    return np.array(vary_keeping(list(out), kept, rng, "product"), dtype=object)
 
 
 # ── support tickets ──────────────────────────────────────────────────────────
