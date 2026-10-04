@@ -106,8 +106,30 @@ def population_choice(rng: np.random.Generator, pool: Sequence[str], size: int,
 _SLOT = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)(?::(\d+)-(\d+))?\}")
 
 
+_CHOICE = re.compile(r"\(\(([^()]*)\)\)")
+_OPTION = re.compile(r"\[\[([^\[\]]*)\]\]")
+
+
+def _inline(template: str, rng: np.random.Generator) -> str:
+    """((a|b|c)) picks one, [[...]] is kept half the time; innermost first."""
+    while "((" in template or "[[" in template:
+        m = _OPTION.search(template) or _CHOICE.search(template)
+        if m is None:
+            break
+        if m.re is _OPTION:
+            rep = m.group(1) if rng.random() < 0.5 else ""
+        else:
+            opts = m.group(1).split("|")
+            rep = opts[int(rng.integers(len(opts)))]
+        template = template[:m.start()] + rep + template[m.end():]
+    return re.sub(r"  +", " ", template).replace(" .", ".").replace(" ,", ",")
+
+
 def _fill(template: str, rng: np.random.Generator, slots: Dict[str, str]) -> str:
-    """Fill ``{name}`` from ``slots`` and ``{n:lo-hi}`` with an integer."""
+    """Fill ``{name}`` from ``slots`` and ``{n:lo-hi}`` with an integer, after
+    resolving inline ((a|b)) choices and [[optional]] parts."""
+    if "((" in template or "[[" in template:
+        template = _inline(template, rng)
     def sub(m: re.Match) -> str:
         name, lo, hi = m.group(1), m.group(2), m.group(3)
         if lo is not None:
@@ -200,7 +222,7 @@ PRODUCT_FAMILIES: Dict[str, ProductFamily] = {f.key: f for f in [
        ["Classic", "Relaxed", "Slim-Fit", "Lightweight", "Oversized", "Cropped", "Everyday",
         "Waterproof@Jacket|Coat", "Stretch@Jeans|Trousers|Leggings|Chino|Shorts|Joggers", "Vintage-Wash@Jeans|Tee|Jacket|Hoodie", "Tailored@Blazer|Trousers|Shirt|Coat", "Ribbed@Sweater|Beanie|Tank|Cardigan|Dress"],
        ["organic cotton", "merino wool@Sweater|Beanie|Scarf|Cardigan|Pullover|Tee", "linen@Shirt|Dress|Trousers|Shorts|Overshirt|Skirt|Blazer", "recycled polyester@Jacket|Leggings|Shorts|Puffer|Coat|Tank|Pullover", "French terry@Hoodie|Joggers|Sweatpants|Pullover", "cotton twill@Chino|Trousers|Shorts|Overshirt|Trench|Jacket|Blazer", "TENCEL lyocell@Dress|Shirt|Skirt|Tee|Tank", "brushed fleece@Pullover|Hoodie|Joggers|Jacket|Sweatpants", "stretch denim@Jeans|Jacket|Skirt|Shorts", "cashmere blend@Sweater|Scarf|Beanie|Cardigan|Coat"],
-       ["a relaxed fit", "a tailored fit", "reinforced seams", "side pockets@Jacket|Trousers|Shorts|Hoodie|Joggers|Dress|Coat|Cardigan|Skirt|Jeans|Sweatpants|Blazer",
+       ["a relaxed fit@Shirt|Tee|Hoodie|Sweater|Trousers|Jeans|Joggers|Cardigan|Dress|Overshirt|Pullover", "reinforced seams", "side pockets@Jacket|Trousers|Shorts|Hoodie|Joggers|Dress|Coat|Cardigan|Skirt|Jeans|Sweatpants|Blazer",
         "a two-way zip@Jacket|Hoodie|Pullover|Coat", "an adjustable hood@Jacket|Hoodie|Coat", "a soft brushed interior@Hoodie|Joggers|Sweatpants|Pullover|Jacket|Leggings", "flatlock stitching@Leggings|Shorts|Tank|Tee|Joggers",
         "a drawstring waist@Shorts|Joggers|Sweatpants|Trousers|Leggings", "a dropped shoulder@Tee|Hoodie|Sweater|Pullover|Cardigan|Shirt|Overshirt", "a hidden phone pocket@Leggings|Shorts|Joggers|Jacket|Sweatpants",
         "moisture-wicking fabric@Leggings|Shorts|Tank|Tee|Joggers|Polo", "a curved hem@Shirt|Tee|Overshirt|Tank|Polo", "ribbed cuffs@Sweater|Hoodie|Cardigan|Joggers|Pullover|Sweatpants|Jacket"],
@@ -573,9 +595,10 @@ def draw_products(rng: np.random.Generator, size: int,
             parts = []
             if use_brand[j]:
                 parts.append(brand[i])
-            if use_attr[j] and attr[i]:
+            if use_attr[j] and attr[i] and str(attr[i]).split("-")[0].lower() not in str(noun[i]).lower():
                 parts.append(attr[i])
-            if use_mat[j] and material[i] and str(material[i]).lower() not in str(noun[i]).lower():
+            if use_mat[j] and material[i] and not (set(str(material[i]).lower().split())
+                                                   & set(str(noun[i]).lower().split())):
                 parts.append(" ".join(w.capitalize() if w.islower() else w
                                       for w in str(material[i]).split()))
             parts.append(noun[i])
@@ -724,6 +747,8 @@ def render_product_descriptions(rng: np.random.Generator, frame: ProductFrame,
         uses += uses[:1]
         specs = eligible(F.specs, key_noun)
         attr = (frame.attr[i] or "classic").lower()
+        if attr.split("-")[0] in noun.lower():
+            attr = "classic" if "classic" not in noun.lower() else "everyday"
         material = frame.material[i] or "durable materials"
         made = "made with" if frame.family[i] in ("beauty", "health", "grocery", "pets") else "made from"
         slots = {
@@ -763,7 +788,8 @@ def render_product_descriptions(rng: np.random.Generator, frame: ProductFrame,
         for k in order[: int(n_sent[i]) - 1]:
             sentences.append(tail[k]())
         out[i] = " ".join(sentences)
-    return out
+    from misata.paraphrase import vary
+    return np.array(vary(list(out), rng, "product"), dtype=object)
 
 
 # ── support tickets ──────────────────────────────────────────────────────────
@@ -784,324 +810,293 @@ _I = Issue
 ISSUES: List[Issue] = [
     # billing
     _I("double_charge", "billing",
-       ["Charged twice for order #{order}", "Double charge on my card", "Duplicate payment",
-        "Billed twice this month", "Two charges for one order"],
-       ["I was charged twice for order #{order}.", "My card shows two identical charges of ${amount}.",
-        "I see a duplicate payment on my statement for the same order."],
-       ["Both charges posted on the same day.", "My bank says both are settled, not pending.",
-        "I only placed one order."],
-       ["The payment provider retried after a timeout and both attempts were captured.",
-        "A duplicate authorisation was captured instead of voided."],
-       ["Refunded the duplicate charge of ${amount}; it should appear in 3-5 business days.",
-        "Voided the second payment and emailed the customer the refund reference."],
+       ["((Charged|Billed)) twice for order #{order}", "Double ((charge|payment)) on my ((card|account))",
+        "Duplicate ((payment|transaction))[[ of ${amount}]]", "((Billed|Charged)) twice this month",
+        "Two charges for ((one|the same)) order", "((Duplicate|Double)) debit[[ on {day}]]"],
+       ["I was ((charged|billed)) twice for order #{order}[[ on the {day}]].",
+        "My ((card|bank statement|account)) shows two ((identical|matching)) charges of ${amount}.",
+        "I ((see|can see|noticed)) a duplicate payment on my statement for the same order.",
+        "((You've|You have)) taken ${amount} from my ((card|account)) twice for ((one|a single)) order."],
+       ["Both charges ((posted|went through|cleared)) on the same day.", "My bank says both are ((settled|final)), not pending.",
+        "I only ((placed|made)) one order.", "((The|My)) order number is #{order}.",
+        "((A screenshot of the statement|My bank statement|The statement)) is attached."],
+       ["The payment provider ((retried|re-sent the charge)) after a timeout and both attempts were captured.",
+        "A duplicate authorisation was captured instead of ((voided|released))."],
+       ["((Refunded|Reversed)) the duplicate charge of ${amount}; it should ((appear|show)) in ((3-5|2-4|5-7)) business days.",
+        "((Voided|Cancelled)) the second payment and ((emailed|sent)) the customer the refund reference."],
        1.3),
     _I("subscription_cancelled_billed", "billing",
-       ["Still billed after cancelling", "Charged after cancellation", "Cancelled but charged again",
-        "Subscription not cancelled?"],
-       ["I cancelled my subscription last month but was charged again on the {day}.",
-        "I was billed ${amount} even though I cancelled my plan."],
-       ["I have the cancellation confirmation email.", "The account still shows as active.",
-        "This is the second month this has happened."],
+       ["Still ((billed|charged)) after cancelling", "((Charged|Billed)) after ((cancellation|I cancelled))",
+        "Cancelled but charged ((again|anyway))", "Subscription not ((cancelled|cancelling))?",
+        "Charged for a plan I ((cancelled|ended))"],
+       ["I cancelled my ((subscription|plan|membership)) ((last month|on the {day}|a few weeks ago)) but was charged again.",
+        "I was ((billed|charged)) ${amount} even though I ((cancelled|ended)) my ((plan|subscription)).",
+        "((Why am I|How come I'm|I'm)) still being charged for the {plan} plan? I cancelled it."],
+       ["I have the cancellation ((confirmation|email|reference)).", "The account still shows as ((active|live)).",
+        "This is the ((second|third)) month this has happened.", "I cancelled through the ((app|website|account page))."],
        ["The cancellation was scheduled for the end of the term but the renewal ran first.",
-        "The cancellation request did not sync to the billing system."],
+        "The cancellation request ((did not sync|never reached)) the billing system."],
        ["Cancelled the subscription, refunded the last charge and confirmed by email.",
         "Issued a full refund of ${amount} and closed the subscription."],
        1.2),
     _I("invoice_request", "billing",
-       ["Need a VAT invoice", "Invoice for order #{order}", "Request for invoice copy",
-        "Company details on invoice", "Receipt missing"],
-       ["Could you send me an invoice for order #{order}?",
-        "I need a VAT invoice with my company name for my last payment.",
-        "I can't find the receipt for my payment of ${amount}."],
-       ["Our finance team needs it by the end of the month.",
-        "The billing email went to an old address."],
+       ["Need a VAT invoice", "Invoice for order #{order}", "Request for ((invoice|receipt)) copy",
+        "Company details on ((invoice|receipt))", "((Receipt|Invoice)) missing", "Invoice for {month} please"],
+       ["Could you ((send|email)) me an invoice for order #{order}?",
+        "I need a VAT invoice with my company name for my last payment[[ of ${amount}]].",
+        "I can't find the ((receipt|invoice)) for my payment of ${amount}.",
+        "Our ((finance|accounts)) team needs a ((proper|VAT|itemised)) invoice for {month}."],
+       ["Our finance team needs it by the end of the month.", "The billing email went to an old address.",
+        "The company name is {company}.", "We need the VAT number on it."],
        ["The invoice email was sent to an outdated address.",
         "Company details were not on the account when the invoice was generated."],
        ["Regenerated the invoice with the company details and sent it to the customer.",
         "Updated the billing email and resent all invoices from this year."],
        0.6),
     _I("payment_declined", "billing",
-       ["Payment declined at checkout", "Card keeps getting declined", "Can't complete payment",
-        "Checkout payment error"],
-       ["My payment keeps failing at checkout, I've tried {n} different cards.",
-        "Checkout says my card was declined but my bank says there's no block."],
-       ["The error just says 'payment could not be processed'.",
-        "It worked fine last week."],
-       ["The card issuer rejected the transaction under 3-D Secure.",
-        "The billing postcode did not match the card."],
+       ["Payment declined at checkout", "Card keeps ((getting declined|failing))", "Can't ((complete|make)) payment",
+        "Checkout payment error", "((Payment|Card)) rejected[[ again]]"],
+       ["My payment keeps ((failing|getting declined)) at checkout, I've tried {n} different cards.",
+        "Checkout says my card was declined but my bank says there's no ((block|problem)).",
+        "Every time I try to pay ((it|the site)) says 'payment could not be processed'."],
+       ["The error just says 'payment could not be processed'.", "It worked fine ((last week|last month|before)).",
+        "I'm trying to pay ${amount}.", "I tried on {browser} and in the app."],
+       ["The card issuer rejected the transaction under 3-D Secure.", "The billing postcode did not match the card."],
        ["Asked the customer to complete 3-D Secure in their banking app; payment went through.",
         "Corrected the billing postcode on the account and the payment succeeded."],
        1.1),
     _I("price_dispute", "billing",
-       ["Wrong price charged", "Discount code not applied", "Promo code didn't work",
-        "Charged full price"],
+       ["Wrong price charged", "Discount code not applied", "Promo code ((didn't work|not working))",
+        "Charged full price", "Code {code} ((not accepted|rejected))"],
        ["I was charged full price even though I used the code {code}.",
-        "The price at checkout was higher than the price on the product page."],
-       ["The code was still valid according to your email.", "The difference is ${amount}."],
+        "The price at checkout was ((higher|more)) than the price on the product page.",
+        "((Your|The)) code {code} ((didn't|wouldn't)) apply and I paid ${amount} instead."],
+       ["The code was still valid according to your email.", "The difference is ${amount}.",
+        "The {item} was on offer when I ordered."],
        ["The promo code excluded sale items.", "The product page showed a cached price."],
-       ["Refunded the ${amount} difference as a goodwill gesture.",
-        "Applied the discount retroactively and refunded the difference."],
+       ["Refunded the ${amount} difference as a goodwill gesture.", "Applied the discount retroactively and refunded the difference."],
        0.8),
     # shipping
     _I("not_received", "shipping",
-       ["Order #{order} not received", "Package marked delivered but not here",
-        "Where is my order?", "Missing parcel", "Delivered to the wrong address?"],
-       ["My order #{order} shows as delivered but I haven't received anything.",
-        "Tracking says my parcel was delivered on the {day} but it isn't here.",
-        "I ordered {n} weeks ago and the parcel still hasn't arrived."],
-       ["I've checked with neighbours and the building's mailroom.",
-        "There's no photo of the delivery in the tracking.",
-        "I was home all day."],
-       ["The courier left the parcel at a neighbouring address.",
-        "The parcel was lost in transit at the regional depot."],
-       ["Shipped a replacement with express delivery at no charge.",
-        "Opened a claim with the courier and refunded the order in full."],
+       ["Order #{order} not ((received|arrived))", "((Package|Parcel)) marked delivered but not here",
+        "Where is my ((order|parcel))?", "Missing ((parcel|delivery))", "Never ((received|got)) my {item}",
+        "Delivered? ((No|Not here|Nothing here))"],
+       ["My order #{order} shows as delivered but I haven't received ((anything|it|a thing)).",
+        "Tracking says my ((parcel|package)) was delivered on the {day} but it isn't here.",
+        "I ordered {n} weeks ago and the ((parcel|{item})) still hasn't arrived.",
+        "The courier says ((they left it|it was left)) ((with a neighbour|in a safe place|at the door)) but there's nothing."],
+       ["I've checked with ((neighbours|the neighbours)) and the building's ((mailroom|concierge)).",
+        "There's no photo of the delivery in the tracking.", "I was ((home|in)) all day.",
+        "I live in a ((flat|block of flats)) in {city}.", "It was meant to be a ((present|gift)) for {occasion}."],
+       ["The courier left the parcel at a neighbouring address.", "The parcel was lost in transit at the regional depot."],
+       ["Shipped a replacement with express delivery at no charge.", "Opened a claim with the courier and refunded the order in full."],
        1.2),
     _I("delayed", "shipping",
-       ["Delivery delayed", "Order still processing", "Shipping taking too long",
-        "When will order #{order} ship?", "Tracking not updating"],
-       ["My order #{order} has been 'processing' for {n} days.",
-        "Tracking hasn't updated since the {day}.",
-        "The estimated delivery date has passed."],
-       ["I need it before the weekend.", "I paid for express shipping."],
-       ["The item was backordered at the warehouse.",
-        "The parcel was held at customs pending paperwork."],
-       ["Upgraded shipping to express and refunded the shipping fee.",
-        "Confirmed a new dispatch date with the warehouse and updated the customer."],
+       ["Delivery delayed", "Order still processing", "Shipping taking ((too long|ages|forever))",
+        "When will order #{order} ship?", "Tracking not updating", "Late delivery[[ - order #{order}]]"],
+       ["My order #{order} has been 'processing' for {n} days.", "Tracking hasn't updated since the {day}.",
+        "The estimated delivery date has passed[[ and I've heard nothing]].",
+        "I paid for ((express|next-day)) delivery and it's been {n} days."],
+       ["I need it before the weekend.", "I paid for express shipping.", "It's for {occasion}.",
+        "I'm away from the {day} so timing matters."],
+       ["The item was backordered at the warehouse.", "The parcel was held at customs pending paperwork."],
+       ["Upgraded shipping to express and refunded the shipping fee.", "Confirmed a new dispatch date with the warehouse and updated the customer."],
        1.0),
     _I("damaged", "shipping",
        ["Item arrived damaged", "Broken on arrival", "Damaged packaging, item cracked",
-        "Order #{order} arrived broken"],
-       ["My order arrived today and the {item} is cracked.",
-        "The box was crushed and the {item} inside is damaged."],
-       ["I've attached photos of the box and the item.", "The outer packaging was torn."],
-       ["Insufficient packaging for a fragile item.",
-        "The parcel was damaged in transit by the courier."],
-       ["Sent a replacement and asked the customer to keep the damaged item.",
-        "Refunded the item and flagged the SKU for better packaging."],
+        "Order #{order} arrived broken", "{item} ((cracked|smashed|dented)) in transit"],
+       ["My order arrived ((today|this morning|yesterday)) and the {item} is ((cracked|broken|dented)).",
+        "The box was ((crushed|soaked|torn open)) and the {item} inside is damaged.",
+        "((Opened|Unpacked)) my {item} and ((it's|it was)) ((in pieces|scratched all over|missing a leg))."],
+       ["I've attached photos of the box and the item.", "The outer packaging was torn.",
+        "The courier ((threw|dropped)) it over the gate.", "It cost ${amount}, so I'd like this sorted."],
+       ["Insufficient packaging for a fragile item.", "The parcel was damaged in transit by the courier."],
+       ["Sent a replacement and asked the customer to keep the damaged item.", "Refunded the item and flagged the SKU for better packaging."],
        1.0),
     _I("change_address", "shipping",
-       ["Change delivery address", "Wrong shipping address", "Update address on order #{order}"],
+       ["Change delivery address", "Wrong shipping address", "Update address on order #{order}",
+        "Moved house - new address", "Delivery address typo"],
        ["I entered the wrong delivery address for order #{order}.",
-        "Can I change the shipping address on my order? I've moved."],
-       ["The order hasn't shipped yet.", "The new address is in the same city."],
+        "Can I change the shipping address on my order? I've ((moved|just moved house)).",
+        "There's a typo in my postcode on order #{order}."],
+       ["The order hasn't shipped yet.", "The new address is in {city}.", "It's the same street, different flat number."],
        ["The customer selected an old saved address at checkout."],
-       ["Updated the address before dispatch and confirmed with the customer.",
-        "Redirected the parcel through the courier's portal."],
+       ["Updated the address before dispatch and confirmed with the customer.", "Redirected the parcel through the courier's portal."],
        0.7),
     # returns
     _I("return_request", "returns",
-       ["Return request for order #{order}", "How do I return an item?", "Return label please",
-        "Want to return {item}", "Exchange for a different size"],
+       ["Return request for order #{order}", "How do I return ((an item|my {item}))?", "Return label please",
+        "Want to return {item}", "Exchange for a different size", "Return - {item}"],
        ["I'd like to return the {item} from order #{order}.",
-        "The {item} doesn't fit, can I exchange it for a different size?",
-        "How do I start a return? I can't find the option in my account."],
-       ["It's unworn with the tags still on.", "I ordered it {n} days ago."],
+        "The {item} ((doesn't fit|is too small|is too big)), can I exchange it for a different size?",
+        "How do I start a return? I can't find the option in my account.",
+        "The {item} isn't ((what I expected|right for me|the colour shown)), I'd like to send it back."],
+       ["It's unworn with the tags still on.", "I ordered it {n} days ago.", "I still have the original box."],
        ["The return window was still open.", "The return option was hidden for marketplace items."],
-       ["Emailed a prepaid return label; refund will be issued on receipt.",
-        "Arranged an exchange and dispatched the new size."],
+       ["Emailed a prepaid return label; refund will be issued on receipt.", "Arranged an exchange and dispatched the new size."],
        0.6),
     _I("refund_not_received", "returns",
        ["Refund not received", "Where is my refund?", "Returned item, no refund yet",
-        "Refund for order #{order}"],
+        "Refund for order #{order}", "Still waiting for ${amount} refund"],
        ["I returned my order {n} weeks ago and still haven't had a refund.",
-        "The courier confirmed my return was delivered but no refund has been issued."],
-       ["The tracking shows it arrived at your warehouse on the {day}.",
-        "The refund amount should be ${amount}."],
-       ["The return was received but not scanned into the returns system.",
-        "The refund was issued to an expired card."],
-       ["Processed the refund of ${amount} manually and sent confirmation.",
-        "Reissued the refund as store credit at the customer's request."],
+        "The courier confirmed my return was delivered but no refund has been issued.",
+        "It's been {n} weeks since I sent back the {item} and ((nothing|no refund|no money))."],
+       ["The tracking shows it arrived at your warehouse on the {day}.", "The refund amount should be ${amount}.",
+        "I have the return receipt from the drop-off point."],
+       ["The return was received but not scanned into the returns system.", "The refund was issued to an expired card."],
+       ["Processed the refund of ${amount} manually and sent confirmation.", "Reissued the refund as store credit at the customer's request."],
        1.0),
     _I("wrong_item", "returns",
-       ["Wrong item received", "Received the wrong size", "Not what I ordered",
-        "Wrong colour sent"],
+       ["Wrong item received", "Received the wrong size", "Not what I ordered", "Wrong colour sent",
+        "Got someone else's order?"],
        ["I ordered the {item} but received something completely different.",
-        "I received the wrong size in order #{order}."],
-       ["The packing slip shows the right item.", "I've attached a photo of what arrived."],
+        "I received the wrong size in order #{order}.",
+        "The ((colour|model|size)) I got isn't the one I ordered."],
+       ["The packing slip shows the right item.", "I've attached a photo of what arrived.",
+        "The label has someone else's name on it."],
        ["A picking error at the warehouse.", "Two orders were swapped at packing."],
-       ["Sent the correct item by express and a return label for the wrong one.",
-        "Refunded the order and arranged a courier collection."],
+       ["Sent the correct item by express and a return label for the wrong one.", "Refunded the order and arranged a courier collection."],
        0.9),
     # technical
     _I("app_crash", "technical",
        ["App crashes on startup", "App keeps crashing", "Crash when opening settings",
-        "iOS app closes immediately", "Android app freezing"],
-       ["The app crashes every time I open the settings page.",
+        "iOS app closes immediately", "Android app freezing", "App crash after update {version}"],
+       ["The app crashes every time I open the ((settings|profile|orders)) page.",
         "Since the latest update the app closes as soon as I open it.",
-        "The app freezes on the loading screen."],
-       ["I'm on version {version}.", "I've reinstalled it twice.",
-        "It works fine on my tablet but not my phone."],
-       ["A null pointer in the settings screen for accounts without a profile photo.",
-        "A bug in release {version} on older OS versions."],
-       ["Fix shipped in version {version}; confirmed with the customer after updating.",
-        "Shared a workaround (clear app data) and linked the bug to the next release."],
+        "The app freezes on the loading screen[[ on my {device}]].",
+        "Every time I tap ((checkout|my basket|notifications)) the app ((crashes|closes|goes white))."],
+       ["I'm on version {version}.", "I've reinstalled it twice.", "It works fine on my tablet but not my phone.",
+        "I'm using a {device}."],
+       ["A null pointer in the settings screen for accounts without a profile photo.", "A bug in release {version} on older OS versions."],
+       ["Fix shipped in version {version}; confirmed with the customer after updating.", "Shared a workaround (clear app data) and linked the bug to the next release."],
        1.2),
     _I("login_error", "technical",
-       ["Error 500 on login", "Login page not loading", "Stuck on loading screen",
-        "Can't log in on mobile"],
-       ["I get an error 500 every time I try to log in.",
-        "The login page just spins and never loads."],
-       ["It happens on Chrome and Safari.", "Started this morning."],
-       ["A failed deploy on the authentication service.",
-        "An expired TLS certificate on the login subdomain."],
-       ["Rolled back the deploy; logins are working again.",
-        "Renewed the certificate and confirmed login with the customer."],
+       ["Error 500 on login", "Login page not loading", "Stuck on loading screen", "Can't log in on mobile",
+        "Login broken[[ since {when}]]"],
+       ["I get an error 500 every time I try to log in.", "The login page just ((spins|hangs|keeps loading)) and never loads.",
+        "I can't get past the login screen on {browser}."],
+       ["It happens on Chrome and Safari.", "Started this morning.", "My colleagues have the same problem."],
+       ["A failed deploy on the authentication service.", "An expired TLS certificate on the login subdomain."],
+       ["Rolled back the deploy; logins are working again.", "Renewed the certificate and confirmed login with the customer."],
        1.6),
     _I("export_broken", "technical",
-       ["CSV export is empty", "Export not working", "Report download fails",
-        "Data export stuck at 0%"],
-       ["The export feature produces an empty CSV file.",
-        "When I download the monthly report the file is blank."],
-       ["It worked last month with the same filters.", "The table on screen has data."],
-       ["The export timed out for date ranges over a year.",
-        "A filter on the archived field excluded every row."],
-       ["Increased the export timeout; export works for the full date range.",
-        "Fixed the filter and re-ran the export for the customer."],
+       ["CSV export is empty", "Export not working", "Report download fails", "Data export stuck at 0%",
+        "{month} report won't download"],
+       ["The export feature produces an empty CSV file.", "When I download the monthly report the file is blank.",
+        "The export ((gets stuck at|hangs at|freezes at)) {n}0% and never finishes."],
+       ["It worked last month with the same filters.", "The table on screen has data.", "I need it for a meeting on {weekday}."],
+       ["The export timed out for date ranges over a year.", "A filter on the archived field excluded every row."],
+       ["Increased the export timeout; export works for the full date range.", "Fixed the filter and re-ran the export for the customer."],
        0.9),
     _I("api_key", "technical",
-       ["API key not working", "401 errors from the API", "Regenerated key rejected",
-        "API authentication failing"],
-       ["My API key returns 401 since I regenerated it.",
-        "Every API call fails with 'invalid credentials' since this morning."],
-       ["The key is copied exactly from the dashboard.", "The old key also stopped working."],
-       ["The new key had not been granted the write scope.",
-        "The key was created in the sandbox environment, not production."],
-       ["Added the missing scope to the key; calls succeed now.",
-        "Pointed the customer to the production key and confirmed a successful call."],
+       ["API key not working", "401 errors from the API", "Regenerated key rejected", "API authentication failing"],
+       ["My API key returns 401 since I regenerated it.", "Every API call fails with 'invalid credentials' since {when}.",
+        "Our ((integration|script|nightly job)) gets 401 ((Unauthorized|errors)) on every request."],
+       ["The key is copied exactly from the dashboard.", "The old key also stopped working.", "We're on the {plan} plan."],
+       ["The new key had not been granted the write scope.", "The key was created in the sandbox environment, not production."],
+       ["Added the missing scope to the key; calls succeed now.", "Pointed the customer to the production key and confirmed a successful call."],
        1.2),
     _I("integration", "technical",
        ["Integration stopped syncing", "Webhook not firing", "Slack notifications stopped",
         "Sync error with calendar", "Zapier integration broken"],
-       ["The integration stopped sending notifications on the {day}.",
-        "Webhooks are no longer reaching our endpoint.",
+       ["The integration stopped sending notifications on the {day}.", "Webhooks are no longer reaching our endpoint.",
         "Our calendar sync has been failing since the {day}."],
-       ["Nothing changed on our side.", "The status page shows everything green."],
-       ["The OAuth token expired and the refresh failed silently.",
-        "The webhook endpoint was disabled after repeated timeouts."],
-       ["Reconnected the integration and replayed the missed events.",
-        "Re-enabled the webhook and advised the customer to respond within 10 seconds."],
+       ["Nothing changed on our side.", "The status page shows everything green.", "About {n}0 events are missing."],
+       ["The OAuth token expired and the refresh failed silently.", "The webhook endpoint was disabled after repeated timeouts."],
+       ["Reconnected the integration and replayed the missed events.", "Re-enabled the webhook and advised the customer to respond within 10 seconds."],
        1.1),
     _I("slow", "technical",
-       ["Dashboard very slow", "Pages taking ages to load", "Performance issues",
-        "Site is really slow today"],
-       ["The dashboard takes over {n} seconds to load.",
-        "Everything has been very slow since this morning."],
-       ["It's affecting the whole team.", "Other websites are fine."],
-       ["A slow database query on accounts with large histories.",
-        "A regional CDN outage."],
-       ["Added an index for the slow query; load time is back under two seconds.",
-        "CDN provider resolved the outage; confirmed performance is normal."],
+       ["Dashboard very slow", "Pages taking ages to load", "Performance issues", "Site is really slow today",
+        "Everything timing out"],
+       ["The dashboard takes over {n}0 seconds to load.", "Everything has been ((very|really|painfully)) slow since {when}.",
+        "Pages ((time out|hang|take minutes)) whenever I open ((reports|the dashboard|our account))."],
+       ["It's affecting the whole team.", "Other websites are fine.", "We're in {city}, if that matters."],
+       ["A slow database query on accounts with large histories.", "A regional CDN outage."],
+       ["Added an index for the slow query; load time is back under two seconds.", "CDN provider resolved the outage; confirmed performance is normal."],
        1.3),
     # account
     _I("password_reset", "account",
        ["Password reset email not arriving", "Can't reset password", "Reset link expired",
-        "Locked out of my account"],
+        "Locked out of my account", "Forgot password, no email"],
        ["I've requested a password reset {n} times but the email never arrives.",
         "The password reset link says it has expired as soon as I click it.",
         "I'm locked out after too many login attempts."],
-       ["I've checked my spam folder.", "I'm using the email address on my account."],
-       ["Reset emails to this domain were being blocked by the recipient's mail server.",
-        "The account was locked after repeated failed attempts."],
-       ["Unlocked the account and sent a reset link to a verified backup address.",
-        "Reset the password manually and enabled two-factor authentication."],
+       ["I've checked my spam folder.", "I'm using the email address on my account.", "I'm on a {device}."],
+       ["Reset emails to this domain were being blocked by the recipient's mail server.", "The account was locked after repeated failed attempts."],
+       ["Unlocked the account and sent a reset link to a verified backup address.", "Reset the password manually and enabled two-factor authentication."],
        1.0),
     _I("two_factor_sms", "account",
-       ["2FA code not arriving", "Verification code never comes", "No SMS code",
-        "Two-factor problem"],
-       ["Two-factor authentication isn't sending the verification code.",
-        "I never receive the SMS code when I try to log in."],
-       ["My phone number hasn't changed.", "I've waited over ten minutes for it."],
-       ["SMS delivery to the customer's carrier was delayed.",
-        "The phone number on file was missing the country code."],
-       ["Switched the customer to app-based codes after SMS delays.",
-        "Corrected the phone number format; codes arrive now."],
+       ["2FA code not arriving", "Verification code never comes", "No SMS code", "Two-factor problem"],
+       ["Two-factor authentication isn't sending the verification code.", "I never receive the SMS code when I try to log in.",
+        "The text with my login code ((never arrives|takes 20 minutes|comes after it's expired))."],
+       ["My phone number hasn't changed.", "I've waited over ten minutes for it.", "I'm with a different mobile network now."],
+       ["SMS delivery to the customer's carrier was delayed.", "The phone number on file was missing the country code."],
+       ["Switched the customer to app-based codes after SMS delays.", "Corrected the phone number format; codes arrive now."],
        1.1),
     _I("two_factor_device", "account",
        ["Lost access to authenticator", "New phone, can't log in", "Reset 2FA please"],
-       ["I got a new phone and lost my authenticator app.",
-        "My old phone broke and I can't get past the two-factor step."],
-       ["I still have access to my email.", "I don't have the backup codes."],
+       ["I got a new phone and lost my authenticator app.", "My old phone broke and I can't get past the two-factor step."],
+       ["I still have access to my email.", "I don't have the backup codes.", "The new phone is a {device}."],
        ["The authenticator was tied to the old device."],
-       ["Verified identity and reset two-factor; customer re-enrolled successfully.",
-        "Reset two-factor after ID check and sent new backup codes."],
+       ["Verified identity and reset two-factor; customer re-enrolled successfully.", "Reset two-factor after ID check and sent new backup codes."],
        1.1),
     _I("change_email", "account",
-       ["Change email address", "Update my email", "New email for my account",
-        "Can't update email"],
-       ["How do I change the email address on my account?",
-        "I'm trying to update my email but the field is greyed out."],
-       ["The old email is no longer active.", "I signed up with Google originally."],
-       ["The email field is read-only for accounts created via social login.",
-        "The new address was already linked to a second account."],
-       ["Updated the email after verifying the customer's identity.",
-        "Released the address from the unused account and updated the email."],
+       ["Change email address", "Update my email", "New email for my account", "Can't update email"],
+       ["How do I change the email address on my account?", "I'm trying to update my email but the field is greyed out."],
+       ["The old email is no longer active.", "I signed up with Google originally.", "I've left {company}, so that address is gone."],
+       ["The email field is read-only for accounts created via social login.", "The new address was already linked to a second account."],
+       ["Updated the email after verifying the customer's identity.", "Released the address from the unused account and updated the email."],
        0.5),
     _I("merge_accounts", "account",
        ["Merge two accounts", "Duplicate accounts", "Two accounts, same person"],
-       ["I have two accounts and would like to merge them.",
-        "I accidentally created a second account and my orders are split between them."],
+       ["I have two accounts and would like to merge them.", "I accidentally created a second account and my orders are split between them."],
        ["Both accounts are in my name.", "One uses my work email."],
        ["A second account was created at guest checkout."],
-       ["Merged the accounts and kept the full order history.",
-        "Moved the orders to the main account and closed the duplicate."],
+       ["Merged the accounts and kept the full order history.", "Moved the orders to the main account and closed the duplicate."],
        0.5),
     _I("delete_account", "account",
        ["Delete my account", "Close account request", "Remove my data", "GDPR deletion request"],
-       ["Please delete my account and all my personal data.",
-        "I'd like to close my account permanently."],
+       ["Please delete my account and all my personal data.", "I'd like to close my account permanently."],
        ["I no longer use the service.", "Please confirm by email once it's done."],
        ["Customer requested erasure under data-protection rules."],
-       ["Deleted the account and confirmed under the data-protection request.",
-        "Closed the account and scheduled data deletion within 30 days."],
+       ["Deleted the account and confirmed under the data-protection request.", "Closed the account and scheduled data deletion within 30 days."],
        0.6),
     _I("unsubscribe", "account",
-       ["Unsubscribe from emails", "Too many marketing emails", "Still getting newsletters",
-        "Stop sending me emails"],
-       ["I keep getting marketing emails even though I unsubscribed.",
-        "I unsubscribed {n} times and the newsletters keep coming."],
+       ["Unsubscribe from emails", "Too many marketing emails", "Still getting newsletters", "Stop sending me emails"],
+       ["I keep getting marketing emails even though I unsubscribed.", "I unsubscribed {n} times and the newsletters keep coming."],
        ["I only want order updates.", "The unsubscribe link says I'm already removed."],
        ["Marketing preferences were stored per list, not per account."],
-       ["Removed the customer from all marketing lists; order emails still on.",
-        "Turned off every marketing list and confirmed the preference change."],
+       ["Removed the customer from all marketing lists; order emails still on.", "Turned off every marketing list and confirmed the preference change."],
        0.4),
     # product
     _I("dark_mode", "product",
        ["Feature request: dark mode", "Dark mode please", "Any plans for dark mode?"],
-       ["It would be great to have a dark mode in the app.",
-        "Is a dark theme on the roadmap? The white screen is harsh at night."],
+       ["It would be great to have a dark mode in the app.", "Is a dark theme on the roadmap? The white screen is harsh at night."],
        ["Our team uses this every day.", "A competitor already offers this."],
        ["Not a defect; logged as a feature request."],
-       ["Logged the request with the product team and shared the public roadmap.",
-        "Added the customer's vote to the existing dark-mode request."],
+       ["Logged the request with the product team and shared the public roadmap.", "Added the customer's vote to the existing dark-mode request."],
        0.4),
     _I("bulk_edit", "product",
        ["Feature request: bulk edit", "Edit several items at once?", "Bulk update option"],
-       ["Could you add a way to edit several items at once?",
-        "Updating {n}00 records one by one takes hours. Is there a bulk edit?"],
+       ["Could you add a way to edit several items at once?", "Updating {n}00 records one by one takes hours. Is there a bulk edit?"],
        ["We have to do this every month."],
        ["Not a defect; bulk edit exists for admins only."],
-       ["Explained the admin bulk-edit tool and raised the request for other roles.",
-        "Shared the CSV import as a workaround and logged the request."],
+       ["Explained the admin bulk-edit tool and raised the request for other roles.", "Shared the CSV import as a workaround and logged the request."],
        0.4),
     _I("pdf_export", "product",
        ["Can you add export to PDF?", "PDF export for reports", "Request: printable reports"],
-       ["We'd love an export to PDF option for reports.",
-        "Is there a way to save reports as PDF for our board pack?"],
+       ["We'd love an export to PDF option for reports.", "Is there a way to save reports as PDF for our board pack?"],
        ["Right now we screenshot the dashboard."],
        ["Not a defect; logged as a feature request."],
-       ["Shared the print-to-PDF workaround and logged the request.",
-        "Added the customer to the beta for scheduled PDF reports."],
+       ["Shared the print-to-PDF workaround and logged the request.", "Added the customer to the beta for scheduled PDF reports."],
        0.4),
     _I("product_question", "product",
-       ["Question about {item}", "Is this compatible?", "Sizing question", "Product information"],
-       ["Is the {item} compatible with my current setup?",
-        "What are the exact dimensions of the {item}?",
-        "Does the {item} come with a warranty?"],
-       ["I couldn't find it on the product page."],
+       ["Question about {item}", "Is this compatible?", "Sizing question", "Product information", "{item} - ((dimensions|warranty|compatibility))?"],
+       ["Is the {item} compatible with my current setup?", "What are the exact dimensions of the {item}?",
+        "Does the {item} come with a warranty?", "Before I order, does the {item} come in other colours?"],
+       ["I couldn't find it on the product page.", "I want to buy it for {occasion}."],
        ["Information missing from the product page."],
-       ["Answered with the specifications and updated the product page.",
-        "Confirmed compatibility and sent the setup guide."],
+       ["Answered with the specifications and updated the product page.", "Confirmed compatibility and sent the setup guide."],
        0.4),
 ]
 
@@ -1174,21 +1169,55 @@ def _ticket_slot_rows(rng, size: int, items: Optional[Sequence] = None) -> List[
         idx = rng.integers(0, len(pool), size)
         return [pool[i] for i in idx]
     devices, browsers, whens, plans = pick(_DEVICES), pick(_BROWSERS), pick(_WHENS), pick(_PLANS)
+    from misata.vocab_seeds import CITIES_BY_COUNTRY, FIRST_NAMES, LAST_NAMES
+    lnames = pick(LAST_NAMES)
+    phones = [f"07{int(a):03d} {int(b):06d}" for a, b in zip(rng.integers(100, 999, size), rng.integers(0, 999999, size))]
+    mails = pick(["gmail.com", "outlook.com", "yahoo.co.uk", "icloud.com", "hotmail.com", "proton.me"])
+    cities = pick([c for cs in CITIES_BY_COUNTRY.values() for c in cs])
+    fnames = pick(FIRST_NAMES)
+    months = pick(["January", "February", "March", "April", "May", "June", "July", "August",
+                   "September", "October", "November", "December"])
+    weekdays = pick(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
+    occasions = pick(["a birthday", "Christmas", "an anniversary", "a wedding", "my daughter's party",
+                      "a trip next week", "the weekend", "my mum's birthday", "a work event"])
+    companies = pick([f"{a} {b}" for a in ("Northwind", "Harbor", "Kestrel", "Lumen", "Cobalt",
+                                             "Redwood", "Marlow", "Pioneer")
+                      for b in ("Ltd", "Group", "Studio", "Partners", "Labs")])
     codes = pick(["SPRING20", "WELCOME10", "SAVE15", "FREESHIP", "VIP25"])
     mins = rng.integers(5, 90, size)
+    last4 = rng.integers(0, 10000, size)
+    refp = pick(["RF", "REF", "CR", "RMA", "INC", "CS", "TRK"])
+    refn = rng.integers(10000, 999999, size)
+    dd = rng.integers(1, 29, size)
+    mon3 = pick(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])
+    hh = rng.integers(7, 21, size)
+    mm = rng.integers(0, 60, size)
+    inits = pick([a + b for a in "ABCDEGHJKLMNPRST" for b in "ABCDEGHJKLMNPRSTW"])
+    tix = rng.integers(10000, 999999, size)
     orders = rng.integers(100000, 999999, size)
     amounts = np.exp(rng.normal(3.6, 0.8, size))
     ns = rng.integers(2, 6, size)
     days = rng.integers(1, 29, size)
     va, vb, vc = rng.integers(3, 9, size), rng.integers(0, 15, size), rng.integers(0, 6, size)
+    # Customers name what they bought. With no product on the row, a product
+    # type from the catalogue stands in for "the item".
+    _nouns = [n for k, F in PRODUCT_FAMILIES.items() if k not in ("books", "grocery", "health")
+              for n in F.nouns]
+    fallback_items = [_soft_lower(_nouns[j]) for j in rng.integers(0, len(_nouns), size)]
     out = []
     for i in range(size):
-        it = items[i] if items is not None and i < len(items) and items[i] else None
+        it = items[i] if items is not None and i < len(items) and items[i] else fallback_items[i]
         out.append({
             "device": devices[i], "browser": browsers[i], "when": whens[i], "plan": plans[i],
             "mins": str(int(mins[i])), "order": str(int(orders[i])),
             "amount": f"{float(amounts[i]):.2f}", "n": str(int(ns[i])), "day": _day(int(days[i])),
             "code": codes[i], "version": f"{va[i]}.{vb[i]}.{vc[i]}", "item": it or "item",
+            "city": cities[i], "fname": fnames[i], "month": months[i], "weekday": weekdays[i],
+            "occasion": occasions[i], "company": companies[i],
+            "last4": f"{int(last4[i]):04d}", "ref": f"{refp[i]}-{int(refn[i])}",
+            "date": f"{int(dd[i])} {mon3[i]}", "time": f"{int(hh[i]):02d}:{int(mm[i]):02d}",
+            "initials": inits[i], "ticket": str(int(tix[i])), "lname": lnames[i], "phone": phones[i],
+            "email": f"{fnames[i].lower()}.{lnames[i].lower()}@{mails[i]}".replace(" ", ""),
         })
     return out
 
@@ -1243,8 +1272,15 @@ def draw_tickets(rng: np.random.Generator, size: int, *,
                               if items else None)
     subjects = []
     for i, iss in enumerate(issues):
-        s = _fill(str(_pick(rng, iss.subjects)), rng, slots[i])
+        if rng.random() < 0.55 and iss.family in _FAMILY_SUBJECTS and iss.key not in _SPECIFIC_ONLY:
+            s = _fill(str(_pick(rng, _FAMILY_SUBJECTS[iss.family])), rng, slots[i])
+        else:
+            s = _fill(str(_pick(rng, iss.subjects)), rng, slots[i])
         q = rng.random()
+        if q < 0.5:
+            pool = _SUBJECT_SUFFIXES + ([" - {item}"] * 3 if iss.family in ("shipping", "returns") else [])
+            s = s + _fill(str(_pick(rng, pool)), rng, slots[i])
+            q = 1.0
         if q < 0.12 and "#" not in s and iss.family in ("billing", "shipping", "returns"):
             s = f"{s} (order #{slots[i]['order']})"
         elif q < 0.2 and iss.family == "technical":
@@ -1265,17 +1301,49 @@ def draw_tickets(rng: np.random.Generator, size: int, *,
         elif r < 0.16:
             s = f"{s}!"
         subjects.append(s)
+    from misata.paraphrase import vary
+    subjects = vary(subjects, rng, "casual", rate=0.5, short=True)
     return TicketFrame(issues, slots, urg, open_, subjects)
 
 
+# Family-level subject lines; each names its topic so the subject still says
+# what the ticket is about.
+_FAMILY_SUBJECTS = {
+    "billing": ["((Charge|Payment|Billing|Invoice|Refund)) ((query|issue|problem|question|error))[[ - order #{order}]]",
+                "((Wrong|Extra|Duplicate|Unexpected)) ((charge|payment|bill))[[ of ${amount}]][[ on {date}]]",
+                "((Billing|Payment)) ((help|issue)) ((for {month}|on card {last4}|re ${amount}|- {plan} plan))"],
+    "shipping": ["((Order|Delivery|Parcel|Shipping)) ((problem|issue|query|delay)) - #{order}",
+                 "((My|Our)) {item} ((order|delivery)) ((hasn't arrived|is late|is missing|is stuck))",
+                 "((Delivery|Shipping)) ((update|status|ETA)) ((for order #{order}|for my {item}|please))"],
+    "returns": ["((Return|Refund|Exchange)) ((request|query|issue)) ((- {item}|for order #{order}|re ${amount}))",
+                "((Returning|Sending back|Exchanging)) ((my|the|a)) {item}"],
+    "technical": ["((App|Website|Login|Export|Sync|API|Dashboard)) ((error|issue|problem|not working|down))[[ on {device}]]",
+                  "((Error|Bug|Crash)) ((in|on|with)) ((the app|the dashboard|checkout|reports|the API))[[ ({version})]]",
+                  "((Can't|Cannot|Unable to)) ((log in|export|upload|sync|load the dashboard))[[ - {browser}]]"],
+    "account": ["((Account|Login|Password|Email|2FA)) ((issue|problem|help|question|access))[[ - {email}]]",
+                "((Help with|Problem with|Question about)) my ((account|login|password|email address|two-factor))",
+                "((Locked out|Can't log in|No access)) ((of|to)) ((my|our)) account"],
+}
+_SUBJECT_SUFFIXES = [" (order #{order})", " - ref {ref}", " - {weekday}", " ({fname})", " - {plan} plan",
+                     " - since {date}", " [#{ticket}]", " - {city}", " [{fname} {lname}]", " - {date}",
+                     " (request #{n})", " - please help", " - {company}", " - urgent?", " ?", " - account {last4}"]
+
 _GREETINGS = ["Hi,", "Hello,", "Hi there,", "Hello team,", "Hey,", "Good morning,", "Dear support,",
               "Hi support,", "Hello there,", "Good afternoon,", "To whom it may concern,", "Hiya,"]
-_LEADS = ["", "", "", "", "", "", "So, ", "Quick one: ", "For the second time, ", "Hoping you can help. ",
-          "Not sure who to ask, but ", "Following up on my chat: ", "As the title says, "]
+_LEADS = ["", "", "", "", "", "", "", "", "", "", "So, ", "Quick one: ", "((For the second time|Again|Once more)), ",
+          "((Hoping|Hope)) you can help. ", "((Not sure who to ask|Not sure where to send this)), but ",
+          "Following up on my ((chat|call|last email)): ", "As the ((title|subject)) says, ", "((Sorry to bother you|Apologies for the hassle)), but ",
+          "((I hope this is the right place|Hope this is the right inbox)). ", "((Second|Third)) ((email|message)) about this. ",
+          "((Writing again|Messaging again|Back again)) because ", "((Just a heads up|FYI|Heads up)), ", "((Bit of a|Slight|Big)) problem: ",
+          "Help please. ", "Hi again. ", "Urgent: ", "((Long story short|In short|Basically)), ", "((Right|OK|Okay)), so "]
 _CONTEXT_LINES = {
-    "any": ["This started {when}.", "I first noticed it {when}.", "I'm on the {plan} plan.",
-            "My account email is the one on this ticket.", "I've been a customer for {n} years.",
-            "I've waited {mins} minutes on chat already.", "This is my {n}th time asking."],
+    "any": ["((This|It)) ((started|began)) {when}.", "I first ((noticed|spotted)) it {when}.", "I'm on the {plan} plan.",
+            "My account email is ((the one on this ticket|the one I'm writing from|{fname}'s work address)).",
+            "I've been a customer for {n} years.", "I've waited {mins} minutes on chat already.",
+            "This is my ((second|third|fourth)) time asking.", "I'm based in {city}.",
+            "((Reference|Case|Ticket)) number from last time was #{order}.", "Happy to jump on a call ((on {weekday}|any time|this week)).",
+            "((You can|Feel free to)) ((reach|call|ring)) me on {phone}((.| any time.| after {time}.))",
+            "((My|The account)) email is {email}.", "((Order|Account)) is under {fname} {lname}."],
     "technical": ["I'm using {browser} on a {device}.", "Same thing on my {device}.",
                   "It started after the {version} update.", "Screenshot attached.",
                   "Our whole team on the {plan} plan sees it.", "Happens every time, not just once."],
@@ -1290,39 +1358,243 @@ _CONTEXT_LINES = {
     "product": ["We're on the {plan} plan.", "I'd happily pay more for this.",
                 "Using it on a {device} mostly."],
 }
-_TRIED = ["I've tried logging out and back in.", "I've already cleared my cache and cookies.",
-          "I tried a different browser with the same result.", "Restarting didn't help.",
-          "I checked the help centre but couldn't find an answer.",
-          "I contacted you on chat but the conversation dropped."]
+_TRIED = ["I've ((tried|already tried)) ((logging out and back in|restarting|reinstalling|a different browser|clearing the cache)).",
+          "I've already cleared my ((cache|cookies|cache and cookies|browser history)).",
+          "((Tried|I tried)) ((a different browser|another device|my phone|incognito mode)) ((with the same result|and same thing|no luck)).",
+          "((Restarting|Rebooting|Turning it off and on)) ((didn't help|made no difference|did nothing)).",
+          "I ((checked|searched|read)) the help ((centre|center|articles)) but ((couldn't find an answer|nothing matched|it didn't cover this)).",
+          "I contacted you on chat ((but the conversation dropped|and was told to email|yesterday but nothing happened))."]
 _IMPACT = {
-    0: ["No rush, just wanted to flag it.", "No hurry on this one.", "Whenever you get a chance.", ""],
-    1: ["Could you look into this?", "Please let me know what to do.", "Thanks for your help.", ""],
-    2: ["This is affecting my work, please help.", "I need this sorted this week.",
-        "Please look into this as soon as possible."],
-    3: ["This is urgent, we can't operate.", "Please escalate, this is blocking our whole team.",
-        "We need this fixed today.", "I need this resolved today."],
+    0: ["((No rush|No hurry|Not urgent)), ((just wanted to flag it|just letting you know|whenever suits)).",
+        "((No hurry|No rush)) on this ((one|at all|really)).",
+        "((Whenever you get a chance|When you get a chance|Whenever you have a minute|In your own time)).",
+        "((Low priority|Not a big deal|Minor thing)) ((for us|really|honestly)), ((but|though)) ((worth fixing|thought you should know|it's a bit annoying)).",
+        ""],
+    1: ["((Could|Can|Would)) you ((look into|check|have a look at)) this((?| please?| when you can?))",
+        "Please let me know ((what to do|how to fix it|what you need from me|the next steps)).",
+        "((Thanks|Thank you)) ((for your help|in advance|for looking))((.|!))",
+        "((Would|I'd)) ((appreciate|be grateful for)) ((a reply|an update|some help)) ((this week|soon|when possible)).",
+        ""],
+    2: ["This is affecting ((my work|our team|my business|my orders)), ((please help|please prioritise it|can you speed this up)).",
+        "I need this ((sorted|fixed|resolved|sorted out)) ((this week|by {weekday}|before the weekend|in the next day or two)).",
+        "Please look into this as soon as ((possible|you can|you're able)).",
+        "((It's|This is)) ((holding up|delaying|blocking)) ((our launch|a client project|month-end|my order for {occasion})).",
+        "((We've|I've)) ((lost|wasted)) ((a whole morning|two days|hours)) on this ((already|so far|now))."],
+    3: ["((This is|It's)) urgent, we ((can't operate|can't take orders|can't work|are completely stuck)).",
+        "Please escalate, this is blocking ((our whole team|everyone|all {n}0 of our users|the entire office)).",
+        "We need this ((fixed|sorted|resolved)) ((today|right now|within the hour|by end of day)).",
+        "((Every hour this is down|Every minute this is down|Each hour of downtime|Right now this)) ((costs us money|loses us customers|is a disaster)).",
+        "((Escalating as critical|Flagging as critical|Marking this critical|Calling this a P1)): ((nobody|no one|none of us)) can ((log in|work|check out))."],
+}
+_INTROS = ["My name is {fname} and I've been a customer ((for {n} years|since {month}|for a while)).",
+           "((Hi, it's|This is)) {fname}((.| again.| from {company}.))",
+           "((I'm|We're)) ((writing|getting in touch)) ((from {company}|about my account|about an order)).",
+           "((Long-time|Regular|New)) customer here."]
+_ASKS = {
+    "any": ["Can you ((help|look into this|sort this out)) ((please|asap|today|this week))?",
+            "((How do I|Can you tell me how to)) ((fix this|sort this|get this sorted))?",
+            "Please ((advise|let me know|get back to me)) ((asap|soon|when you can)).",
+            "((Could|Can)) someone ((call|email|message)) me ((back|about this))?",
+            "((Let me know|Tell me)) ((if you need|what else you need|if there's anything else)) ((from me|to sort this|))((.|?))",
+            "((Really|Very|Would be)) ((grateful|thankful|appreciative)) for ((a quick reply|any help|a fix))((.|!))"],
+    "billing": ["((Please|Can you)) refund ((the extra charge|the duplicate charge|me the ${amount}|the difference)).",
+                "((I'd like|I want|Please arrange)) ((a refund|my money back|a credit)) ((asap|today|this week))."],
+    "shipping": ["((Can you|Please)) ((send a replacement|chase the courier|tell me where it is|refund me)).",
+                 "((When|By when)) will it ((arrive|be delivered|get here))?"],
+    "returns": ["((Please|Can you)) ((send me a return label|process my refund|arrange a collection)).",
+                "((How long|When)) will the refund ((take|come through|show up))?"],
+    "technical": ["((Is there|Do you have)) ((a fix|a workaround|an ETA)) for this?",
+                  "((Please|Can you)) ((escalate|look into|fix)) this ((asap|urgently|today))."],
+    "account": ["((Can you|Please)) ((reset|unlock|update)) ((it|my account|this)) for me?",
+                "((What|Which)) ((details|ID|information)) do you need from me?"],
+    "product": ["((Any|Is there an)) ((ETA|timeline|update)) on this?", "((Would|Will)) this be ((possible|added|considered))?"],
 }
 _SIGNOFFS = ["Thanks", "Thanks,", "Thank you", "Cheers", "Regards", "Best", "Many thanks"]
-_PREFACES = ["Spoke to the customer by phone. ", "Per chat with the customer: ",
-             "Checked the logs. ", "Escalated to tier 2. ", "Reproduced the issue. ",
-             "Verified the account. ", "Investigated with engineering. ",
-             "Customer called back. ", "Reviewed the order history. ", "Confirmed with billing. ",
-             "Looked into this with the warehouse. ", "Followed up by email. ",
-             "Checked with the courier. ", "Pulled the payment logs. "]
-_RESOLUTION_NOTES_EXTRA = [
-    "Customer is on the {plan} plan.", "Handled in {mins} minutes.", "Order #{order}.",
-    "Amount involved: ${amount}.", "Reported on {device}.", "First reported {when}.",
-    "Second contact about this.", "Customer was polite and patient.",
-    "Customer was frustrated; offered a {n}0% voucher.", "No further action needed.",
-    "Checked for similar tickets: {n} others this week.", "Added an internal note to the account.",
+_PREFACES = ["((Spoke to|Called|Rang)) the customer ((by phone|this morning|on {weekday})). ",
+             "Per ((chat|email|phone call)) with the customer: ", "((Checked|Reviewed|Pulled)) the ((logs|order history|payment logs|account notes)). ",
+             "Escalated to ((tier 2|engineering|the billing team|a supervisor)). ", "((Reproduced|Confirmed)) the issue((| on {device}| in staging)). ",
+             "((Verified|Checked)) the account((| and ID| and order)). ", "Investigated with ((engineering|the warehouse|the courier|billing)). ",
+             "Customer ((called back|replied|chased)) ((on {weekday}|today|after {n} days)). ", "((Followed up|Replied)) by ((email|chat|phone)). ",
+             "((Looked into|Picked up)) this ((with the warehouse|from the queue|after the handover)). "]
+# What customers write, by family: a second symptom or a concrete detail,
+# full of the order numbers, amounts, dates and devices real tickets carry.
+_FAMILY_SYMPTOMS = {
+    "billing": ["((I've been|I was|We've been)) ((charged|billed|debited)) ${amount} ((twice|for something I didn't order|after cancelling|more than the price shown)) ((on {date}|this month|on my card ending {last4})).",
+                "((There's|I see|My bank shows)) ((a charge|a payment|a debit)) of ${amount} ((I don't recognise|that shouldn't be there|from {date})) ((on my statement|on card {last4}|from you)).",
+                "((Your|The)) ((renewal|subscription|monthly charge)) ((jumped|went up|changed)) from ((${amount}|the usual price)) ((without warning|on {date}|this month)) ((on my account|for the {plan} plan)).",
+                "((Just|I've just|I have just)) ((noticed|seen|spotted)) ((two|duplicate|extra)) ((payments|charges|debits)) ((totalling|of|adding up to)) ${amount} ((from {date}|this {weekday}|for order #{order})).",
+                "((Got|Received)) ((an email|a receipt|a notification)) ((saying|that says)) I paid ${amount} ((on {date}|at {time}|today)) but ((I never ordered|that's wrong|my plan is cheaper)).",
+                "((Was|I was|We were)) ((promised|told|quoted)) ${amount} ((on chat|by your sales team|on {date})) but ((charged more|billed the full price|invoiced differently)) ((on card {last4}|this month|for the {plan} plan))."],
+    "shipping": ["((My|Our)) {item} ((was due|should have arrived|was promised)) ((on {date}|by {weekday}|last {weekday})) and ((still isn't here|hasn't turned up|there's no sign of it)).",
+                 "Order #{order} ((says delivered|shows as delivered|was marked delivered)) at {time} on {date} but ((nobody|no one|nothing)) ((was left|came|turned up)).",
+                "((Tracking|The courier)) ((has shown|says|keeps saying)) (('out for delivery'|'delayed'|'exception')) ((since {date}|for {n} days|every day this week)) for order #{order}.",
+                "((Ordered|Bought|Paid for)) ((a|the|my)) {item} ((on {date}|{n} weeks ago|last {weekday})) ((with next-day delivery|with express shipping|for ${amount})) and ((it's not here|nothing yet|still waiting)).",
+                "((Driver|Courier|The delivery app)) ((says|claims|shows)) ((they tried to deliver|nobody was in|it was left in a safe place)) ((at {time}|on {date})) but ((I was home|that's not true|there's nothing here)).",
+                "((Parcel|Package|My {item})) ((was meant to come|was booked for|was scheduled for)) {date} ((between|from)) ((8 and 12|1 and 5|9 and 6)) and ((nothing came|no-one showed|it was rescheduled without asking)).",
+                "((Only|Just)) ((half|part|one box)) of order #{order} ((arrived|turned up|was delivered)) ((on {date}|today|this {weekday})), the {item} is ((missing|not there|nowhere))."],
+    "returns": ["((I|We)) ((sent back|returned|posted back)) the {item} ((on {date}|{n} weeks ago|last {weekday})) and ((the refund of ${amount} hasn't appeared|still no refund|heard nothing since)).",
+                "The {item} ((doesn't fit|is the wrong colour|isn't as described|arrived faulty)) and I want to ((return|exchange|swap)) it ((before {date}|this week|asap)).",
+                "((Need|Want|I'd like)) to ((return|send back|exchange)) ((the|my)) {item} from order #{order} ((bought on {date}|that arrived {weekday}|which cost ${amount}))."],
+    "technical": ["((Since|From)) {date} ((the app|the dashboard|your site|the export)) ((keeps crashing|won't load|throws an error|logs me out)) ((on my {device}|in {browser}|for everyone on our {plan} plan)).",
+                  "((Every time|Whenever|Each time)) I ((open|try|tap)) ((reports|checkout|settings|the dashboard)) ((on {device}|in {browser})) it ((freezes|crashes|spins forever|shows a blank page)).",
+                "((Our|My)) ((sync|integration|export|report)) ((failed|stopped|broke)) ((at {time} on {date}|overnight on {date}|after {version})) ((with error {n}0{n}|without any error|and hasn't recovered)).",
+                "((Getting|Seeing|Hitting)) ((error|code)) {n}0{n} ((when|whenever|every time)) I ((upload|export|log in|save)) ((on {device}|in {browser}|since {date})).",
+                "((The|Our)) {plan} ((workspace|account|dashboard)) ((went down|stopped loading|became really slow)) ((at {time} on {date}|this morning around {time}|after the {version} release)).",
+                "((Can't|Cannot|Unable to)) ((save|upload|export|sync|print)) ((anything|my {month} report|files over {n}MB|invoices)) ((since {date}|from {browser}|on the {plan} plan)), ((it just|the page|the app)) ((times out|errors|goes blank)).",
+                "((Notifications|Emails|Alerts|Webhooks)) ((stopped|aren't|haven't been)) ((arriving|sending|coming through)) ((since {date}|after {time} yesterday|for {n} days)) ((for our team|on {device}|in {city})).",
+                "((Two|Several|All)) of our ((users|staff|team members)) ((got logged out|lost their data|see a blank screen)) ((at {time}|this morning|on {date})) ((using|on|in)) ((Chrome|Safari|the app|{device}))."],
+    "account": ["((I can't|I'm unable to|I cannot)) ((log in|get into my account|reset my password|get the code)) ((on my {device}|since {date}|from {city}|after changing phones)).",
+                "((My|The)) ((login|account|password reset|two-factor code)) ((stopped working|is broken|never arrives)) ((on {date}|since {weekday}|after the {version} update)).",
+                "((Locked out|Can't sign in|Blocked)) ((after|since)) (({n} wrong attempts|changing my email|a password reset on {date}))((.|, please help.))",
+                "((Trying|I'm trying|Been trying)) to ((update|change|recover)) ((my email|my password|my phone number|my login)) ((since {date}|for {n} days|all morning)) and ((it won't save|nothing works|the link expires))."],
+    "product": ["((Could you|Can you|Would you)) ((add|build|support)) ((dark mode|bulk editing|PDF export|a {device} app|more integrations)) ((for the {plan} plan|soon|this year))?"],
+}
+
+_FAMILY_DETAILS = {
+    "billing": ["((The charge|It|The payment)) ((shows as|is listed as|appears as)) ${amount} on ((my card ending {last4}|my statement|my banking app)) ((dated {date}|from {date}|on {date})).",
+                "((My|Our)) ((invoice|receipt|account page)) says ((one thing|${amount}|the {plan} plan)) but ((my bank says another|I was charged more|I'm on a different plan)).",
+                "((I've|We've)) been a {plan} customer since {month} and ((this has never happened|never had an issue|always paid on time)).",
+                "((Order|Invoice|Transaction)) ((number|ref|ID)) is ((#{order}|{ref})), ((paid|charged)) on {date}.",
+                "((I|We)) ((only|just)) ((ordered|bought|signed up for)) ((the {item}|one {item}|the {plan} plan)) ((on {date}|in {month}|last {weekday})), nothing else.",
+                "((Can you|Please)) ((check|look at)) ((transaction|payment|invoice)) {ref} ((from {date}|for ${amount}|on card {last4}))?"],
+    "shipping": ["((Tracking|The tracking page|The courier app)) ((last updated|has said 'in transit' since|shows nothing after)) {date} ((at {time}|in {city}|at the depot)).",
+                 "((I'm|We're)) in {city} and the ((estimated|promised|quoted)) date was {date}.",
+                 "Order #{order} ((for the {item}|placed on {date}|paid ${amount})) ((still hasn't moved|is stuck|shows as delivered)).",
+                 "((I've|We've)) ((called|emailed|messaged)) the courier ((twice|three times|already)) and they ((say to contact you|have no record|keep saying tomorrow)).",
+                "((The|My)) ((neighbour|concierge|building manager)) ((hasn't seen it|says nothing came|checked the CCTV)) ((on {date}|that day|at {time})).",
+                "((I|We)) ((need|wanted)) the {item} for {occasion} ((on {date}|this {weekday}|next week)), ((so this is a problem|so I'm worried|so please hurry))."],
+    "returns": ["((I|We)) ((dropped it off|sent it back|posted it)) at ((the post office|a locker|the shop in {city})) on {date}, ((receipt attached|tracking {ref}|still have the slip)).",
+                "((The|My)) {item} ((cost|was)) ${amount} and ((the refund should go|I paid with|it was charged to)) ((card ending {last4}|my original card|PayPal)).",
+                "((It's|That's)) been {n} ((weeks|working days|days)) since ((your warehouse|you|the depot)) ((got it|signed for it|received it)).",
+                "((Return|Drop-off)) ((reference|code|label number)) ((is|was)) {ref}((.|, from {city}.| if that helps.))",
+                "((Your|The)) ((website|returns page|app)) ((still says|shows|says)) (('awaiting return'|'in transit'|nothing)) ((for order #{order}|since {date}))."],
+    "technical": ["((I'm|We're)) on {browser} ((on a|using a|with a)) {device}, ((app|version)) {version}.",
+                  "((It|The error)) ((started|first appeared|kicked in)) on {date} around {time}.",
+                  "((Error|The message)) says ((\"something went wrong\"|code {n}0{n}|'request failed'|'session expired')) ((every time|after a few seconds|at random)).",
+                  "((About|Roughly|At least)) {n}0 ((people|users|of our staff)) on the {plan} plan ((are affected|see the same thing|can't work)).",
+                "((Screenshot|Screen recording|Console log)) ((attached|is attached|below)), ((taken at|from|captured)) {time} on {date}.",
+                "((Same|It's the same)) on ((my|our)) ((laptop|work PC|second account|colleague {fname}'s machine)) ((in {city}|at home|in the office))."],
+    "account": ["((I'm|I am)) trying on ((my|a)) {device} ((with|in|using)) {browser}((.|, if that helps.))",
+                "((The|My)) account email ((is|should be)) ((my work one at {company}|the one I signed up with in {month}|{fname}'s address)).",
+                "((Last|The last time I)) logged in[[ successfully]] ((on {date}|in {month}|a few weeks ago)).",
+                "((My|The)) ((phone number|mobile|backup email)) ((ends in|is the one ending)) {last4}((.|, still the same.))",
+                "((I signed up|I opened the account|I joined)) ((in {month}|on {date}|years ago)) ((with|through|using)) ((Google|Apple|my email|{company} SSO))."],
+    "product": ["((We|I)) ((use|rely on)) ((this|the app|your tool)) ((every day|daily|for {company})) ((on the {plan} plan|across {n}0 seats|on {device}))."],
+}
+
+_FAMILY_CAUSES = {
+    "billing": ["((The payment gateway|Our card processor|The billing system|The renewal job)) ((retried|double-posted|failed to void|mis-applied)) the ((authorisation|charge|renewal|discount)) ((on {date}|at {time} on {date}|during the {date} incident)).",
+                "((Invoice|Billing)) ((details|address|plan)) on the account ((were out of date|didn't match the card|were never updated)) ((since {month}|after the plan change|after migration)).",
+                "((Customer|Account holder)) was on the ((legacy|annual|monthly)) {plan} plan and the ((price change|proration|tax update)) on {date} ((wasn't applied|was applied twice|missed them)).",
+                "((Duplicate|Extra|Unexpected)) ((charge|debit|payment)) of ${amount} ((traced to|came from|was caused by)) ((a retry at {time}|order #{ticket} being submitted twice|a stale saved card ending {last4})).",
+                "((Discount|Promo|Coupon)) {code} ((expired|was excluded|didn't stack)) ((on {date}|for sale items|on the {plan} plan)), so full price was charged.",
+                "((Bank|Card issuer|Payment provider)) ((held|flagged|declined)) the ((first|original|earlier)) attempt ((at {time}|on {date})), ((then|and later)) ((both settled|the retry also went through|we charged again)).",
+                "((Annual|Monthly)) ((renewal|invoice)) ((ran|was generated)) ((a day early|before the downgrade|after cancellation)) because the ((change|request|downgrade)) ((was queued|hadn't synced|was saved on {date})).",
+                "((Tax|VAT|Currency conversion)) ((was|got)) ((applied twice|calculated on the wrong country|rounded up)) for {city} ((on invoice {ref}|this cycle|since {month}))."],
+    "shipping": ["((The courier|Our carrier|The depot)) ((mis-scanned|misrouted|held|lost)) the parcel ((at the {city} hub|on {date}|between depots)).",
+                 "((Warehouse|Fulfilment)) ((missed|delayed|split)) the ((dispatch|pick|shipment)) ((on {date}|because of a stock shortage|after a system outage)).",
+                "((Address|Postcode|Flat number)) on order #{ticket} ((was incomplete|had a typo|failed validation)), so the ((courier|driver)) ((returned it to depot|couldn't deliver|left a card)).",
+                "((Label|Address|Routing)) ((printed|was set|defaulted)) to ((an old address|the billing address|the wrong depot)) ((on {date}|for order #{ticket}|after checkout)).",
+                "((Severe weather|A vehicle breakdown|Staff shortages|A depot backlog)) in {city} ((delayed|held up|stalled)) ((all parcels|this route|deliveries)) ((from {date}|for {n} days|this week)).",
+                "((Parcel|Package)) ((was|got)) ((sent to the {city} depot by mistake|stuck in customs|returned to sender)) ((on {date}|after {n} attempts|because nobody signed)).",
+                "((Driver|Courier)) ((scanned|marked)) it delivered ((at {time}|on {date})) ((at the wrong door|from the van|before arriving)), ((GPS shows|photo shows|logs show)) ((another street|the depot|nothing)).",
+                "((Item|Stock)) ((was out of stock|was mis-picked|failed quality check)) at the ((warehouse|fulfilment centre|{city} site)) ((on {date}|so the order sat|until {weekday}))."],
+    "returns": ["((Return|Parcel)) ((arrived|was received)) on {date} but ((wasn't scanned|sat in quarantine|was logged to the wrong order #{ticket})).",
+                "((Refund|Return)) ((stalled|failed|bounced)) because the ((original card|card ending {last4}|payment method)) had ((expired|been replaced|been cancelled)).",
+                "((Return|Parcel)) was ((logged|received|scanned)) at the {city} ((warehouse|returns centre|hub)) on {date} ((but not matched to the order|under the wrong customer|without the RMA)).",
+                "((Refund|Credit)) ((was|had been)) ((issued to store credit|sent to an old card|held for inspection)) ((by mistake|automatically|on {date})) ((instead of the original payment|per the default rule|for {n} days)).",
+                "((Return|Exchange)) ((label|request|RMA)) {ref} ((expired|was never used|was cancelled)) ((on {date}|before drop-off|after 14 days))."],
+    "technical": ["((Release|Build|Deploy)) {version} ((introduced|caused|exposed)) a ((regression|bug|timeout)) ((in the {plan} tier|for {device} users|on accounts created before {month})).",
+                  "((A config change|An expired token|A rate limit|A failed migration)) ((on {date}|at {time}|last {weekday})) ((broke|disabled|throttled)) the ((sync|export|login|webhook)).",
+                "((Logs|Traces)) from {date} {time} show ((repeated 500s|timeouts|a null response)) from the ((auth|export|billing|sync)) service ((for this account|for {n}% of {plan} users|on {device})).",
+                "((Rate limiting|A cache bug|A database lock|A third-party outage)) ((between|from)) {time} ((and|to)) ((the evening|midnight|the next morning)) on {date} ((affected|hit|slowed)) ((this workspace|{n}% of requests|the {plan} tier)).",
+                "((Customer's|Their)) ((browser|app|device)) ((was on|was running|had)) ((an old version|{version}|a blocked cookie setting)) ((and|so)) ((the session kept dropping|uploads failed|pages cached stale data)).",
+                "((Our|The)) ((status page|monitoring|alerting)) ((missed|didn't catch|under-reported)) ((a partial outage|elevated errors|slow queries)) ((from {time} on {date}|in the {city} region|for {plan} accounts))."],
+    "account": ["((Account|Login)) ((was locked|was flagged|was suspended)) ((after {n} failed attempts|by the fraud rules|on {date})).",
+                "((Email|Phone|Two-factor)) ((details|settings|device)) ((were stale|didn't match|had changed)) ((since {month}|after a phone upgrade|after migration)).",
+                "((Customer|User)) ((changed phones|switched email providers|left {company})) ((in {month}|recently|on {date})) and ((lost access|never updated the account|missed the verification email)).",
+                "((Too many|Repeated|Multiple)) ((reset requests|login attempts|code requests)) ((from|in)) {city} ((triggered|tripped)) ((the security lock|rate limiting|a fraud hold)) ((at {time}|on {date})).",
+                "((Customer|User)) was ((using|trying)) ((an old password|the wrong email|a personal address)) ((from before {month}|instead of {company}'s|on {device})).",
+                "((Account|Profile)) ((merge|migration|update)) on {date} ((left|created|moved)) ((a duplicate login|two profiles|the orders on the old account))."],
+    "product": ["Not a defect; ((feature|request|behaviour)) is ((working as designed|on the roadmap|not supported yet)) ((as of {version}|for the {plan} plan|for now))."],
+}
+
+_FAMILY_ACTIONS = {
+    "billing": ["((Refunded|Reversed|Credited back|Voided)) ((the duplicate charge|the second payment|the overcharge|the renewal charge|the difference)) ((of ${amount}|)) ((and emailed the reference|; reference sent to the customer|, should clear in 3-5 working days|, confirmed in the payment dashboard|, customer notified)).",
+                "((Updated|Corrected|Fixed)) the ((billing address|card details|VAT number|company name|plan)) on the account and ((reissued the invoice|re-ran the payment|confirmed with the customer|sent a new receipt)).",
+                "((Applied|Added)) a ((goodwill|service|one-off)) credit of ${amount} ((to the account|to the next invoice|for the trouble)).",
+                "((Raised|Logged)) ((a billing correction|an adjustment|a credit note)) ((CN-{ticket}|ref {ref})) for ${amount} ((and emailed {fname}|; posts to card ending {last4}|, visible on the next statement)).",
+                "((Waived|Cancelled|Refunded)) ((the late fee|this month's charge|the renewal)) [[of ${amount} ]]and ((moved the account to monthly billing|set the plan to cancel at term end|updated the card on file to {last4})).",
+                "((Corrected|Reissued|Re-raised)) invoice {ref} ((with the right VAT|in the right currency|with {company} details)) ((and emailed it to {email}|; old one voided|, PDF attached to the ticket)).",
+                "((Moved|Switched|Changed)) the customer ((to monthly billing|to the {plan} plan|off auto-renew)) ((from {date}|effective today|at their request)) ((and confirmed by email|; prorated credit ${amount}|, no further charges)).",
+                "((Contacted|Called|Emailed)) the ((payment provider|card issuer|bank)) ((about|re:|regarding)) ((transaction {ref}|the ${amount} charge|card ending {last4})) ((and they released the hold|; reversal pending|, released in 2 days))."],
+    "shipping": ["((Reshipped|Sent out|Dispatched)) a ((replacement|new unit|second parcel)) ((by express|next day|with tracking|signed for)) ((at no charge|free of charge|and refunded the postage)).",
+                 "((Opened|Raised|Filed)) a ((claim|trace|investigation)) with the ((courier|carrier|depot)) ((and refunded in full|and sent a replacement|; customer updated)).",
+                 "((Chased|Called|Escalated with)) the ((warehouse|courier|depot)); new ((dispatch|delivery)) date ((is {weekday}|confirmed for {weekday}|within {n} days)).",
+                "((Updated|Corrected)) the delivery details and ((rebooked|requested)) ((redelivery|a new slot)) for {weekday} ((before {time}|in the morning|with a safe-place note)).",
+                "((Booked|Sent)) a ((free|priority|tracked)) ((replacement|resend|re-delivery)) ((ref {ref}|via express|for {weekday})) and ((cancelled the original|told the customer to refuse the late parcel|kept the original claim open)).",
+                "((Refunded|Credited|Returned)) the ((shipping fee|delivery charge|express upgrade)) [[of ${amount} ]]((as goodwill|for the delay|and apologised)).",
+                "((Asked|Instructed|Told)) the ((courier|depot|driver)) to ((hold it for collection|redeliver on {weekday}|leave it with a neighbour)) ((ref {ref}|per the customer|and texted {phone})).",
+                "((Cancelled|Stopped|Recalled)) the ((original|late|lost)) shipment and ((issued a full refund|sent a replacement|offered store credit)) ((of ${amount}|to card {last4}|same day))."],
+    "returns": ["((Sent|Emailed|Issued)) a ((prepaid|free|QR-code)) return label ((by email|to the customer|for drop-off)); refund ((on receipt|once scanned|within {n} days of arrival)).",
+                "((Processed|Pushed through|Approved)) the refund of ${amount} ((manually|early|as an exception)) ((and sent confirmation|; customer notified|to the original card)).",
+                "((Arranged|Booked)) a ((courier collection|home pickup|exchange)) for {weekday}.",
+                "((Matched|Linked|Assigned)) the return to order #{order} ((manually|in the system|by hand)) and ((released|issued|pushed)) the refund ((of ${amount}|to card {last4}|same day)).",
+                "((Converted|Switched|Moved)) the ((store credit|voucher|refund)) ((to a card refund|back to the original card|to PayPal)) [[of ${amount} ]]((at the customer's request|and confirmed|; ref {ref})).",
+                "((Extended|Reopened|Reissued)) the return ((window|label|RMA)) ((to {date}|for 14 days|as {ref})) and ((emailed|sent|texted)) ((the new label|instructions|a QR code))."],
+    "technical": ["((Pushed|Shipped|Deployed)) a ((fix|patch|hotfix)) in ((version {version}|release {version}|this morning's deploy)); ((confirmed with the customer|customer verified|monitoring)).",
+                  "((Cleared|Reset|Rebuilt)) the ((cache|session|sync job|index)) for the account ((and the issue stopped|; working again|, confirmed fixed)).",
+                  "((Shared|Sent)) a ((workaround|temporary fix|step-by-step guide)) ((while engineering fixes the root cause|and linked the bug|; permanent fix due in {version})).",
+                "((Rolled back|Reverted|Disabled)) the ((change|flag|config)) from {date}[[ at {time}]] ((and confirmed recovery|; error rate back to normal|, customer can log in again)).",
+                "((Raised|Opened|Filed)) ((incident|bug|ticket)) {ref} ((with engineering|for the platform team|as a P2)); ((workaround shared|customer kept updated|fix expected in {version})).",
+                "((Asked|Helped|Walked)) the customer ((to update|through updating|to reinstall)) ((to {version}|the app|their browser)) ((and it worked|; confirmed fixed at {time}|, problem gone)).",
+                "((Replayed|Re-sent|Backfilled)) ((the missed events|failed exports|the sync)) ((from {date}|for the last {n} days|since {time})) ((and confirmed counts match|; {n}0 records restored|, customer verified))."],
+    "account": ["((Verified|Confirmed)) the customer's identity ((by email|with ID|via security questions)) and ((reset|unlocked|updated)) the ((account|password|two-factor|email address)).",
+                "((Merged|Closed|Updated)) the ((duplicate account|old account|account details)) ((and kept the order history|; customer confirmed|as requested)).",
+                "((Removed|Unsubscribed)) the customer from ((all marketing|the newsletter|promotional)) emails; ((order updates still on|confirmed by email)).",
+                "((Sent|Issued)) a ((reset link|verification code|new invite)) to ((the backup email|{fname}'s new address|the verified phone)) ((at {time}|on {date})) ((and confirmed access|; customer logged in|, all good)).",
+                "((Lifted|Cleared|Removed)) the ((lock|hold|flag)) ((after verifying|once we confirmed|having checked)) ((ID|the card ending {last4}|the billing postcode)) ((at {time}|on {date}|on the call)).",
+                "((Walked|Talked)) the customer through ((resetting|recovering|updating)) ((the password|two-factor|their email)) ((on the phone|over chat|by email)) ((at {time}|on {date}|in about {mins} minutes)).",
+                "((Moved|Transferred|Linked)) ((the orders|order history|the subscription)) ((to|onto)) ((the main account|{email}|the correct profile)) ((and closed the duplicate|; customer confirmed|as asked))."],
+    "product": ["((Logged|Recorded|Added)) the ((request|suggestion|feedback)) ((with the product team|on the roadmap board|to the feature tracker)) ((and thanked the customer|; shared the public roadmap|, {n} similar votes))."],
+}
+
+_RESOLUTION_REFS = [
+    "Re: {item}, order #{order}.", "((Item|Product)): {item}.", "((Customer|Cx|Account)): {fname} {lname}, {city}.",
+    "((Company|Org)): {company}.", "((Contact|Callback)) number {phone}.", "Email on file {email}.",
+    "{item} ((x1|x2|qty 1|qty 2)), ${amount}.", "Order #{order} ({date}, {city}).",
 ]
-_FOLLOWUPS = ["", "", "Customer confirmed the issue is resolved.",
-              "Customer thanked us; marking solved.", "Will monitor for a week.",
-              "Macro sent.", "Linked to the known-issue article.", "Tagged for the weekly review.",
-              "Closing; customer can reply to reopen.", "Sent a follow-up survey.",
-              "No reply from customer after 48 hours; closing.",
-              "Added a note to the account for future reference.",
-              "Shared the help-centre article for next time."]
+_RESOLUTION_NOTES_EXTRA = [
+    "Card ending {last4}.", "Ref {ref}.", "((Logged|Updated)) {date} {time}.", "Related ticket #{ticket}.",
+    "((Refund|Credit|Return)) ref {ref} ((sent|issued|shared)) to the customer.", "Customer called at {time} on {date}.",
+    "Customer is on the {plan} plan.", "((Handled|Resolved|Closed)) in {mins} minutes.", "Order #{order}.",
+    "Amount involved: ${amount}.", "((Reported|Seen)) on {device}.", "First reported {when}.",
+    "((Second|Third|Fourth)) contact ((about this|on this issue|this month)) ((- see #{ticket}|since {date}|)).", "Customer was ((polite and patient|understanding|very calm|frustrated but fair)).",
+    "Customer was frustrated; offered a {n}0% voucher.", "No further action ((needed|required|on our side))((.| unless the customer replies.))",
+    "Checked for similar tickets: {n} others this week.", "((Added|Left)) ((an internal|a)) note ((on|to)) the account ((for the next agent|re: {plan} plan|on {date})).",
+    "Customer based in {city}.", "((Linked|Merged)) with ticket #{order}.", "((Refund|Credit)) reference sent to {fname}.",
+    "((Also|Additionally)) ((updated|corrected)) the ((billing address|phone number|marketing preferences)).",
+    "((Raised|Logged)) a bug ((for|with)) the ((app|web|payments)) team.",
+]
+_FOLLOWUPS = ["", "", "", "Customer confirmed ((it's|the issue is|everything is)) ((resolved|working|sorted)) ((on {date}|at {time}|by email|)).",
+              "Customer ((thanked us|was happy|said thanks)); marking solved.",
+              "Will monitor ((for a week|for a few days|for 48 hours|until {date})).", "Macro ((sent|applied)): ((refund-confirmation|shipping-update|password-reset|apology-voucher)).",
+              "((Linked|Attached)) ((to|the)) known-issue article ((KB-{n}{n}0|#{ticket}|)).", "Tagged ((for the weekly review|#{plan}|vip|repeat-contact|billing-error)).",
+              "Closing; customer can reply to reopen.", "((Sent|Queued)) a ((follow-up|satisfaction|CSAT)) survey.",
+              "No reply from customer after ((48 hours|two days|a week)); closing.", "((Set|Scheduled)) a check-in for {weekday} {time}.",
+              "((Closing|Resolved)) - {fname}", "- {fname}", "({initials})", "-- {initials}, {date}", "Ref {ref}.",
+              "((Next|Follow-up)) step: ((check back|confirm the refund landed|chase the courier|verify the fix)) on {date}.",
+              "((Escalation|Handover)) note left for ((the night shift|tier 2|{fname}|the {city} team)).",
+              "((CSAT|Survey|Feedback request)) ((queued|sent|scheduled)) for ((tomorrow|{date}|after closure)).",
+              "((Time spent|Handle time|Work time)): {mins} min.", "((Status|State)) -> ((solved|pending customer|closed)) at {time}.",
+              "((Reopened|Re-opened)) ((once|twice)) before; ((now stable|watching|should hold))."]
+
+
+# Issues the family-level symptom would misdescribe (a feature request is not
+# "charged twice"), so they always use their own.
+_SPECIFIC_ONLY = {"invoice_request", "change_address", "merge_accounts", "delete_account",
+                  "unsubscribe", "change_email", "dark_mode", "bulk_edit", "pdf_export",
+                  "product_question", "price_dispute", "wrong_item", "damaged"}
 
 
 def render_ticket_descriptions(rng: np.random.Generator, frame: TicketFrame) -> np.ndarray:
@@ -1331,29 +1603,45 @@ def render_ticket_descriptions(rng: np.random.Generator, frame: TicketFrame) -> 
     for i in range(size):
         iss, sl, u = frame.issue[i], frame.slots[i], frame.urgency[i]
         parts = []
-        greeting = str(_pick(rng, _GREETINGS)) if rng.random() < 0.4 else ""
-        sym = _fill(str(_pick(rng, iss.symptoms)), rng, sl)
-        lead = str(_pick(rng, _LEADS))
+        greeting = str(_pick(rng, _GREETINGS)) if rng.random() < 0.3 else ""
+        if rng.random() < 0.65 and iss.family in _FAMILY_SYMPTOMS and iss.key not in _SPECIFIC_ONLY:
+            sym = _fill(str(_pick(rng, _FAMILY_SYMPTOMS[iss.family])), rng, sl)
+        else:
+            sym = _fill(str(_pick(rng, iss.symptoms)), rng, sl)
+        lead = _fill(str(_pick(rng, _LEADS)), rng, sl)
         if lead and not lead.endswith(". ") and not lead.endswith(": "):
             sym = sym[0].lower() + sym[1:] if not sym.startswith("I ") and not sym.startswith("I'") else sym
         parts.append(lead + sym)
-        if rng.random() < 0.7:
+        if rng.random() < 0.35:
             parts.append(_fill(str(_pick(rng, iss.details)), rng, sl))
-        if rng.random() < 0.6:
+        if iss.family in _FAMILY_DETAILS:
+            fd = _FAMILY_DETAILS[iss.family]
+            picks = _distinct(rng, fd, 2 if rng.random() < 0.4 else 1) if rng.random() < 0.8 else []
+            parts.extend(_fill(str(x), rng, sl) for x in picks)
+        if rng.random() < 0.4:
             pool = _CONTEXT_LINES.get(iss.family, []) + _CONTEXT_LINES["any"]
             parts.append(_fill(str(_pick(rng, pool)), rng, sl))
+        if rng.random() < 0.35:
+            parts.append(_fill(str(_pick(rng, _ASKS.get(iss.family, _ASKS["any"]))), rng, sl))
         if iss.family in ("technical", "account") and rng.random() < 0.5:
-            parts.append(str(_pick(rng, _TRIED)))
-        impact = str(_pick(rng, _IMPACT[u]))
+            parts.append(_fill(str(_pick(rng, _TRIED)), rng, sl))
+        impact = _fill(str(_pick(rng, _IMPACT[u])), rng, sl) if rng.random() < (0.85 if u >= 2 else 0.5) else ""
         if impact:
             parts.append(impact)
         text = " ".join(parts)
         if greeting:
             text = f"{greeting}\n\n{text}"
-        if rng.random() < 0.25:
-            text += f"\n\n{_pick(rng, _SIGNOFFS)}"
+        if rng.random() < 0.15:
+            text = _fill(str(_pick(rng, _INTROS)), rng, sl) + " " + text
+        if greeting:
+            pass
+        if rng.random() < 0.35:
+            so = _pick(rng, _SIGNOFFS)
+            sig = (f"\n{sl['fname']} {sl['lname']}" if rng.random() < 0.4 else f"\n{sl['fname']}") if rng.random() < 0.7 else ""
+            text += f"\n\n{so}{sig}"
         out[i] = text
-    return out
+    from misata.paraphrase import vary
+    return np.array(vary(list(out), rng, "casual"), dtype=object)
 
 
 def render_ticket_resolutions(rng: np.random.Generator, frame: TicketFrame) -> np.ndarray:
@@ -1369,6 +1657,10 @@ def render_ticket_resolutions(rng: np.random.Generator, frame: TicketFrame) -> n
         k = int(rng.integers(len(iss.fixes)))
         fix = _fill(iss.fixes[k], rng, sl)
         cause = _fill(iss.causes[k % len(iss.causes)], rng, sl)
+        if rng.random() < 0.85 and iss.family in _FAMILY_ACTIONS:
+            # The family-level cause and action go together, as the issue's own pair does.
+            fix = _fill(_pick(rng, _FAMILY_ACTIONS[iss.family]), rng, sl)
+            cause = _fill(_pick(rng, _FAMILY_CAUSES[iss.family]), rng, sl)
         r = rng.random()
         if r < 0.45:
             text = f"{cause} {fix}"
@@ -1376,14 +1668,19 @@ def render_ticket_resolutions(rng: np.random.Generator, frame: TicketFrame) -> n
             text = f"Root cause: {cause[0].lower() + cause[1:]}".rstrip(".") + f". {fix}"
         else:
             text = fix
-        if rng.random() < 0.5:
-            text = f"{text} {_fill(str(_pick(rng, _RESOLUTION_NOTES_EXTRA)), rng, sl)}"
-        follow = str(_pick(rng, _FOLLOWUPS))
-        pre = str(_pick(rng, _PREFACES)) if rng.random() < 0.3 else ""
+        if rng.random() < 0.55:
+            ref_line = _fill(str(_pick(rng, _RESOLUTION_REFS)), rng, sl)
+            text = f"{ref_line} {text}" if rng.random() < 0.5 else f"{text} {ref_line}"
+        for prob in (0.75, 0.4):
+            if rng.random() < prob:
+                text = f"{text} {_fill(str(_pick(rng, _RESOLUTION_NOTES_EXTRA)), rng, sl)}"
+        follow = _fill(str(_pick(rng, _FOLLOWUPS)), rng, sl)
+        pre = _fill(str(_pick(rng, _PREFACES)), rng, sl) if rng.random() < 0.3 else ""
         if pre and r >= 0.45:
             text = text[0].lower() + text[1:] if pre.endswith(": ") else text
         out[i] = f"{pre}{text} {follow}".strip()
-    return out
+    from misata.paraphrase import vary
+    return np.array(vary(list(out), rng, "business"), dtype=object)
 
 
 # ── short labels and profiles ────────────────────────────────────────────────

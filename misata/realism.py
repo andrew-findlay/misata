@@ -62,6 +62,9 @@ COUNTRIES = list(CITIES_BY_COUNTRY.keys())
 # Table-name substrings that make a bare "name" column a *person* name. Anything
 # else (plans, statuses, types, categories) is a lookup/dimension table whose
 # labels should come from the schema's inline_data, not a person generator.
+_POST_TABLE_HINTS = ("post", "article", "blog", "news", "story", "stories", "thread", "entry",
+                     "entries", "essay", "journal", "page")
+
 _PERSON_TABLE_HINTS = (
     "user", "customer", "person", "people", "employee", "member", "contact",
     "author", "owner", "student", "patient", "doctor", "nurse", "driver",
@@ -864,11 +867,7 @@ class RealisticTextGenerator:
             return self._generate_product_text(size=size, semantic=semantic, table_data=table_data,
                                                table_name=table_name)
         if semantic == "bio":
-            from misata.scenarios import bios
-            return bios(self.rng, size,
-                        jobs=self._row_values(table_data, ("job_title", "title", "role", "occupation"), size),
-                        cities=self._row_values(table_data, ("city", "location", "home_city"), size),
-                        companies=self._row_values(table_data, ("company", "company_name", "employer"), size))
+            return self._textkit("bio", size, table_data)
         if semantic == "brand":
             from misata.scenarios import brands, family_for_category
             cats = self._row_values(table_data, ("category", "product_category"), size)
@@ -885,7 +884,7 @@ class RealisticTextGenerator:
             labels = np.array([PRODUCT_FAMILIES[k].label for k in keys], dtype=object)
             return labels[self.rng.choice(len(keys), size=size, p=w)]
         if semantic == "caption":
-            return self._generate_caption(size=size, table_data=table_data)
+            return self._textkit("caption", size, table_data)
         if semantic == "comment_body":
             return self._generate_comment_body(size=size)
         if semantic == "restaurant_name":
@@ -957,8 +956,7 @@ class RealisticTextGenerator:
             from misata.vocab_seeds import SURGE_REASONS
             return self.rng.choice(SURGE_REASONS, size=size)
         if semantic == "cancellation_reason":
-            from misata.vocab_seeds import CANCELLATION_REASONS
-            return self.rng.choice(CANCELLATION_REASONS, size=size)
+            return self._textkit("cancel", size, table_data)
         if semantic == "med_frequency":
             from misata.vocab_seeds import MED_FREQUENCIES
             return self.rng.choice(MED_FREQUENCIES, size=size)
@@ -971,27 +969,33 @@ class RealisticTextGenerator:
             from misata.scenarios import render_ticket_resolutions
             return render_ticket_resolutions(self.rng, self._ticket_frame(table_name, size, table_data))
         if semantic in ("transaction_memo", "statement_descriptor", "transaction_description"):
-            return self.microtext.transaction_memos(size)
+            return self._textkit("memo", size, table_data)
         if semantic in ("error_message", "log_message", "exception_message"):
             return self.microtext.error_messages(size, context=_prose_context(table_data, size))
         if semantic in ("clinical_notes", "doctor_notes", "progress_notes"):
-            return self.microtext.clinical_notes(size, "clinical_notes")
+            return self._textkit("clinical", size, table_data)
         if semantic == "chief_complaint":
-            return self.microtext.clinical_notes(size, "chief_complaint")
+            return self._textkit("complaint", size, table_data)
         if semantic in ("discharge_instructions", "discharge_summary"):
-            return self.microtext.clinical_notes(size, "discharge_instructions")
+            return self._textkit("discharge", size, table_data)
         if semantic in ("delivery_instructions", "shipping_notes", "dropoff_instructions"):
-            return self.microtext.delivery_instructions(size)
+            return self._textkit("delivery", size, table_data)
         if semantic in ("return_reason", "refund_reason"):
-            return self.microtext.return_reasons(size)
+            return self._textkit("return", size, table_data)
         if semantic == "churn_reason":
-            return self.microtext.churn_reasons(size)
+            return self._textkit("churn", size, table_data)
         if semantic in ("audit_reason", "override_reason"):
-            return self.microtext.audit_reasons(size)
+            return self._textkit("audit", size, table_data)
         if semantic in ("customer_feedback", "feedback", "survey_response"):
-            return self.microtext.customer_feedback(size, ratings=self._ratings_from(table_data, size))
+            return self._textkit("feedback", size, table_data)
+        if semantic == "post_title":
+            return self._textkit("post_title", size, table_data)
+        if semantic == "post_body":
+            return self._textkit("post_body", size, table_data)
+        if semantic == "email_subject":
+            return self._textkit("email_subject", size, table_data)
         if semantic in ("note", "notes", "sentence"):
-            return self.microtext.notes(size)
+            return self._textkit("note", size, table_data)
 
         # Unknown semantic token from the caller (LLMs invent text_types like
         # "make" or "model"): re-infer from the column name before falling
@@ -1224,6 +1228,12 @@ class RealisticTextGenerator:
             return "city"
         if "job" in name or "role" in name or "occupation" in name or "designation" in name:
             return "job_title"
+        if name in ("title", "headline", "post_title", "article_title", "blog_title") and any(
+                h in table for h in _POST_TABLE_HINTS):
+            return "post_title"
+        if name in ("subject", "email_subject", "subject_line") and any(
+                h in table for h in ("email", "message", "inbox", "mail", "newsletter", "campaign")):
+            return "email_subject"
         if "title" in name:
             # Only a person's title is a job. A listing's, post's or course's
             # title is the thing's name.
@@ -1384,12 +1394,17 @@ class RealisticTextGenerator:
             return "bio"
         if name == "caption":
             return "caption"
-        if name in ("body", "description", "summary"):
+        if name in ("body", "description", "summary", "content", "text", "excerpt"):
             if "ticket" in table or "issue" in table or "support" in table:
                 return "ticket_body"
             if "transaction" in table or "payment" in table or "billing" in table:
                 return "transaction_memo"
-            return "product_description"
+            if any(h in table for h in _POST_TABLE_HINTS):
+                return "post_body"
+            if any(h in table for h in ("product", "item", "listing", "catalog", "sku", "inventory",
+                                        "merchandise", "offer")):
+                return "product_description"
+            return "notes"
         # Last resort before assuming this is free-text prose: an unrecognised
         # column name ("geo_group") is far more often a short descriptor on a
         # table whose own name already says its topic than it is a genuine
@@ -1498,6 +1513,7 @@ class RealisticTextGenerator:
             names = list(pc["name"])[:size]
             if len({n for n in names[:500] if n}) >= 5:
                 ctx["subject"] = [subject_from_name(n) if n else "" for n in names]
+                ctx.update(_product_review_slots(self.rng, names, pc.get("category"), size))
         return ctx
 
     def _generate_email_body(self, *, size: int) -> np.ndarray:
@@ -1717,6 +1733,32 @@ class RealisticTextGenerator:
         frame = self._product_frame(table_name, size, table_data)
         names = self._row_values(table_data, ("product_name", "name", "title", "item_name"), size)
         return render_product_descriptions(self.rng, frame, names=names)
+
+    def _textkit(self, kind: str, size: int, table_data) -> np.ndarray:
+        """Free text of ``kind`` from :mod:`misata.textkit`, reading the row's
+        own score, job, city, company and names where the table has them."""
+        from misata import textkit
+        ctx = {}
+        for slot, cols in (("job_title", ("job_title", "title", "role", "occupation")),
+                           ("city", ("city", "location", "home_city")),
+                           ("company", ("company", "company_name", "employer")),
+                           ("fname", ("first_name",)), ("lname", ("last_name",)),
+                           ("plan", ("plan", "plan_name", "tier"))):
+            vals = self._row_values(table_data, cols, size)
+            if vals is not None:
+                ctx[slot] = vals
+        ratings = None
+        if kind == "feedback":
+            ratings = self._ratings_from(table_data, size)
+            if ratings is None:
+                nps = self._row_values(table_data, ("nps", "nps_score", "satisfaction", "csat"), size)
+                if nps is not None:
+                    ratings = pd.to_numeric(pd.Series(nps), errors="coerce").values
+        pc = self.parent_context or {}
+        if pc.get("name") is not None:
+            from misata.scenarios import subject_from_name
+            ctx["item"] = [subject_from_name(n) if n else "" for n in list(pc["name"])[:size]]
+        return textkit.render(kind, self.rng, size, ratings=ratings, context=ctx)
 
     def _user_vocab(self, name: str) -> Optional[list]:
         """Capsule vocabulary someone actually supplied, else None.
@@ -2584,6 +2626,33 @@ _SUBJECT_COLS = ("product_name", "product", "item_name", "item", "model",
                  "plan_name", "listing_title", "course_name", "merchant_name")
 _AGENT_COLS = ("agent_name", "agent", "support_agent", "representative", "rep_name",
                "employee_name", "handled_by", "assigned_to", "staff_name")
+
+
+def _product_review_slots(rng, names, categories, size: int) -> dict:
+    """A use, material and feature of each row's own product, from its
+    family, so a review of a rain jacket talks about rainy commutes and a
+    two-way zip rather than about "the item"."""
+    from misata.scenarios import (PRODUCT_FAMILIES, _fill, _noun_from_name, eligible,
+                                  family_for_category)
+    cats = list(categories)[:size] if categories is not None else [None] * size
+    uses, mats, feats, fams = [], [], [], []
+    for name, cat in zip(list(names)[:size], cats):
+        fam = family_for_category(cat) if cat is not None else None
+        noun = _noun_from_name(name).title() if name else ""
+        if fam is None:
+            fam = next((k for k, F in PRODUCT_FAMILIES.items()
+                        if any(n.lower() == noun.lower() for n in F.nouns)), None)
+        _f = {"footwear": "clothing", "furniture": "home", "health": "beauty", "baby": "toys"}
+        fams.append(_f.get(fam, fam) if fam else "")
+        if fam is None or not name:
+            uses.append(""); mats.append(""); feats.append("")
+            continue
+        F = PRODUCT_FAMILIES[fam]
+        pick = lambda pool: pool[int(rng.integers(len(pool)))] if pool else ""  # noqa: E731
+        uses.append(pick(eligible(F.uses, noun)))
+        mats.append(pick(eligible(F.materials, noun)))
+        feats.append(_fill(pick(eligible(F.features, noun)) or "", rng, {}))
+    return {"use": uses, "material": mats, "feature": feats, "family": fams}
 
 
 def _prose_context(df, size: int) -> dict:

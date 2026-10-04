@@ -425,6 +425,13 @@ def _text_sample(s: pd.Series) -> Optional[List[str]]:
     v = v[v.str.strip() != ""]
     if len(v) < 200:
         return None
+    # Codes and statement descriptors ("TESCO STORES #4412 LEEDS") are not
+    # prose: mostly upper-case letters means a machine format, judged by the
+    # diversity check instead.
+    letters = "".join(v.head(300).tolist())
+    alpha = [c for c in letters if c.isalpha()]
+    if alpha and sum(c.isupper() for c in alpha) / len(alpha) > 0.6:
+        return None
     if len(v) > _TEXT_SAMPLE:
         v = v.sample(_TEXT_SAMPLE, random_state=0)
     return v.tolist()

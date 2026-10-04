@@ -3101,6 +3101,11 @@ class DataSimulator:
                 "url":      (self.text_gen.url,       "text_url"),
             }
             gen_fn, pool_key = _LEGACY_GEN_MAP.get(text_type, (_note_fn, "text_sentence"))
+            if gen_fn is _note_fn:
+                # Free-text fallback: the notes grammar, drawn per row rather
+                # than from a fixed pool that repeats once the table outgrows it.
+                from misata import textkit
+                return textkit.render("note", self.rng, size)
             if pool_key not in self._text_pools:
                 self._text_pools[pool_key] = np.array([gen_fn() for _ in range(_pool_size)])
             elif len(self._text_pools[pool_key]) < size:

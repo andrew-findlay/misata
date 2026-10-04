@@ -190,7 +190,9 @@ class TestDeclaredTextTypes:
         ("transaction_memo", ["*", "ACH", "WIRE", "STORE", "INC", "MKT", "AIR"]),
         ("error_message", ["Error", "HTTP", "Exception", "Timeout", "Denied", "Constraint"]),
         ("delivery_instructions", ["porch", "gate", "door", "package", "lobby", "desk"]),
-        ("return_reason", ["damaged", "size", "defective", "mistake", "parts", "price"]),
+        ("return_reason", ["damaged", "size", "defective", "mistake", "parts", "price", "small", "big",
+                           "fit", "faulty", "wrong", "broke", "late", "pictured", "described", "quality",
+                           "colour", "gift", "needed", "suit"]),
         ("churn_reason", ["competitor", "budget", "platform", "price", "support", "adoption"]),
         ("audit_reason", ["compliance", "soc2", "audit", "override", "review", "verification"]),
     ])
@@ -257,4 +259,7 @@ class TestEnrichTextAPI:
         assert hasattr(misata, "enrich_text")
         res = misata.enrich_text(pd.Series([""] * 5), text_type="churn_reason", seed=10)
         assert len(res) == 5
-        assert all(r in CHURN_REASONS for r in res)
+        # Churn reasons are composed now, not drawn from the old list; each still
+        # names a reason a customer gives.
+        assert all(isinstance(r, str) and len(r) > 5 for r in res)
+        assert CHURN_REASONS  # the legacy list remains importable
