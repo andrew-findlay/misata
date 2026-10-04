@@ -804,7 +804,7 @@ _RULES: Dict[str, list] = {
              "((Signed|Countersigned|Final)) ((contract|NDA|SOW)) - {company}((| - {date}))",
              "{n} ((spots|seats|tickets)) left for ((the {month} workshop|Thursday's webinar|our {city} meetup))",
              "((Notes|Feedback|Thoughts)) on {fname}'s ((draft|proposal|deck|plan))((| - {date}))",
-             "{company} x {company_u}: ((next steps|kick-off|contract|pilot results))",
+             "{company}: ((next steps|kick-off|contract|pilot results))((| - {date}| for {fname}))",
              "((Can you|Could you|Mind if I)) ((review|sign off|look over|check)) the {es_topic}((?| by {weekday}?| today?))",
              "((Updated|New|Revised)) ((times|dates|plan)) for ((the {city} trip|{month} offsite|the {weekday} workshop))",
              "((Your|Re: your)) ((parcel|booking|refund|appointment)) ((is on its way|is confirmed|has been processed|on {date}))",
@@ -869,7 +869,7 @@ _RULES: Dict[str, list] = {
     "bio_loc": ["((Somewhere|Usually|Mostly)) ((in|around|near)) {city}",
              "{city} ((local|resident|regular))",
              "((Calling|Writing|Working)) from {city}",
-             "{citytag} ((bound|lifer|transplant))",
+             "{city} ((lifer|transplant|for life))",
              "{city}", "Based in {city}", "{city2} → {city}", "📍 {city}", "{city}-based", "Living in {city}[[ with {pet}]]", "{city} ((born and bred|for now|since {since_year}|for {k} years))", "((Happily|Proudly|Reluctantly)) in {city}"],
     "bio_int": ["((Weekends|Evenings|Sundays)): {int1}((| and {int2}))",
              "{int_cap} ((convert|evangelist|devotee|apprentice))",
@@ -899,7 +899,7 @@ _RULES: Dict[str, list] = {
     "bio_hist": ["{n} years at {company}",
              "Alumni of {company}",
              "Once a {prev_short}, always a {prev_short}",
-             "Previously at {company} and {company_u}",
+             "Previously at {company}",
              "{field} nerd since {since_year}",
              "Ex-{prev_short}", "{n} years in {field}", "((Previously|Formerly|Before that)) {prev}", "Former {prev_short}", "{field} ((since|from)) {since_year}", "Recovering {prev_short}", "((Started|Began)) in {field}", "{prev_short} ((in a past life|once upon a time|in another life))"],
     "bio_learn": ["Currently reading about {field}",
@@ -1702,7 +1702,8 @@ def render(kind: str, rng: np.random.Generator, size: int, *,
         out = vary(out, rng, reg or "casual", rate=0.5, short=True) if reg else out
     elif kind == "bio":
         # the job title is the row's own value: never paraphrase inside it
-        out = vary_keeping(out, [sl.get("job_given", "") for sl in slots], rng, reg, styles=False)
+        out = vary_keeping(out, [(sl.get("job_given", ""), sl.get("city", ""), sl.get("city2", ""),
+                                  sl.get("company", "")) for sl in slots], rng, reg, styles=False)
     elif reg:
         sentences = kind in ("feedback", "note", "clinical")
         out = vary(out, rng, reg, styles=sentences)

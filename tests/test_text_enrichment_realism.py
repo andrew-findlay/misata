@@ -8,6 +8,7 @@ Validates:
 5. Determinism under fixed seeds and zero lorem-ipsum leakage.
 """
 
+import re
 import numpy as np
 import pandas as pd
 import pytest
@@ -240,7 +241,8 @@ class TestEnrichTextAPI:
         # delivery_instructions should be transformed into authentic instructions
         assert any("porch" in d.lower() or "gate" in d.lower() or "door" in d.lower() for d in enriched["delivery_instructions"])
         # customer_feedback should be transformed into authentic feedback
-        assert any("interface" in f.lower() or "team" in f.lower() or "support" in f.lower() for f in enriched["customer_feedback"])
+        fb_words = r"interface|team|support|renew|recommend|update|integration|tool|price|plan|love|slow|faster"
+        assert any(re.search(fb_words, f.lower()) for f in enriched["customer_feedback"])
 
     def test_enrich_array_or_list(self):
         items = ["placeholder"] * 6

@@ -580,7 +580,9 @@ def _terse(t: str, nxt) -> str:
     t = _TERSE_DROP.sub("", t)
     for pat, opts in _TERSE_SUBS:
         t = pat.sub(lambda m: opts[int(nxt() * len(opts)) % len(opts)], t)
-    t = t.replace(". ", ", " if nxt() < 0.4 else ". ")
+    if nxt() < 0.4:
+        # joined with commas, the next word is mid-sentence (keep "I" and acronyms)
+        t = re.sub(r"\. ([A-Z])([a-z])", lambda m: ", " + m.group(1).lower() + m.group(2), t)
     if nxt() < 0.6:
         t = t.lower()
     return t.rstrip(".")
@@ -766,13 +768,14 @@ def _fix_articles(t: str) -> str:
     return _ARTICLE.sub(fix, t)
 
 
-def vary_keeping(texts: Sequence[str], keep: Sequence[str], rng: np.random.Generator,
+def vary_keeping(texts: Sequence[str], keep: Sequence, rng: np.random.Generator,
                  register: str = "casual", **kwargs) -> List[str]:
-    """``vary`` that leaves each row's ``keep`` phrase (a product noun, a job
-    title) exactly as written, in whatever case it appears."""
+    """``vary`` that leaves each row's ``keep`` phrase or phrases (a product
+    noun, a job title, a city) exactly as written, in whatever case."""
     held, found_all = [], []
     for t, k in zip(texts, keep):
-        found = re.findall(re.escape(k), t, re.I) if k else []
+        ks = [x for x in ([k] if isinstance(k, str) else list(k or [])) if x]
+        found = re.findall("|".join(re.escape(x) for x in sorted(ks, key=len, reverse=True)), t, re.I) if ks else []
         for j, f in enumerate(found[:8]):
             t = t.replace(f, chr(j + 1), 1)
         held.append(t)
