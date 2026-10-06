@@ -10,7 +10,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import click
 import numpy as np
@@ -132,6 +132,7 @@ def _generate_tables_to_csv(
     smart: bool,
     smart_no_llm: bool,
     batch_size: int,
+    output_format: str = "csv",
 ) -> Dict[str, int]:
     console.print("\n⚙️  Initializing simulator...")
     simulator = DataSimulator(
@@ -146,6 +147,9 @@ def _generate_tables_to_csv(
     os.makedirs(output_dir, exist_ok=True)
     files_created = set()
     table_rows: Dict[str, int] = {}
+    # Parquet cannot be appended to, so its batches are held and written once
+    # per table. CSV streams batch by batch as it always has.
+    parquet_batches: Dict[str, List[pd.DataFrame]] = {}
 
     with Progress(
         SpinnerColumn(),
@@ -156,16 +160,22 @@ def _generate_tables_to_csv(
         task = progress.add_task("Generating data...", total=None)
 
         for table_name, batch_df in simulator.generate_all():
-            output_path = os.path.join(output_dir, f"{table_name}.csv")
-            mode = "a" if table_name in files_created else "w"
-            header = table_name not in files_created
-
-            batch_df.to_csv(output_path, mode=mode, header=header, index=False)
-            files_created.add(table_name)
+            if output_format == "parquet":
+                parquet_batches.setdefault(table_name, []).append(batch_df)
+            else:
+                output_path = os.path.join(output_dir, f"{table_name}.csv")
+                mode = "a" if table_name in files_created else "w"
+                header = table_name not in files_created
+                batch_df.to_csv(output_path, mode=mode, header=header, index=False)
+                files_created.add(table_name)
 
             generated_rows = len(batch_df)
             table_rows[table_name] = table_rows.get(table_name, 0) + generated_rows
             progress.update(task, advance=generated_rows, description=f"Generating {table_name}...")
+
+    for table_name, batches in parquet_batches.items():
+        frame = batches[0] if len(batches) == 1 else pd.concat(batches, ignore_index=True)
+        frame.to_parquet(os.path.join(output_dir, f"{table_name}.parquet"), index=False)
 
     console.print("\n" + "=" * 70)
     console.print(simulator.get_summary())
@@ -287,6 +297,16 @@ def init(db: Optional[str], story: Optional[str], output: str,
     help="Output directory for CSV files (default: ./generated_data)",
 )
 @click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["csv", "parquet"]),
+    default="csv",
+    show_default=True,
+    help="File format for each table. Parquet keeps column types (timestamps, "
+         "booleans, 64-bit integers) that a CSV reader has to guess, and needs "
+         "the [parquet] extra.",
+)
+@click.option(
     "--rows",
     "-n",
     type=int,
@@ -405,6 +425,7 @@ def generate(
     locale: Optional[str],
     oracle: bool,
     capsule: Optional[str],
+    output_format: str = "csv",
 ) -> None:
     """
     Generate synthetic data from a story or configuration file.
@@ -626,6 +647,7 @@ def generate(
         smart=smart,
         smart_no_llm=smart_no_llm,
         batch_size=batch_size,
+        output_format=output_format,
     )
 
     elapsed = time.time() - start_time
@@ -643,7 +665,9 @@ def generate(
     if oracle:
         output_path = Path(output_dir)
         tables = {
-            table_name: pd.read_csv(output_path / f"{table_name}.csv")
+            table_name: (pd.read_parquet(output_path / f"{table_name}.parquet")
+                         if output_format == "parquet"
+                         else pd.read_csv(output_path / f"{table_name}.csv"))
             for table_name in table_rows
         }
         oracle_payload = build_oracle_report(

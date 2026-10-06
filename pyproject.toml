@@ -105,6 +105,9 @@ dev = [
 db = [
     "psycopg[binary]>=3.1.0",
 ]
+parquet = [
+    "pyarrow>=14.0.0",
+]
 orm = [
     "sqlalchemy>=2.0.0",
 ]

@@ -110,6 +110,35 @@ class TestCLIGenerate:
                 assert oracle["misata_report"] == "oracle"
                 assert "guarantees" in oracle
 
+    def test_generate_parquet_keeps_types_and_matches_csv(self, runner, tmp_path):
+        """--format parquet writes one file per table with the same rows the CSV
+        path writes, and keeps the column types a CSV reader has to guess."""
+        pytest.importorskip("pyarrow")
+        config = tmp_path / "misata.yaml"
+        config.write_text(
+            "name: fmt\nseed: 7\ntables:\n"
+            "  accounts:\n    rows: 50\n    columns:\n"
+            "      id: {type: int, unique: true, min: 1, max: 50}\n"
+            "      big: {type: int, min: 4000000000, max: 9000000000}\n"
+            "      active: {type: boolean}\n"
+            "      created_at: {type: datetime, start: '2024-01-01', end: '2024-12-31'}\n"
+        )
+        out_csv, out_pq = tmp_path / "csv", tmp_path / "pq"
+        for out, fmt in ((out_csv, "csv"), (out_pq, "parquet")):
+            result = runner.invoke(generate, [
+                "--config", str(config), "--output-dir", str(out), "--format", fmt])
+            assert result.exit_code == 0, result.output
+
+        import pandas as pd
+        frame = pd.read_parquet(out_pq / "accounts.parquet")
+        assert not (out_pq / "accounts.csv").exists()
+        assert len(frame) == 50
+        assert str(frame["big"].dtype) == "int64"
+        assert str(frame["active"].dtype) == "bool"
+        assert str(frame["created_at"].dtype).startswith("datetime64")
+        from_csv = pd.read_csv(out_csv / "accounts.csv")
+        assert list(frame["id"]) == list(from_csv["id"])
+
     def test_generate_with_db_url_sqlite(self, runner):
         """Test generate with db-url seeds SQLite."""
         with tempfile.TemporaryDirectory() as tmpdir:
