@@ -3457,6 +3457,12 @@ class DataSimulator:
             # (e.g. cap daily hours), and any formula derived from it (billed = hours * rate)
             # must reflect the constrained value, not the pre-constraint one. Formulas are
             # idempotent, so re-running is safe when nothing changed.
+            #
+            # The panel's columns are re-asserted first. The passes since the first
+            # stamp -- causality, the realism time-chain sort -- may have moved a
+            # panel date, and a formula reading it would carry the moved value out
+            # while the stamp at the end put the column itself back.
+            df_batch = self._apply_panel_index(df_batch, panel_plan, rows_generated)
             df_batch = self._run_pass("formulas", table_name, rows_generated,
                                       self._apply_formula_columns, df_batch, table_name)
 
