@@ -332,6 +332,13 @@ def _check_min_children(config: Any) -> List[Conflict]:
         n = int(getattr(rel, "min_children", 0) or 0)
         if n <= 0:
             continue
+        # A filtered relationship covers only the parents its filters match,
+        # and how many that is depends on values not generated yet -- a plan
+        # drawn by formula, a status the lifecycle decides. Counting every
+        # parent refuses a schema whose real demand fits easily: 400 contracts
+        # over the ~470 enterprise accounts among 16,000.
+        if getattr(rel, "filters", None):
+            continue
         parents = _row_count(config, rel.parent_table)
         children = _row_count(config, rel.child_table)
         if not parents or not children:

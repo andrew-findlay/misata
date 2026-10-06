@@ -254,6 +254,37 @@ class TestStructural:
         m = str(e.value)
         assert "300" in m and "120" in m
 
+    def test_min_children_is_not_judged_over_filtered_parents(self):
+        """Filters restrict the parents a child covers, and which parents match
+        is only known once they are generated -- so the static check cannot
+        count them and must not refuse on the unfiltered total."""
+        s = SchemaConfig(
+            name="cover",
+            tables=[Table(name="orders", row_count=100),
+                    Table(name="items", row_count=20)],
+            columns={
+                "orders": [
+                    Column(name="order_id", type="int", unique=True,
+                           distribution_params={"min": 1, "max": 100}),
+                    Column(name="tier", type="categorical",
+                           distribution_params={"choices": ["gold", "basic"],
+                                                "probabilities": [0.1, 0.9]}),
+                ],
+                "items": [
+                    Column(name="item_id", type="int", unique=True,
+                           distribution_params={"min": 1, "max": 20}),
+                    Column(name="order_id", type="foreign_key",
+                           distribution_params={"references": "orders.order_id"}),
+                ],
+            },
+            relationships=[Relationship(
+                parent_table="orders", child_table="items",
+                parent_key="order_id", child_key="order_id", min_children=1,
+                filters={"tier": "gold"})],
+            seed=5,
+        )
+        check_feasibility(s)
+
     def test_lifecycle_weight_on_unreachable_state_is_refused(self):
         s = _base()
         s.lifecycles = [Lifecycle(
