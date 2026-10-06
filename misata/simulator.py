@@ -5935,6 +5935,11 @@ class DataSimulator:
             for rel in self.config.relationships
             if rel.child_table == table_name
         }
+        pk_mappings = {
+            rel.parent_table: rel.parent_key
+            for rel in self.config.relationships
+            if rel.child_table == table_name
+        }
 
         for col in formula_cols:
             spec = col.distribution_params.get("aggregate")
@@ -5946,7 +5951,8 @@ class DataSimulator:
                 continue
             formula = col.distribution_params["formula"]
             try:
-                result = engine.evaluate_with_lookups(df, formula, fk_mappings=fk_mappings)
+                result = engine.evaluate_with_lookups(
+                    df, formula, fk_mappings=fk_mappings, pk_mappings=pk_mappings)
                 df[col.name] = result
             except (ValueError, ImportError) as e:
                 warnings.warn(f"Formula column '{col.name}' skipped: {e}")

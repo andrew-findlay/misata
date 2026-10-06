@@ -253,9 +253,11 @@ class FormulaEngine:
         df: pd.DataFrame,
         formula: str,
         fk_mappings: Optional[Dict[str, str]] = None,
+        pk_mappings: Optional[Dict[str, str]] = None,
     ) -> tuple[str, Dict[str, np.ndarray]]:
         """Resolve cross-table refs and return names to inject into evaluation."""
         fk_mappings = fk_mappings or {}
+        pk_mappings = pk_mappings or {}
         pattern = r'@(\w+)\.(\w+)'
         matches = re.findall(pattern, formula)
 
@@ -277,7 +279,13 @@ class FormulaEngine:
             # `<singular>_id` / `<table>_id`, then a lone `id`.
             singular = table_name[:-1] if table_name.endswith("s") else table_name
             parent_key = None
-            for cand in (f"{singular}_id", f"{table_name}_id", "id"):
+            # The relationship names the key outright; guessing from the table's
+            # name is for formulas written without one. `icebreaker_engagements`
+            # keys on `engagement_id`, which no guess from the name finds.
+            declared_key = pk_mappings.get(table_name)
+            if declared_key and declared_key in ref_table.columns:
+                parent_key = declared_key
+            for cand in (() if parent_key else (f"{singular}_id", f"{table_name}_id", "id")):
                 if cand in ref_table.columns:
                     parent_key = cand
                     break
@@ -362,6 +370,7 @@ class FormulaEngine:
         df: pd.DataFrame,
         formula: str,
         fk_mappings: Optional[Dict[str, str]] = None,
+        pk_mappings: Optional[Dict[str, str]] = None,
     ) -> np.ndarray:
         """
         Evaluate formula with automatic cross-table lookups.
@@ -379,7 +388,7 @@ class FormulaEngine:
         fk_mappings = fk_mappings or {}
 
         # Pattern to match @table.column
-        result, lookup_names = self._prepare_formula_context(df, formula, fk_mappings)
+        result, lookup_names = self._prepare_formula_context(df, formula, fk_mappings, pk_mappings)
         names = {
             'np': SafeNumpy(),
             'pd': pd,
