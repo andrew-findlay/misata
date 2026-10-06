@@ -5980,6 +5980,19 @@ class DataSimulator:
 
         src_keys = [key(source, m[1]) for m in match]
         tgt_keys = [key(df, m[0]) for m in match]
+        # Integer choices are carried through the engine as text, and typed
+        # again only when written, so a numeric key can meet its own text
+        # twin. Compared as they stand they match nothing; say so loudly.
+        for i, (a, b) in enumerate(zip(tgt_keys, src_keys)):
+            ka, kb = np.asarray(a).dtype.kind, np.asarray(b).dtype.kind
+            if (ka in "iuf") != (kb in "iuf") and "M" not in (ka, kb):
+                numeric = lambda x: pd.to_numeric(pd.Series(x), errors="coerce").to_numpy()
+                a2, b2 = numeric(a), numeric(b)
+                if np.isnan(b2.astype("float64")).any() or np.isnan(a2.astype("float64")).any():
+                    raise ValueError(
+                        f"aggregate key {i} is numeric on one side and text that is not "
+                        f"numeric on the other ({match[i][0]!r} vs {match[i][1]!r})")
+                tgt_keys[i], src_keys[i] = a2, b2
         frame = pd.DataFrame({f"k{i}": k for i, k in enumerate(src_keys)})
         column = spec.get("column")
         if op == "count" and not column:
