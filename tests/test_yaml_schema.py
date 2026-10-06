@@ -6,6 +6,7 @@ relationship arrow shorthand.
 import tempfile
 from pathlib import Path
 
+import pytest
 import yaml
 
 from misata.yaml_schema import load_yaml_schema, save_yaml_schema, MISATA_YAML_TEMPLATE
@@ -561,3 +562,53 @@ def test_relationship_filters_restrict_the_parent_pool():
     tier = dict(zip(out["accounts"]["account_id"], out["accounts"]["tier"]))
     referenced = {tier.get(a) for a in out["customers"]["account_id"]}
     assert referenced == {"self_serve"}, f"filter leaked: {referenced}"
+
+
+_INLINE_YAML = """
+name: inline
+seed: 3
+tables:
+  plans:
+    columns:
+      plan_id: {type: text}
+      price_pence: {type: int}
+      is_self_serve: {type: boolean}
+    inline_data:
+      - {plan_id: free, price_pence: 0, is_self_serve: true}
+      - {plan_id: starter, price_pence: 1200, is_self_serve: true}
+      - {plan_id: enterprise, price_pence: 4500, is_self_serve: false}
+  accounts:
+    rows: 40
+    columns:
+      account_id: {type: int, unique: true, min: 1, max: 40}
+      plan_id: {type: foreign_key}
+relationships:
+  - {parent_table: plans, parent_key: plan_id, child_table: accounts, child_key: plan_id}
+"""
+
+
+def test_inline_data_survives_the_yaml_loader(tmp_path):
+    """The engine has always written `inline_data` verbatim; the YAML loader
+    dropped it, so a declared lookup table came back as random rows."""
+    import misata
+
+    path = tmp_path / "misata.yaml"
+    path.write_text(_INLINE_YAML)
+    config = misata.load_yaml_schema(path)
+    plans = config.get_table("plans")
+    assert plans.is_reference and plans.row_count == 3
+
+    out = misata.generate_from_schema(config)
+    assert out["plans"].to_dict("records") == [
+        {"plan_id": "free", "price_pence": 0, "is_self_serve": True},
+        {"plan_id": "starter", "price_pence": 1200, "is_self_serve": True},
+        {"plan_id": "enterprise", "price_pence": 4500, "is_self_serve": False},
+    ]
+    assert set(out["accounts"]["plan_id"]) <= {"free", "starter", "enterprise"}
+
+
+def test_inline_rows_must_match_the_declared_columns(tmp_path):
+    path = tmp_path / "misata.yaml"
+    path.write_text(_INLINE_YAML.replace("is_self_serve: false}", "is_self_serv: false}"))
+    with pytest.raises(ValueError, match="row 2 does not match"):
+        load_yaml_schema(path)

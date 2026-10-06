@@ -483,6 +483,31 @@ def _parse_rate_curve(raw: Dict[str, Any]) -> RateCurve:
 # Public API
 # ---------------------------------------------------------------------------
 
+def _check_inline_data(table_name: str, rows: Any,
+                       col_defs: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Validate a table's ``inline_data`` and order it by its declared columns.
+
+    Columns are optional alongside inline rows, but when they are declared
+    they are the contract: every row must carry exactly those keys. A typo in
+    one row would otherwise add a column that is null everywhere else.
+    """
+    if not isinstance(rows, list) or not rows or not all(isinstance(r, dict) for r in rows):
+        raise ValueError(
+            f"Table {table_name!r}: inline_data must be a non-empty list of rows, "
+            f"each a mapping of column to value.")
+    declared = list(col_defs)
+    if not declared:
+        return rows
+    for i, row in enumerate(rows):
+        missing, extra = set(declared) - set(row), set(row) - set(declared)
+        if missing or extra:
+            raise ValueError(
+                f"Table {table_name!r}: inline_data row {i} does not match the "
+                f"declared columns (missing {sorted(missing)}, undeclared "
+                f"{sorted(extra)}).")
+    return [{c: row[c] for c in declared} for row in rows]
+
+
 def load_yaml_schema(
     path: Union[str, Path],
     rows: int = 1000,
@@ -526,8 +551,19 @@ def load_yaml_schema(
         t_rows = int(tdef.get("rows", default_rows))
         t_desc = tdef.get("description")
         t_scd2 = SCD2Config(**tdef["scd2"]) if isinstance(tdef.get("scd2"), dict) else None
+        # Exact rows for a lookup table. The engine has always honoured these,
+        # and this loader dropped both keys, so a declared reference table came
+        # back as random rows of the right shape. The rows ARE the table: their
+        # count is the row count, and declaring `inline_data` makes it a
+        # reference table whether or not `is_reference` says so.
+        t_inline = tdef.get("inline_data")
+        if t_inline is not None:
+            t_inline = _check_inline_data(table_name, t_inline, tdef.get("columns") or {})
+            t_rows = len(t_inline)
         tables.append(Table(name=table_name, row_count=t_rows,
-                            description=t_desc, scd2=t_scd2))
+                            description=t_desc, scd2=t_scd2,
+                            is_reference=bool(tdef.get("is_reference") or t_inline),
+                            inline_data=t_inline))
 
         col_defs: Dict[str, Any] = tdef.get("columns", {})
         columns_map[table_name] = [
