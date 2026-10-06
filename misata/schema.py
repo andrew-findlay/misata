@@ -650,6 +650,49 @@ class Missingness(BaseModel):
     description: Optional[str] = None
 
 
+class WindowColumn(BaseModel):
+    """A column computed over a finished table, in the order its rows would sort.
+
+    A running balance, a row number, the first date an account did something:
+    each needs the whole table, grouped and ordered, and none is a value a row
+    can draw for itself.
+
+    Example, a ledger's running balance per account and its global sequence::
+
+        WindowColumn(table="ledger", column="balance_after", op="cumsum",
+                     of="credits_delta", partition_by=["account_id"],
+                     order_by=["account_id", "at", "type_rank"])
+        WindowColumn(table="ledger", column="seq", op="row_number",
+                     order_by=["account_id", "at", "type_rank"])
+
+    Attributes:
+        table, column: The column written. It is declared on the table; this
+            overwrites what generation drew for it.
+        op: ``row_number`` (1 within the partition, in order), ``cumsum``
+            (running sum of ``of``, in order), or ``sum``/``min``/``max``/
+            ``mean``/``count`` (the group's value, on every row of the group).
+        of: The column aggregated. Not needed for ``row_number`` or ``count``.
+        partition_by: Columns defining the groups. Empty is one group.
+        order_by: Columns giving the order; ties keep generation order.
+    """
+
+    table: str
+    column: str
+    op: Literal["row_number", "cumsum", "sum", "min", "max", "mean", "count"]
+    of: Optional[str] = None
+    partition_by: List[str] = Field(default_factory=list)
+    order_by: List[str] = Field(default_factory=list)
+    description: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _needs_a_subject(self) -> "WindowColumn":
+        if self.op in ("cumsum", "sum", "min", "max", "mean") and not self.of:
+            raise ValueError(f"window op {self.op!r} needs `of`, the column it aggregates")
+        if self.op in ("row_number", "cumsum") and not self.order_by:
+            raise ValueError(f"window op {self.op!r} needs `order_by`")
+        return self
+
+
 class LateArrival(BaseModel):
     """Declare that some events land after the fact.
 
@@ -1664,6 +1707,7 @@ class SchemaConfig(BaseModel):
     lifecycles: List[Lifecycle] = Field(default_factory=list)
     retention: List[CohortRetention] = Field(default_factory=list)
     missingness: List[Missingness] = Field(default_factory=list)
+    windows: List[WindowColumn] = Field(default_factory=list)
     late_arrivals: List[LateArrival] = Field(default_factory=list)
     time_grids: List[TimeGrid] = Field(default_factory=list)
     duplicates: List[Duplicates] = Field(default_factory=list)

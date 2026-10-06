@@ -1340,6 +1340,56 @@
         ],
         "additionalProperties": false
       }
+    },
+    "windows": {
+      "type": "array",
+      "description": "Columns computed over a finished table: running sums, row numbers, group aggregates.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "table",
+          "column",
+          "op"
+        ],
+        "properties": {
+          "table": {
+            "type": "string"
+          },
+          "column": {
+            "type": "string"
+          },
+          "op": {
+            "enum": [
+              "row_number",
+              "cumsum",
+              "sum",
+              "min",
+              "max",
+              "mean",
+              "count"
+            ]
+          },
+          "of": {
+            "type": "string"
+          },
+          "partition_by": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "order_by": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
     }
   },
   "$defs": {

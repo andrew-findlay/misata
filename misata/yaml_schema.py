@@ -636,11 +636,12 @@ def load_yaml_schema(
     from misata.schema import (Bitemporal, CohortRetention, DagEdges,
                                Duplicates, EventLog, LateArrival, Lifecycle,
                                Missingness, Outliers, TimeGrid,
-                               TransitiveClosure, Typos)
+                               TransitiveClosure, Typos, WindowColumn)
     _declared: Dict[str, List[Any]] = {}
     for key, model in (("lifecycles", Lifecycle),
                        ("retention", CohortRetention),
                        ("missingness", Missingness),
+                       ("windows", WindowColumn),
                        ("late_arrivals", LateArrival),
                        ("time_grids", TimeGrid),
                        ("duplicates", Duplicates),
@@ -693,6 +694,7 @@ def load_yaml_schema(
         lifecycles=_declared["lifecycles"],
         retention=_declared["retention"],
         missingness=_declared["missingness"],
+        windows=_declared["windows"],
         late_arrivals=_declared["late_arrivals"],
         time_grids=_declared["time_grids"],
         duplicates=_declared["duplicates"],

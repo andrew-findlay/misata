@@ -5845,8 +5845,11 @@ class DataSimulator:
         adjusted a formula column — an exact outcome curve is the obvious case,
         and it holds a promise the formula does not know about.
         """
+        return self._reapply_formulas_reading(df, table_name, self._lifecycle_owned_columns(spec))
+
+    def _reapply_formulas_reading(self, df: pd.DataFrame, table_name: str, owned: set) -> pd.DataFrame:
+        """Recompute every formula that reads ``owned``, directly or through another formula."""
         columns = self.config.get_columns(table_name)
-        owned = self._lifecycle_owned_columns(spec)
 
         # Transitively: a formula reading a formula that reads the state
         # column is just as stale. `first_term = add_months(signed, 1)` over
@@ -6214,9 +6217,13 @@ class DataSimulator:
         for event in cascade_events:
             cascade_tables.add(event.table)
             cascade_tables.update(event.propagate_to.keys())
+        # A window column (running sum, row number, group aggregate) needs the
+        # whole finished table, so it buffers.
+        window_tables = {w.table for w in (getattr(self.config, "windows", None) or [])
+                         if w.table in set(sorted_tables)}
         buffer_tables = (cascade_tables | rollup_tables | group_share_tables
                          | waterfall_tables | scd2_tables | stock_flow_tables
-                         | lifecycle_tables | dyn_tables)
+                         | lifecycle_tables | dyn_tables | window_tables)
 
         buffered: Dict[str, pd.DataFrame] = {}
         streamed: list = []   # tables already yielded (order record for phase 3)
@@ -6276,6 +6283,15 @@ class DataSimulator:
                             # answer it got from the categorical draw.
                             buffered[table_name] = self._reapply_lifecycle_formulas(
                                 buffered[table_name], table_name, _spec)
+                        self._refresh_context(table_name, buffered[table_name])
+                    if table_name in window_tables:
+                        # After the lifecycle, so a window can read what it
+                        # decided; then the formulas that read the window, and
+                        # the context children will look the table up through.
+                        buffered[table_name] = self._apply_windows(buffered[table_name], table_name)
+                        owned = {w.column for w in self.config.windows if w.table == table_name}
+                        buffered[table_name] = self._reapply_formulas_reading(
+                            buffered[table_name], table_name, owned)
                         self._refresh_context(table_name, buffered[table_name])
             else:
                 # Stream immediately — no post-pass involvement
@@ -6435,6 +6451,41 @@ class DataSimulator:
             warnings.warn(f"drop_when on '{table_name}' skipped: {e}")
             return df
         return df.loc[~drop].reset_index(drop=True)
+
+    def _apply_windows(self, df: pd.DataFrame, table_name: str) -> pd.DataFrame:
+        """Compute the table's declared window columns over the finished table."""
+        specs = [w for w in (getattr(self.config, "windows", None) or []) if w.table == table_name]
+        if not specs or df.empty:
+            return df
+        df = df.reset_index(drop=True)
+        for w in specs:
+            for col in [w.of, *w.partition_by, *w.order_by]:
+                if col and col not in df.columns:
+                    warnings.warn(f"window {table_name}.{w.column} skipped: no column {col!r}")
+                    break
+            else:
+                df[w.column] = self._window(df, w)
+        return df
+
+    @staticmethod
+    def _window(df: pd.DataFrame, w: Any) -> np.ndarray:
+        order = (df.sort_values(list(w.order_by), kind="stable").index
+                 if w.order_by else df.index)
+        ordered = df.loc[order]
+        groups = ordered.groupby(list(w.partition_by), sort=False, dropna=False) \
+            if w.partition_by else None
+        if w.op == "row_number":
+            values = (groups.cumcount() + 1) if groups is not None \
+                else pd.Series(np.arange(1, len(ordered) + 1), index=ordered.index)
+        elif w.op == "cumsum":
+            values = groups[w.of].cumsum() if groups is not None else ordered[w.of].cumsum()
+        elif w.op == "count":
+            values = groups[ordered.columns[0]].transform("size") if groups is not None \
+                else pd.Series(len(ordered), index=ordered.index)
+        else:
+            values = groups[w.of].transform(w.op) if groups is not None \
+                else pd.Series(getattr(ordered[w.of], w.op)(), index=ordered.index)
+        return values.reindex(df.index).to_numpy()
 
     def _public(self, table_name: str, df: pd.DataFrame) -> pd.DataFrame:
         """Drop columns declared `internal: true` from what leaves the engine.

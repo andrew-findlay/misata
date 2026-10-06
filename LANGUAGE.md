@@ -273,6 +273,28 @@ formulas and `drop_when` can use it. `first` takes a string; `count` needs no
 Also: `zero_pad(n, width)` for `in_00000042`-style ids, and `internal: true`
 on a foreign-key column.
 
+### `windows` — columns computed over a finished table
+
+```yaml
+windows:
+  - {table: ledger, column: seq, op: row_number, order_by: [account_id, at, type_rank]}
+  - {table: ledger, column: balance_after, op: cumsum, of: credits_delta,
+     partition_by: [account_id], order_by: [account_id, at, type_rank]}
+  - {table: engagements, column: first_at, op: min, of: requested_at, partition_by: [account_id]}
+```
+
+A running balance, a row number, the first date an account did something: each
+needs the whole table, grouped and ordered, and none is a value a row can draw
+for itself. `row_number` and `cumsum` take an `order_by` (ties keep generation
+order); `sum`, `min`, `max`, `mean` and `count` write the group's value onto
+every row of the group.
+
+The table buffers until it is whole, the window runs after its lifecycle, and
+every formula that reads a window column, directly or through another formula,
+is recomputed afterwards. Children generated later see the finished values.
+The column is declared on the table; the window overwrites what generation
+drew for it.
+
 ### temporal FK eligibility — a parent that already existed
 
 ```python
