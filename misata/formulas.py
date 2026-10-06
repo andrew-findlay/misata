@@ -49,6 +49,13 @@ def _month_start(ts):
                     t.astype("datetime64[M]").astype("datetime64[ns]"))
 
 
+def _day_start(ts):
+    """Midnight of each timestamp's day."""
+    t = _ts(ts)
+    return np.where(np.isnat(t), np.datetime64("NaT", "ns"),
+                    t.astype("datetime64[D]").astype("datetime64[ns]"))
+
+
 def _day_diff(start, end):
     """Calendar days from start to end -- midnights crossed, as SQL counts them."""
     s = _ts(start).astype("datetime64[D]")
@@ -143,6 +150,7 @@ SAFE_FUNCTIONS = {
     'days_between': _days_between,
     'month_start': _month_start,
     'zero_pad': _zero_pad,
+    'day_start': _day_start,
     'day_diff': _day_diff,
     'month_diff': _month_diff,
     'months_elapsed': _months_elapsed,
