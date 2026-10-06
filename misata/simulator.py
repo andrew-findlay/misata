@@ -1300,7 +1300,8 @@ class DataSimulator:
                 if not isinstance(spec, dict) or not spec.get("from_table"):
                     continue
                 words = set(re.findall(r"[A-Za-z_]\w*", " ".join(
-                    [str(spec.get("column", ""))] + [str(m[1]) for m in spec.get("match", [])])))
+                    [str(spec.get("column", "")), str(spec.get("where", ""))]
+                    + [str(m[1]) for m in spec.get("match", [])])))
                 found.setdefault(t.name, {}).setdefault(spec["from_table"], set()).update(words)
         return found
 
@@ -5862,6 +5863,10 @@ class DataSimulator:
             changed = False
             for col in columns:
                 formula = col.distribution_params.get("formula")
+                spec = col.distribution_params.get("aggregate")
+                if spec and not formula:
+                    # An aggregate reads the target-side half of its match.
+                    formula = " ".join(str(m[0]) for m in spec.get("match", []))
                 if not formula or col.name in owned or col in dependent:
                     continue
                 # A bare name match is deliberately generous: a formula
@@ -5987,6 +5992,13 @@ class DataSimulator:
                 engine.evaluate_with_lookups(frame, expr)
             return pd.to_datetime(values).to_numpy() if np.asarray(values).dtype.kind == "M" else values
 
+        # A filter over the source, as a formula: only rows where it is true
+        # are grouped. The organic campaigns are the unpaid ones, and an
+        # aggregate over "campaigns" should not need a second table to say so.
+        keep = spec.get("where")
+        if keep:
+            mask = np.asarray(engine.evaluate_with_lookups(source, str(keep)), dtype=bool)
+            source = source.loc[mask].reset_index(drop=True)
         src_keys = [key(source, m[1]) for m in match]
         tgt_keys = [key(df, m[0]) for m in match]
         # Integer choices are carried through the engine as text, and typed

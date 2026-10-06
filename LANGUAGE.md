@@ -261,6 +261,7 @@ peak_endpoints:
       - [account_id, account_id]
       - [period_start, "month_start(usage_date)"]
     default: 0                    # for a row no source row matches
+    where: "is_paid == False"     # optional: only these source rows are grouped
 ```
 
 The monthly peak of a daily meter per account is neither a foreign-key
@@ -270,8 +271,10 @@ generated first, kept whole, and read when the column's formulas run, so later
 formulas and `drop_when` can use it. `first` takes a string; `count` needs no
 `column`.
 
-Also: `zero_pad(n, width)` for `in_00000042`-style ids, and `internal: true`
-on a foreign-key column.
+Also: `zero_pad(n, width)` for `in_00000042`-style ids, `json_object(key,
+value, ...)` for a JSON column, `hour_start` and `epoch_ms` for session ids, and
+`internal: true` on a foreign-key column. An inline reference table may carry a
+column marked `derived: true`, which its rows do not: a window over them, say.
 
 ### `windows` — columns computed over a finished table
 

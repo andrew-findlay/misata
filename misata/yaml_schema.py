@@ -501,7 +501,9 @@ def _check_inline_data(table_name: str, rows: Any,
         raise ValueError(
             f"Table {table_name!r}: inline_data must be a non-empty list of rows, "
             f"each a mapping of column to value.")
-    declared = list(col_defs)
+    # A column marked `derived: true` is computed after the rows exist -- a
+    # window over them, an aggregate -- so the rows do not carry it.
+    declared = [c for c, d in col_defs.items() if not (d or {}).get("derived")]
     if not declared:
         return rows
     for i, row in enumerate(rows):

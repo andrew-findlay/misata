@@ -97,6 +97,38 @@ def _day_of(ts):
                                       .astype("datetime64[D]")).astype("int64") + 1)
 
 
+def _hour_start(ts):
+    t = _ts(ts)
+    return np.where(np.isnat(t), np.datetime64("NaT", "ns"),
+                    t.astype("datetime64[h]").astype("datetime64[ns]"))
+
+
+def _epoch_ms(ts):
+    """Milliseconds since 1970 -- the session ids Amplitude's SDK emits."""
+    t = _ts(ts)
+    return np.where(np.isnat(t), 0, t.astype("datetime64[ms]").astype("int64"))
+
+
+def _json_object(*pairs):
+    """A JSON object per row from alternating key, value arguments.
+
+    A null value is written as JSON null, keys keep the order given, and
+    numbers stay numbers -- what a database's to_json of a struct produces.
+    """
+    import json
+    if len(pairs) % 2:
+        raise ValueError("json_object takes alternating keys and values")
+    keys, cols = pairs[0::2], [np.asarray(v, dtype=object) for v in pairs[1::2]]
+    n = max((len(c) for c in cols if c.ndim), default=1)
+    cols = [np.broadcast_to(c, (n,)) if c.ndim == 0 else c for c in cols]
+    def cell(v):
+        if v is None or (isinstance(v, float) and np.isnan(v)) or v is pd.NaT:
+            return None
+        return v.item() if hasattr(v, "item") else v
+    return np.array([json.dumps({str(k): cell(c[i]) for k, c in zip(keys, cols)}, separators=(",", ":"))
+                     for i in range(n)], dtype=object)
+
+
 def _zero_pad(x, width):
     """An integer as text, left-padded with zeros: 42 -> '00000042'."""
     n = np.asarray(x).astype("int64").astype("U")
@@ -150,6 +182,9 @@ SAFE_FUNCTIONS = {
     'days_between': _days_between,
     'month_start': _month_start,
     'zero_pad': _zero_pad,
+    'hour_start': _hour_start,
+    'epoch_ms': _epoch_ms,
+    'json_object': _json_object,
     'day_start': _day_start,
     'day_diff': _day_diff,
     'month_diff': _month_diff,
