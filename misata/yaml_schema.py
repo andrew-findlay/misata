@@ -569,7 +569,8 @@ def load_yaml_schema(
         tables.append(Table(name=table_name, row_count=t_rows,
                             description=t_desc, scd2=t_scd2,
                             is_reference=bool(tdef.get("is_reference") or t_inline),
-                            inline_data=t_inline))
+                            inline_data=t_inline,
+                            drop_when=tdef.get("drop_when")))
 
         col_defs: Dict[str, Any] = tdef.get("columns", {})
         columns_map[table_name] = [

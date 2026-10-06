@@ -3507,14 +3507,21 @@ class DataSimulator:
             # The panel is the declaration; it wins.
             df_batch = self._apply_panel_index(df_batch, panel_plan, rows_generated)
 
+            # Rows the table declares absent. After everything that could read
+            # or move them, so a gap never shifts what the other rows were.
+            df_batch = self._drop_declared_rows(df_batch, table_name)
+
             # Update context for future batches/tables
             self._update_context(table_name, df_batch)
             output_df = self._run_pass("noise", table_name, rows_generated,
                                        self._apply_configured_noise,
                                        df_batch.copy(), table_name, table)
             # Noise runs on a copy after the context update, so re-assert rather
-            # than trusting it to have left these two columns alone.
-            output_df = self._apply_panel_index(output_df, panel_plan, rows_generated)
+            # than trusting it to have left these two columns alone. A panel's
+            # plan is indexed by position, and dropping rows broke that, so the
+            # key and date are put back only while no row has been dropped.
+            if len(output_df) == min(batch_size, total_rows - rows_generated):
+                output_df = self._apply_panel_index(output_df, panel_plan, rows_generated)
             yield output_df
 
             rows_generated += batch_size
@@ -6310,6 +6317,23 @@ class DataSimulator:
         for table_name in sorted_tables:
             if table_name in buffered:
                 yield table_name, self._public(table_name, buffered[table_name])
+
+    def _drop_declared_rows(self, df: pd.DataFrame, table_name: str) -> pd.DataFrame:
+        """Remove the rows a table's ``drop_when`` formula selects."""
+        table = self.config.get_table(table_name)
+        formula = getattr(table, "drop_when", None) if table else None
+        if not formula or df.empty:
+            return df
+        from misata.formulas import FormulaEngine
+        engine = FormulaEngine({**self.context, table_name: df})
+        fk_mappings = {rel.parent_table: rel.child_key
+                       for rel in self.config.relationships if rel.child_table == table_name}
+        try:
+            drop = np.asarray(engine.evaluate_with_lookups(df, formula, fk_mappings=fk_mappings), dtype=bool)
+        except (ValueError, ImportError) as e:
+            warnings.warn(f"drop_when on '{table_name}' skipped: {e}")
+            return df
+        return df.loc[~drop].reset_index(drop=True)
 
     def _public(self, table_name: str, df: pd.DataFrame) -> pd.DataFrame:
         """Drop columns declared `internal: true` from what leaves the engine.

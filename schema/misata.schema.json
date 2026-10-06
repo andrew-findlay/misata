@@ -1507,6 +1507,10 @@
         },
         "events": {
           "$ref": "#/properties/events"
+        },
+        "drop_when": {
+          "type": "string",
+          "description": "A formula; rows where it is true are removed from the finished table -- a gap in a dense series."
         }
       }
     },

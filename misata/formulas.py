@@ -49,6 +49,47 @@ def _month_start(ts):
                     t.astype("datetime64[M]").astype("datetime64[ns]"))
 
 
+def _day_diff(start, end):
+    """Calendar days from start to end -- midnights crossed, as SQL counts them."""
+    s = _ts(start).astype("datetime64[D]")
+    e = _ts(end).astype("datetime64[D]")
+    out = (e - s).astype("int64").astype("float64")
+    return np.where(np.isnat(s) | np.isnat(e), np.nan, out)
+
+
+def _month_diff(start, end):
+    """Calendar months from start to end -- month boundaries crossed."""
+    s = _ts(start).astype("datetime64[M]")
+    e = _ts(end).astype("datetime64[M]")
+    out = (e - s).astype("int64").astype("float64")
+    return np.where(np.isnat(s) | np.isnat(e), np.nan, out)
+
+
+def _months_elapsed(start, end):
+    """Whole months from start to end: anniversaries passed."""
+    from misata.panels import _full_months
+    s, e = _ts(start), _ts(end)
+    return np.where(np.isnat(s) | np.isnat(e), np.nan,
+                    _full_months(np.where(np.isnat(s), e, s), e).astype("float64"))
+
+
+def _weekday(ts):
+    """0 Monday ... 6 Sunday."""
+    t = _ts(ts).astype("datetime64[D]")
+    return np.where(np.isnat(t), -1, (t.astype("int64") + 3) % 7)
+
+
+def _month_of(ts):
+    t = _ts(ts)
+    return np.where(np.isnat(t), 0, t.astype("datetime64[M]").astype("int64") % 12 + 1)
+
+
+def _day_of(ts):
+    t = _ts(ts)
+    return np.where(np.isnat(t), 0, (t.astype("datetime64[D]") - t.astype("datetime64[M]")
+                                      .astype("datetime64[D]")).astype("int64") + 1)
+
+
 def _days_between(start, end):
     """Fractional days from start to end; NaN where either is null."""
     delta = (_ts(end) - _ts(start)).astype("timedelta64[ns]").astype("float64")
@@ -95,6 +136,12 @@ SAFE_FUNCTIONS = {
     'add_months': _add_months,
     'days_between': _days_between,
     'month_start': _month_start,
+    'day_diff': _day_diff,
+    'month_diff': _month_diff,
+    'months_elapsed': _months_elapsed,
+    'weekday': _weekday,
+    'month_of': _month_of,
+    'day_of': _day_of,
     'timestamp': _timestamp,
     'isnull': _isnull,
     'notnull': lambda x: ~_isnull(x),

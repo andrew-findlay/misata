@@ -96,6 +96,10 @@ class Table(BaseModel):
         description: Optional description of the table's purpose
         is_reference: If True, this is a lookup/reference table
         inline_data: Actual data rows for reference tables (list of dicts)
+        drop_when: A formula; rows where it is true are removed from the
+            finished table. A gap in an otherwise dense series -- the 0.2% of
+            days a meter did not report -- is a row that is not there, which no
+            column value can express.
     """
 
     name: str
@@ -104,6 +108,7 @@ class Table(BaseModel):
     description: Optional[str] = None
     is_reference: bool = False
     inline_data: Optional[List[Dict[str, Any]]] = None
+    drop_when: Optional[str] = None
     columns: List[str] = Field(default_factory=list)
     constraints: List["Constraint"] = Field(default_factory=list)
     workflow_preset: Optional[str] = None
