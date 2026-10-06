@@ -5913,6 +5913,7 @@ class DataSimulator:
 
         if not formula_cols:
             return df
+        formula_cols = self._formula_order(formula_cols)
 
         # FormulaEngine now needs context, not full data
         # BUT FormulaEngine expects full DataFrames in tables dict for lookups
@@ -5963,6 +5964,43 @@ class DataSimulator:
                 warnings.warn(f"Formula column '{col.name}' skipped: {e}")
 
         return df
+
+    @staticmethod
+    def _formula_order(cols: List[Any]) -> List[Any]:
+        """Order computed columns so each comes after the ones it reads.
+
+        Columns used to be computed in the order they were declared, so a
+        formula reading a column declared below it saw that column's drawn
+        placeholder and not its value -- silently, and only when the two were
+        written in the wrong order. Reading is the dependency, not position.
+        The sort is stable: columns with no dependency between them keep their
+        declared order, so a schema already written in order is unchanged.
+        """
+        names = {c.name for c in cols}
+
+        def reads(col: Any) -> set:
+            params = col.distribution_params or {}
+            text = params.get("formula") or ""
+            spec = params.get("aggregate")
+            if spec:
+                text += " " + " ".join(str(m[0]) for m in spec.get("match", []))
+            text = re.sub(r"@\w+\.\w+", " ", str(text))   # a lookup reads another table
+            return (set(re.findall(r"[A-Za-z_]\w*", text)) & names) - {col.name}
+
+        deps = {c.name: reads(c) for c in cols}
+        done: List[Any] = []
+        placed: set = set()
+        pending = list(cols)
+        while pending:
+            ready = [c for c in pending if deps[c.name] <= placed]
+            if not ready:                      # a cycle: keep declared order for the rest
+                done.extend(pending)
+                break
+            first = ready[0]
+            done.append(first)
+            placed.add(first.name)
+            pending.remove(first)
+        return done
 
     _AGGREGATES = ("max", "min", "sum", "mean", "count", "first")
 
