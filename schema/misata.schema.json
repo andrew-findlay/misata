@@ -416,6 +416,23 @@
             "default": 30,
             "type": "integer"
           },
+          "end_bound": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Instant no timestamp in the chain may pass. A chain that would end later is translated earlier, start column included, keeping every gap."
+          },
+          "end_spread_days": {
+            "default": 0.0,
+            "type": "number",
+            "description": "A translated chain ends uniformly within this many days before end_bound, rather than all on it."
+          },
           "description": {
             "anyOf": [
               {

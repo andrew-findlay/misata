@@ -188,7 +188,39 @@ def apply_lifecycle(
             vals = base_ns[mask] + offsets[:, i]
             df.loc[mask, col] = pd.to_datetime(vals)
 
+    if spec.end_bound:
+        _bound_chain_end(df, spec, ts_cols, rng)
+
     return df
+
+
+def _bound_chain_end(df: pd.DataFrame, spec: Any, ts_cols: List[str],
+                     rng: np.random.Generator) -> None:
+    """Translate every chain that passes ``end_bound`` back inside it.
+
+    The whole chain moves by one amount, start column included, so the
+    lifecycle's gaps survive exactly. Where a chain lands is spread over
+    ``end_spread_days`` before the bound: clamping every one to the bound
+    itself would put all their terminal events on one day.
+    """
+    bound = pd.Timestamp(spec.end_bound)
+    cols = list(ts_cols)
+    if spec.start_column and spec.start_column in df.columns and spec.start_column not in cols:
+        cols.append(spec.start_column)
+    chain = pd.concat([pd.to_datetime(df[c], errors="coerce") for c in cols], axis=1)
+    chain_end = chain.max(axis=1)
+    over = (chain_end > bound).to_numpy()
+    n = int(over.sum())
+    if not n:
+        return
+    spread_ns = int(max(float(spec.end_spread_days), 0.0) * NS_PER_DAY)
+    slack = rng.integers(0, spread_ns, size=n) if spread_ns > 0 else np.zeros(n, dtype="int64")
+    target = bound.value - slack
+    shift = target - chain_end[over].astype("int64").to_numpy()
+    for c in cols:
+        current = pd.to_datetime(df.loc[over, c], errors="coerce")
+        moved = current.astype("int64") + shift
+        df.loc[over, c] = pd.to_datetime(moved).where(current.notna())
 
 
 def apply_lifecycles(

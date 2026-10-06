@@ -2770,7 +2770,18 @@ class DataSimulator:
             start = pd.to_datetime(params.get("start", "2020-01-01"))
             end = pd.to_datetime(params.get("end", "2024-12-31"))
             start_int, end_int = _datetime_range_ns(start, end)
-            random_ints = self.rng.integers(start_int, end_int, size=size)
+            if params.get("distribution") == "beta":
+                # Where in the window, shaped. Beta(a, 1) with a > 1 leans
+                # towards the end -- a business acquiring faster as it grows --
+                # and a < 1 towards the start. Same parameters as the numeric
+                # beta. Only drawn when declared, so a uniform column's stream
+                # is untouched.
+                a = float(params.get("a", 1.0))
+                b = float(params.get("b", 1.0))
+                frac = self.rng.beta(a, b, size=size)
+                random_ints = start_int + (frac * (end_int - start_int)).astype("int64")
+            else:
+                random_ints = self.rng.integers(start_int, end_int, size=size)
             values = pd.to_datetime(random_ints)
             return values
 
@@ -5811,7 +5822,11 @@ class DataSimulator:
         # so denormalized parent copies agree regardless of code path.
         df = self._fix_denormalized_parent_columns(df, table_name)
 
-        df = apply_realism_rules(df, table_name, rng=self.rng, protected=protected_columns)
+        from misata.lifecycle import lifecycles_for_table
+        lifecycle_columns = {c for spec in lifecycles_for_table(self.config, table_name)
+                             for c in spec.timestamp_columns()}
+        df = apply_realism_rules(df, table_name, rng=self.rng, protected=protected_columns,
+                                 lifecycle_columns=lifecycle_columns)
 
         realism = self._get_realism_config()
         if realism and realism.coherence != "off":

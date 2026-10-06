@@ -1977,7 +1977,8 @@ def _find_duration_column(df: pd.DataFrame):
     return None, None
 
 
-def _fix_time_chains(df: pd.DataFrame, columns: set, rng: np.random.Generator) -> None:
+def _fix_time_chains(df: pd.DataFrame, columns: set, rng: np.random.Generator,
+                     exclude: Optional[set] = None) -> None:
     """Order event-sequence timestamps per row AND keep the gaps plausible.
 
     Three passes: (1) per-row sort so impossible orderings (dropoff before
@@ -1994,8 +1995,16 @@ def _fix_time_chains(df: pd.DataFrame, columns: set, rng: np.random.Generator) -
                 return i
         return -1
 
+    # Columns a lifecycle owns are left out. The machine writes them after
+    # this pass, in path order, so sorting their pre-lifecycle draws enforces
+    # nothing -- and the sort is not harmless: it makes every column in the
+    # chain an order statistic of the row. With `created_at` and a lifecycle's
+    # `trial_started_at` both in the chain, created_at became the minimum of
+    # two uniform draws and lost the distribution it was declared with.
+    exclude = exclude or set()
     chain = [(c, _rank(c)) for c in df.columns
-             if _rank(c) >= 0 and ("time" in c.lower() or "date" in c.lower() or c.lower().endswith("_at"))]
+             if c not in exclude and _rank(c) >= 0
+             and ("time" in c.lower() or "date" in c.lower() or c.lower().endswith("_at"))]
     chain = [c for c, _ in sorted(chain, key=lambda x: x[1])]
     if len(chain) < 2:
         return
@@ -2342,6 +2351,7 @@ def apply_realism_rules(
     table_name: str = "",
     rng: Optional[np.random.Generator] = None,
     protected: Optional[set] = None,
+    lifecycle_columns: Optional[set] = None,
 ) -> pd.DataFrame:
     """
     Apply cross-column realism rules to a DataFrame.
@@ -2368,7 +2378,7 @@ def apply_realism_rules(
         _fix_state_country(df, columns, _rng)
         _fix_postal_from_city(df, columns, _rng)
     _fix_phone_country(df, columns, _rng)
-    _fix_time_chains(df, columns, _rng)
+    _fix_time_chains(df, columns, _rng, exclude=lifecycle_columns)
 
     # ── Temporal consistency ──
     _fix_created_updated(df, columns, _rng)

@@ -740,6 +740,15 @@ class Lifecycle(BaseModel):
                       (an order's ``order_date``, a customer's ``signup_date``).
         max_days_per_step: Upper bound on the gap between consecutive state
                       timestamps, so a shipped-to-completed hop stays plausible.
+        end_bound:    Optional instant no timestamp in the chain may pass -- the
+                      close of the data window. A chain that would end later is
+                      translated earlier, start_column included, so every gap
+                      the machine drew is kept and only its place on the
+                      calendar moves.
+        end_spread_days: Where a translated chain lands. Zero ends every one
+                      exactly on ``end_bound``, which piles terminal events
+                      onto a single day; a positive value ends each uniformly
+                      within that many days before it.
     """
 
     name: str
@@ -751,6 +760,8 @@ class Lifecycle(BaseModel):
     weights: Optional[Dict[str, float]] = None
     start_column: Optional[str] = None
     max_days_per_step: int = 30
+    end_bound: Optional[str] = None
+    end_spread_days: float = 0.0
     description: Optional[str] = None
 
     @field_validator("states")

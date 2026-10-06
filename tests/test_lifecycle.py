@@ -320,3 +320,93 @@ class TestInteractions:
         for _, group in events.groupby("entity_id"):
             assert group["timestamp"].is_monotonic_increasing
 
+
+
+# --------------------------------------------------------------------------- #
+# end_bound: no chain passes the close of the window
+# --------------------------------------------------------------------------- #
+
+_TS = ["order_date", "placed_at", "shipped_at", "completed_at", "cancelled_at"]
+
+
+def _chains(lc, seed=3, rows=2000):
+    out = misata.generate_from_schema(_schema(lc, rows=rows, seed=seed))["orders"]
+    return out, out[_TS].apply(pd.to_datetime)
+
+
+class TestEndBound:
+    def test_no_timestamp_passes_the_bound(self):
+        _, ts = _chains(_order_lifecycle(max_days_per_step=60, end_bound="2024-07-15"))
+        assert (ts.max(axis=1) <= pd.Timestamp("2024-07-15")).all()
+
+    def test_without_it_chains_do_pass(self):
+        """The guard above means something: unbounded, chains overrun."""
+        _, ts = _chains(_order_lifecycle(max_days_per_step=60))
+        assert (ts.max(axis=1) > pd.Timestamp("2024-07-15")).any()
+
+    def test_the_chain_moves_whole(self):
+        """Gaps between states, start column included, are the lifecycle's.
+        Only rows that overran move, and they all move by one amount."""
+        free, free_ts = _chains(_order_lifecycle(max_days_per_step=60))
+        bound, bound_ts = _chains(_order_lifecycle(max_days_per_step=60,
+                                                   end_bound="2024-07-15",
+                                                   end_spread_days=10))
+        assert (free["status"] == bound["status"]).all()
+        delta = bound_ts.sub(free_ts["order_date"], axis=0).sub(
+            free_ts.sub(free_ts["order_date"], axis=0))
+        per_row = delta.apply(lambda r: r.dropna().nunique(), axis=1)
+        assert (per_row <= 1).all()
+        moved = (bound_ts["order_date"] != free_ts["order_date"])
+        assert (moved == (free_ts.max(axis=1) > pd.Timestamp("2024-07-15"))).all()
+
+    def test_spread_avoids_a_pile_up_on_the_bound(self):
+        _, ts = _chains(_order_lifecycle(max_days_per_step=60, end_bound="2024-07-15",
+                                         end_spread_days=20))
+        on_bound_day = (ts.max(axis=1).dt.normalize() == pd.Timestamp("2024-07-15")).sum()
+        assert on_bound_day < 0.2 * (ts.max(axis=1) > pd.Timestamp("2024-06-25")).sum()
+
+
+def test_datetime_beta_shapes_the_window():
+    """Beta(a, 1) with a > 1 leans towards the end of the window."""
+    cfg = SchemaConfig(
+        name="b", seed=4, tables=[Table(name="t", row_count=20_000)],
+        columns={"t": [Column(name="at", type="datetime", distribution_params={
+            "start": "2020-01-01", "end": "2024-01-01", "distribution": "beta",
+            "a": 2.0, "b": 1.0})]})
+    at = pd.to_datetime(misata.generate_from_schema(cfg)["t"]["at"])
+    assert at.min() >= pd.Timestamp("2020-01-01") and at.max() <= pd.Timestamp("2024-01-01")
+    # Beta(2,1): density 2x, so the last quarter of the window holds 1-0.75^2 = 43.75%.
+    share = (at >= pd.Timestamp("2023-01-01")).mean()
+    assert 0.42 < share < 0.455
+
+
+def test_a_lifecycle_timestamp_does_not_reshape_its_start_column():
+    """The realism pass sorted every row's chain-named timestamps, and a
+    lifecycle's `trial_started_at` counted. With `created_at` in the same
+    chain, created_at became the row minimum of two uniform draws: its first
+    year held ~2x its share. The lifecycle owns trial_started_at, so the sort
+    leaves it out and created_at keeps its declared distribution."""
+    lc = Lifecycle(
+        name="acct", table="accounts", state_column="status",
+        start_column="created_at", initial="trialing",
+        states=[LifecycleState(name="trialing", timestamp="trial_started_at"),
+                LifecycleState(name="active", timestamp="converted_at", terminal=True)],
+        transitions=[("trialing", "active")])
+    cfg = SchemaConfig(
+        name="a", seed=8, tables=[Table(name="accounts", row_count=8000)],
+        columns={"accounts": [
+            Column(name="account_id", type="int", unique=True,
+                   distribution_params={"min": 1, "max": 8000}),
+            Column(name="status", type="categorical",
+                   distribution_params={"choices": ["trialing", "active"]}),
+            Column(name="created_at", type="datetime",
+                   distribution_params={"start": "2020-01-01", "end": "2024-01-01"}),
+            Column(name="trial_started_at", type="datetime",
+                   distribution_params={"start": "2020-01-01", "end": "2024-01-01"}),
+            Column(name="converted_at", type="datetime",
+                   distribution_params={"start": "2020-01-01", "end": "2024-01-01"}),
+        ]},
+        lifecycles=[lc])
+    created = pd.to_datetime(misata.generate_from_schema(cfg)["accounts"]["created_at"])
+    first_year = (created < pd.Timestamp("2021-01-01")).mean()
+    assert 0.22 < first_year < 0.28, first_year   # uniform: 25%; min-of-2: ~44%
