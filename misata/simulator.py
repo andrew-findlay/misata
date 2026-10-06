@@ -3388,6 +3388,7 @@ class DataSimulator:
                 # Gap 1: enforce RateCurve targets (proportional pass — preserves AME=0).
                 fact_df = self._run_pass("rate_curves", table_name, 0,
                                          self._apply_rate_curves, fact_df, table_name)
+                fact_df = self._reapply_after_curves(fact_df, table_name)
                 self._update_context(table_name, fact_df)
                 output_df = self._run_pass("noise", table_name, 0,
                                            self._apply_configured_noise,
@@ -3526,6 +3527,10 @@ class DataSimulator:
             # final sum per period converges to the implied target.
             df_batch = self._run_pass("rebalance", table_name, rows_generated,
                                       self._rebalance_relative_batch, df_batch, table_name)
+
+            # A curve sets its column after the formulas ran, so a formula that
+            # reads one saw the drawn value and not the curve's.
+            df_batch = self._reapply_after_curves(df_batch, table_name)
 
             # Apply null_rate / nullable nulls LAST — after correlations,
             # time-series, and rate curves, so the statistical passes see full
@@ -6507,6 +6512,21 @@ class DataSimulator:
             warnings.warn(f"drop_when on '{table_name}' skipped: {e}")
             return df
         return df.loc[~drop].reset_index(drop=True)
+
+    def _reapply_after_curves(self, df: pd.DataFrame, table_name: str) -> pd.DataFrame:
+        """Recompute the formulas that read a column an outcome or rate curve owns.
+
+        Curves run after formulas and write their column last, so a formula over
+        one -- "the rows that did not convert" over a conversion-rate curve --
+        was computed from the value drawn before the curve and never saw the
+        value that is emitted. 4,000 of 110,000 clicks were treated as
+        unconverted that finally converted.
+        """
+        owned = {c.column for c in (getattr(self.config, "outcome_curves", None) or [])
+                 if c.table == table_name}
+        owned |= {c.column for c in (getattr(self.config, "rate_curves", None) or [])
+                  if c.table == table_name}
+        return self._reapply_formulas_reading(df, table_name, owned) if owned else df
 
     def _apply_windows(self, df: pd.DataFrame, table_name: str) -> pd.DataFrame:
         """Compute the table's declared window columns over the finished table."""
