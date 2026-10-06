@@ -840,6 +840,41 @@ def _detect_dynamics_violation(tables, schema) -> List[CoherenceFinding]:
                     rows_affected=bad,
                 ))
 
+    # ---- windows ---------------------------------------------------------
+    # Recomputed from the emitted rows, by pandas' own grouped operations rather
+    # than the generator's: a running balance that does not run, a row number
+    # that skips, an aggregate that disagrees within its group.
+    for spec in (getattr(schema, "windows", None) or []):
+        df = tables.get(spec.table)
+        needed = [spec.column, *([spec.of] if spec.of else []),
+                  *spec.partition_by, *spec.order_by]
+        if df is None or df.empty or not set(needed).issubset(df.columns):
+            continue
+        ordered = df.sort_values(list(spec.order_by), kind="stable") if spec.order_by else df
+        groups = ordered.groupby(list(spec.partition_by), sort=False, dropna=False) \
+            if spec.partition_by else None
+        if spec.op == "row_number":
+            want = (groups.cumcount() + 1) if groups is not None \
+                else pd.Series(range(1, len(ordered) + 1), index=ordered.index)
+        elif spec.op == "cumsum":
+            want = groups[spec.of].cumsum() if groups is not None else ordered[spec.of].cumsum()
+        elif spec.op == "count":
+            want = groups[spec.column].transform("size") if groups is not None \
+                else pd.Series(len(ordered), index=ordered.index)
+        else:
+            want = groups[spec.of].transform(spec.op) if groups is not None \
+                else pd.Series(getattr(ordered[spec.of], spec.op)(), index=ordered.index)
+        got = ordered[spec.column]
+        wrong = int((~((got == want) | (got.isna() & want.isna()))).sum())
+        if wrong:
+            out.append(CoherenceFinding(
+                kind="window_mismatch", severity="high",
+                table=spec.table, column=spec.column,
+                message=(f"{wrong} of {len(df)} rows disagree with the declared "
+                         f"{spec.op}{' of ' + spec.of if spec.of else ''}"),
+                rows_affected=wrong,
+            ))
+
     # ---- missingness -----------------------------------------------------
     for spec in (getattr(schema, "missingness", None) or []):
         df = tables.get(spec.table)

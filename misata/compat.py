@@ -73,6 +73,7 @@ _ENVELOPE_KEYS: Tuple[Tuple[str, str], ...] = (
     ("lifecycles", "__lifecycles__"),
     ("retention", "__retention__"),
     ("missingness", "__missingness__"),
+    ("windows", "__windows__"),
     ("late_arrivals", "__late_arrivals__"),
     ("time_grids", "__time_grids__"),
     ("duplicates", "__duplicates__"),
@@ -950,12 +951,13 @@ def from_dict_schema(
                                Duplicates, EventLog, GraphMotifs,
                                JointDistribution, LateArrival, Lifecycle,
                                Missingness, Outliers, ScenarioEvent, TimeGrid,
-                               TransitiveClosure, Typos)
+                               TransitiveClosure, Typos, WindowColumn)
     declared: Dict[str, List[Any]] = {}
     for key, model in (("events", ScenarioEvent),
                        ("lifecycles", Lifecycle),
                        ("retention", CohortRetention),
                        ("missingness", Missingness),
+                       ("windows", WindowColumn),
                        ("late_arrivals", LateArrival),
                        ("time_grids", TimeGrid),
                        ("duplicates", Duplicates),
@@ -1261,6 +1263,7 @@ def from_dict_schema(
         lifecycles=declared["lifecycles"],
         retention=declared["retention"],
         missingness=declared["missingness"],
+        windows=declared["windows"],
         late_arrivals=declared["late_arrivals"],
         time_grids=declared["time_grids"],
         duplicates=declared["duplicates"],

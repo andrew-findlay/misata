@@ -850,6 +850,49 @@ def _check_closure_source(config: Any) -> List[Conflict]:
     return out
 
 
+def _check_windows(config: Any) -> List[Conflict]:
+    """A window is computed over columns the table must have, in an order it can sort.
+
+    Every column a window names -- the one it writes, the one it aggregates, its
+    partition and its order -- has to be declared on its table. A missing one
+    was a warning at generation time and a column left holding whatever its type
+    drew, which is exactly a declaration quietly doing nothing. Two windows
+    writing the same column contradict each other.
+    """
+    out: List[Conflict] = []
+    seen: Dict[tuple, int] = {}
+    for i, w in enumerate(getattr(config, "windows", None) or []):
+        declared = {c.name for c in config.get_columns(w.table)}
+        table_known = any(t.name == w.table for t in config.tables)
+        if not table_known:
+            out.append(Conflict(
+                kind="window_unknown_table", where=w.table,
+                declarations=[f"windows[{i}] writes {w.table}.{w.column}"],
+                arithmetic=f"no table named {w.table!r} is declared",
+                remedy="name a table declared under `tables`"))
+            continue
+        named = [("column", w.column)] + \
+                ([("of", w.of)] if w.of else []) + \
+                [("partition_by", c) for c in w.partition_by] + \
+                [("order_by", c) for c in w.order_by]
+        for role, name in named:
+            if name not in declared:
+                out.append(Conflict(
+                    kind="window_unknown_column", where=f"{w.table}.{name}",
+                    declarations=[f"windows[{i}] {w.op} names {name!r} as {role}"],
+                    arithmetic=f"{w.table} declares no column {name!r}",
+                    remedy=f"declare {name!r} on {w.table}, or correct the name"))
+        key = (w.table, w.column)
+        if key in seen:
+            out.append(Conflict(
+                kind="window_written_twice", where=f"{w.table}.{w.column}",
+                declarations=[f"windows[{seen[key]}]", f"windows[{i}]"],
+                arithmetic="two windows write the same column; the later overwrites the earlier",
+                remedy="keep one, or write them to different columns"))
+        seen[key] = i
+    return out
+
+
 def _check_dag_capacity(config: Any) -> List[Conflict]:
     """A DAG over n nodes holds at most n(n-1)/2 distinct edges.
 
@@ -1108,6 +1151,7 @@ _CHECKS = _CHECKS + (
     _check_history_depth,
     _check_closure_source,
     _check_wear_envelope,
+    _check_windows,
 )
 
 

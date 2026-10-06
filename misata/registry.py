@@ -7,7 +7,7 @@ post-generation audit, and ``joint_distributions`` had neither despite shipping
 in 0.9.6.48. The rule was true of the design and false of most of the language,
 which is the worst of both, because nothing said so.
 
-All 24 keep it now. The floor in the contract test only moves up, so that
+All 25 keep it now. The floor in the contract test only moves up, so that
 cannot quietly stop being true.
 
 The failure was structural, not careless. Feasibility lives in one module and
@@ -116,6 +116,8 @@ DECLARATIONS: Tuple[Declaration, ...] = (
                 "_check_numeric_ranges", "when_then_violation", linear=True),
     Declaration("missingness", "Why values are missing, conditionally.",
                 "_check_declared_fractions", "missingness_mismatch", linear=True),
+    Declaration("windows", "A running sum, row number or group aggregate over a finished table.",
+                "_check_windows", "window_mismatch", linear=False),
     Declaration("duplicates", "Exactly this many duplicate rows.",
                 "_check_injected_counts", "duplicate_count", linear=True),
     Declaration("typos", "Exactly this many corrupted values.",
