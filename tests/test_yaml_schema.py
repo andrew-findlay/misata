@@ -612,3 +612,16 @@ def test_inline_rows_must_match_the_declared_columns(tmp_path):
     path.write_text(_INLINE_YAML.replace("is_self_serve: false}", "is_self_serv: false}"))
     with pytest.raises(ValueError, match="row 2 does not match"):
         load_yaml_schema(path)
+
+
+def test_a_datetime_distribution_survives_the_yaml_loader(tmp_path):
+    """`distribution` is structural, so the passthrough skipped it and only
+    the numeric branch copied it: a beta-shaped datetime loaded uniform."""
+    path = tmp_path / "misata.yaml"
+    path.write_text(
+        "name: d\nseed: 1\ntables:\n  t:\n    rows: 5\n    columns:\n"
+        "      at: {type: datetime, start: '2020-01-01', end: '2024-01-01',"
+        " distribution: beta, a: 2.0, b: 1.0}\n")
+    col = load_yaml_schema(path).get_columns("t")[0]
+    assert col.distribution_params["distribution"] == "beta"
+    assert col.distribution_params["a"] == 2.0

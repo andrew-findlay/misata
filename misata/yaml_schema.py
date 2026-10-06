@@ -348,6 +348,11 @@ def _parse_column(col_name: str, col_def: Dict[str, Any],
     elif misata_type in ("date", "datetime"):
         params["start"] = col_def.get("start", "2020-01-01")
         params["end"] = col_def.get("end", "2024-12-31")
+        # `distribution` is a structural key, so the passthrough below skips
+        # it, and only the numeric branch copied it: a shaped datetime loaded
+        # from YAML came back uniform.
+        if col_def.get("distribution"):
+            params["distribution"] = col_def["distribution"]
 
     # Generation features that may appear on any column type (0.8.0.2): pass them through
     # so they survive load. These are validated at generation time, not here.
