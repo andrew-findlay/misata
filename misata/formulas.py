@@ -320,7 +320,7 @@ class FormulaEngine:
                     f"(looked for {singular}_id, {table_name}_id)"
                 )
 
-            ref_col = ref_table.set_index(parent_key)[col_name]
+            ref_col = ref_table.set_index(parent_key, drop=False)[col_name]
             looked_up = df[fk_col].map(ref_col.to_dict())
             # A missing value is 0 only for a number. A null timestamp filled
             # with 0 is 1 January 1970, and a null label filled with 0 is the
