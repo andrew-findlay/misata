@@ -42,6 +42,13 @@ def _add_months(ts, months):
     return add_months(_ts(ts), np.broadcast_to(np.asarray(months, dtype="int64"), _ts(ts).shape))
 
 
+def _month_start(ts):
+    """First instant of each timestamp's month."""
+    t = _ts(ts)
+    return np.where(np.isnat(t), np.datetime64("NaT", "ns"),
+                    t.astype("datetime64[M]").astype("datetime64[ns]"))
+
+
 def _days_between(start, end):
     """Fractional days from start to end; NaN where either is null."""
     delta = (_ts(end) - _ts(start)).astype("timedelta64[ns]").astype("float64")
@@ -87,6 +94,7 @@ SAFE_FUNCTIONS = {
     'add_days': _add_days,
     'add_months': _add_months,
     'days_between': _days_between,
+    'month_start': _month_start,
     'timestamp': _timestamp,
     'isnull': _isnull,
     'notnull': lambda x: ~_isnull(x),

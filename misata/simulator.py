@@ -5809,16 +5809,28 @@ class DataSimulator:
         columns = self.config.get_columns(table_name)
         owned = self._lifecycle_owned_columns(spec)
 
+        # Transitively: a formula reading a formula that reads the state
+        # column is just as stale. `first_term = add_months(signed, 1)` over
+        # `signed = coalesce(converted_at, ...)` kept its pre-lifecycle value
+        # when only direct readers were recomputed.
         dependent = []
-        for col in columns:
-            formula = col.distribution_params.get("formula")
-            if not formula or col.name in owned:
-                continue
-            # A bare name match is deliberately generous: a formula mentioning
-            # the state column in any form depends on it, and recomputing one
-            # that did not need it costs a column write.
-            if any(re.search(rf"\b{re.escape(name)}\b", str(formula)) for name in owned):
-                dependent.append(col)
+        stale = set(owned)
+        changed = True
+        while changed:
+            changed = False
+            for col in columns:
+                formula = col.distribution_params.get("formula")
+                if not formula or col.name in owned or col in dependent:
+                    continue
+                # A bare name match is deliberately generous: a formula
+                # mentioning the column in any form depends on it, and
+                # recomputing one that did not need it costs a column write.
+                if any(re.search(rf"\b{re.escape(name)}\b", str(formula)) for name in stale):
+                    dependent.append(col)
+                    stale.add(col.name)
+                    changed = True
+        # Declaration order, so a formula is recomputed after what it reads.
+        dependent = [c for c in columns if c in dependent]
 
         if not dependent:
             return df

@@ -410,3 +410,38 @@ def test_a_lifecycle_timestamp_does_not_reshape_its_start_column():
     created = pd.to_datetime(misata.generate_from_schema(cfg)["accounts"]["created_at"])
     first_year = (created < pd.Timestamp("2021-01-01")).mean()
     assert 0.22 < first_year < 0.28, first_year   # uniform: 25%; min-of-2: ~44%
+
+
+def test_a_formula_two_steps_from_the_lifecycle_is_recomputed():
+    """`first_start` reads `anchor`, which reads converted_at. Only direct
+    readers were recomputed after the lifecycle, so first_start kept a value
+    computed from the pre-lifecycle draw."""
+    lc = Lifecycle(
+        name="acct", table="accounts", state_column="status",
+        start_column="created_at", initial="trialing",
+        states=[LifecycleState(name="trialing", timestamp="trial_started_at"),
+                LifecycleState(name="active", timestamp="converted_at", terminal=True)],
+        transitions=[("trialing", "active")], weights={"trialing": 0.3, "active": 0.7})
+    cfg = SchemaConfig(
+        name="a", seed=8, tables=[Table(name="accounts", row_count=500)],
+        columns={"accounts": [
+            Column(name="account_id", type="int", unique=True,
+                   distribution_params={"min": 1, "max": 500}),
+            Column(name="status", type="categorical",
+                   distribution_params={"choices": ["trialing", "active"]}),
+            Column(name="created_at", type="datetime",
+                   distribution_params={"start": "2020-01-01", "end": "2024-01-01"}),
+            Column(name="trial_started_at", type="datetime",
+                   distribution_params={"start": "2020-01-01", "end": "2024-01-01"}),
+            Column(name="converted_at", type="datetime",
+                   distribution_params={"start": "2020-01-01", "end": "2024-01-01"}),
+            Column(name="anchor", type="datetime",
+                   distribution_params={"formula": "coalesce(converted_at, trial_started_at)"}),
+            Column(name="first_start", type="datetime",
+                   distribution_params={"formula": "add_months(month_start(anchor), 1)"}),
+        ]},
+        lifecycles=[lc])
+    acc = misata.generate_from_schema(cfg)["accounts"]
+    anchor = pd.to_datetime(acc["converted_at"]).fillna(pd.to_datetime(acc["trial_started_at"]))
+    expected = anchor.dt.to_period("M").dt.to_timestamp() + pd.DateOffset(months=1)
+    assert (pd.to_datetime(acc["first_start"]) == expected).all()
