@@ -2786,6 +2786,11 @@ class DataSimulator:
         # BOOLEAN
         elif column.type == "boolean":
             probability = params.get("probability")
+            # `true_probability` is the spelling the published JSON Schema and
+            # the YAML loader both accept, and nothing read it: a column
+            # declared 14% true was drawn at the name-based base rate, 50%.
+            if probability is None:
+                probability = params.get("true_probability")
             if probability is None:
                 probability = _boolean_base_rate(column.name)
             values = self.rng.random(size) < probability

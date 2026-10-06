@@ -625,3 +625,18 @@ def test_a_datetime_distribution_survives_the_yaml_loader(tmp_path):
     col = load_yaml_schema(path).get_columns("t")[0]
     assert col.distribution_params["distribution"] == "beta"
     assert col.distribution_params["a"] == 2.0
+
+
+def test_a_boolean_true_probability_is_honoured(tmp_path):
+    """The loader and the JSON Schema accept `true_probability`; the engine
+    read only `probability`, so a declared rate fell back to the name-based
+    base rate."""
+    import misata
+    path = tmp_path / "misata.yaml"
+    path.write_text(
+        "name: b\nseed: 2\ntables:\n  t:\n    rows: 20000\n    columns:\n"
+        "      is_sales_assisted: {type: boolean, true_probability: 0.14}\n"
+        "      livemode: {type: boolean, true_probability: 1.0}\n")
+    t = misata.generate_from_schema(misata.load_yaml_schema(path))["t"]
+    assert 0.13 < t["is_sales_assisted"].mean() < 0.15
+    assert t["livemode"].all()
