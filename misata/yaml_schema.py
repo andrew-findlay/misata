@@ -300,7 +300,7 @@ def _parse_column(col_name: str, col_def: Dict[str, Any],
         # a real schema where `grabs.wanted_item_id` is UNIQUE, one grab per
         # item. `references` and `nullable` were being lost the same way.
         params: Dict[str, Any] = {}
-        for k in ("references", "sampling", "filters", "null_rate"):
+        for k in ("references", "sampling", "filters", "null_rate", "internal"):
             if col_def.get(k) is not None:
                 params[k] = col_def[k]
         return Column(

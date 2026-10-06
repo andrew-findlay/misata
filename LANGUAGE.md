@@ -248,6 +248,31 @@ because a table of the wrong size that says so beats no table at all.
 
 **Note.** A declared `rows:` on the child is ignored and reported. Remove it.
 
+### `aggregate` — a column filled from another table
+
+```yaml
+peak_endpoints:
+  type: int
+  aggregate:
+    from_table: endpoint_usage_daily
+    op: max                       # max | min | sum | mean | count | first
+    column: endpoints_protected
+    match:                        # [expression over THIS table, expression over the source]
+      - [account_id, account_id]
+      - [period_start, "month_start(usage_date)"]
+    default: 0                    # for a row no source row matches
+```
+
+The monthly peak of a daily meter per account is neither a foreign-key
+lookup nor a roll-up into a parent. `match` pairs expressions, so either side
+may be a formula: that is how days are grouped into months. The source is
+generated first, kept whole, and read when the column's formulas run, so later
+formulas and `drop_when` can use it. `first` takes a string; `count` needs no
+`column`.
+
+Also: `zero_pad(n, width)` for `in_00000042`-style ids, and `internal: true`
+on a foreign-key column.
+
 ### temporal FK eligibility — a parent that already existed
 
 ```python

@@ -719,6 +719,14 @@ class DataSimulator:
             graph[rel.parent_table].append(rel.child_table)
             in_degree[rel.child_table] += 1
 
+        # A column filled by aggregating another table needs that table whole
+        # first, exactly as a foreign key needs its parent.
+        for table in self.config.tables:
+            for source in sorted(self._aggregate_sources(self.config).get(table.name, {})):
+                if source != table.name and table.name not in graph[source]:
+                    graph[source].append(table.name)
+                    in_degree[table.name] += 1
+
         # Kahn's algorithm for topological sort
         queue = deque([name for name, degree in in_degree.items() if degree == 0])
         sorted_tables = []
@@ -1277,9 +1285,30 @@ class DataSimulator:
                         found.setdefault(table, set()).add(column)
         return found
 
+    @staticmethod
+    def _aggregate_sources(config: Any) -> Dict[str, Dict[str, set]]:
+        """{table: {source table: source columns its aggregate columns read}}.
+
+        An aggregate column is filled from another table by a key, e.g. the
+        monthly peak of a meter per account: ``aggregate: {from_table, op,
+        column, match: [[target expr, source expr], ...]}``.
+        """
+        found: Dict[str, Dict[str, set]] = {}
+        for t in config.tables:
+            for col in config.get_columns(t.name):
+                spec = (col.distribution_params or {}).get("aggregate")
+                if not isinstance(spec, dict) or not spec.get("from_table"):
+                    continue
+                words = set(re.findall(r"[A-Za-z_]\w*", " ".join(
+                    [str(spec.get("column", ""))] + [str(m[1]) for m in spec.get("match", [])])))
+                found.setdefault(t.name, {}).setdefault(spec["from_table"], set()).update(words)
+        return found
+
     @classmethod
     def _tables_read_whole(cls, config: Any) -> set:
         whole = set(cls._formula_lookups(config))
+        for sources in cls._aggregate_sources(config).values():
+            whole.update(sources)
         for rel in (getattr(config, "relationships", None) or []):
             if getattr(rel, "rows_per_parent", None) is not None:
                 whole.add(rel.parent_table)
@@ -1396,6 +1425,9 @@ class DataSimulator:
         needed_cols.update(
             c for c in self._formula_lookups(self.config).get(table_name, ())
             if c in df.columns)
+        # ... and every column an aggregate over this table reads.
+        for sources in self._aggregate_sources(self.config).values():
+            needed_cols.update(c for c in sources.get(table_name, ()) if c in df.columns)
 
         # Gap 3: retain the outcome/rate curve time column so child tables can
         # perform temporal FK weighting (Level-1 curve inheritance).
@@ -5861,7 +5893,9 @@ class DataSimulator:
             return df
 
         columns = self.config.get_columns(table_name)
-        formula_cols = [c for c in columns if c.distribution_params.get("formula")]
+        formula_cols = [c for c in columns
+                        if c.distribution_params.get("formula")
+                        or c.distribution_params.get("aggregate")]
 
         # Set only by _reapply_lifecycle_formulas, which recomputes the formulas
         # that read a lifecycle-owned column and must leave the rest alone.
@@ -5900,6 +5934,13 @@ class DataSimulator:
         }
 
         for col in formula_cols:
+            spec = col.distribution_params.get("aggregate")
+            if spec:
+                try:
+                    df[col.name] = self._aggregate_column(df, table_name, col, spec, engine)
+                except (ValueError, KeyError, ImportError) as e:
+                    warnings.warn(f"Aggregate column '{col.name}' skipped: {e}")
+                continue
             formula = col.distribution_params["formula"]
             try:
                 result = engine.evaluate_with_lookups(df, formula, fk_mappings=fk_mappings)
@@ -5908,6 +5949,53 @@ class DataSimulator:
                 warnings.warn(f"Formula column '{col.name}' skipped: {e}")
 
         return df
+
+    _AGGREGATES = ("max", "min", "sum", "mean", "count", "first")
+
+    def _aggregate_column(self, df: pd.DataFrame, table_name: str, col: Any,
+                          spec: Dict[str, Any], engine: Any) -> np.ndarray:
+        """Fill a column from another table, grouped by a (possibly composite) key.
+
+        ``match`` pairs an expression over THIS table with one over the source:
+        ``[[account_id, account_id], [period_start, month_start(usage_date)]]``.
+        Either side may be a column or a formula, which is how a daily meter is
+        grouped to months. A row with no matching group takes ``default``.
+        """
+        source_name = spec["from_table"]
+        op = str(spec.get("op", "sum"))
+        if op not in self._AGGREGATES:
+            raise ValueError(f"aggregate op {op!r} is not one of {', '.join(self._AGGREGATES)}")
+        source = self.context.get(source_name)
+        if source is None:
+            raise ValueError(f"'{source_name}' has not been generated yet")
+        match = spec.get("match") or []
+        if not match:
+            raise ValueError("aggregate needs at least one match pair")
+
+        def key(frame: pd.DataFrame, expr: str) -> np.ndarray:
+            expr = str(expr)
+            values = frame[expr].to_numpy() if expr in frame.columns else \
+                engine.evaluate_with_lookups(frame, expr)
+            return pd.to_datetime(values).to_numpy() if np.asarray(values).dtype.kind == "M" else values
+
+        src_keys = [key(source, m[1]) for m in match]
+        tgt_keys = [key(df, m[0]) for m in match]
+        frame = pd.DataFrame({f"k{i}": k for i, k in enumerate(src_keys)})
+        column = spec.get("column")
+        if op == "count" and not column:
+            frame["v"] = 1
+        else:
+            if column not in source.columns:
+                raise ValueError(f"'{source_name}' does not keep column {column!r}")
+            frame["v"] = source[column].to_numpy()
+        grouped = frame.groupby([f"k{i}" for i in range(len(match))], sort=False)["v"]
+        agg = grouped.size() if op == "count" and not column else getattr(grouped, op)()
+        index = pd.MultiIndex.from_arrays(tgt_keys) if len(match) > 1 else pd.Index(tgt_keys[0])
+        out = agg.reindex(index)
+        default = spec.get("default")
+        if default is not None:
+            out = out.fillna(default)
+        return out.to_numpy()
 
     def _fix_correlated_columns(self, df: pd.DataFrame, table_name: str) -> pd.DataFrame:
         """Post-process to fix common semantically correlated columns."""

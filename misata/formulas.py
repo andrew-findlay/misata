@@ -90,6 +90,12 @@ def _day_of(ts):
                                       .astype("datetime64[D]")).astype("int64") + 1)
 
 
+def _zero_pad(x, width):
+    """An integer as text, left-padded with zeros: 42 -> '00000042'."""
+    n = np.asarray(x).astype("int64").astype("U")
+    return np.char.zfill(n, int(width)).astype(object)
+
+
 def _days_between(start, end):
     """Fractional days from start to end; NaN where either is null."""
     delta = (_ts(end) - _ts(start)).astype("timedelta64[ns]").astype("float64")
@@ -136,6 +142,7 @@ SAFE_FUNCTIONS = {
     'add_months': _add_months,
     'days_between': _days_between,
     'month_start': _month_start,
+    'zero_pad': _zero_pad,
     'day_diff': _day_diff,
     'month_diff': _month_diff,
     'months_elapsed': _months_elapsed,
