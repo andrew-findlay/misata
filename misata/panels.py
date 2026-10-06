@@ -126,6 +126,9 @@ def plan(
     declaration cannot be honoured, having warned; the caller then falls back
     to the declared row count rather than generating nothing.
     """
+    if getattr(spec, "count_column", None):
+        return _plan_counted(parent, parent_key, spec, table_name)
+
     for col in (spec.from_column, spec.to_column, getattr(spec, "every_column", None)):
         if col and col not in parent.columns:
             warnings.warn(
@@ -237,6 +240,39 @@ def plan(
         nxt = _advance(repeated_starts, (step + 1) * repeated_every, spec.grain, anchor)
         out[spec.period_end_column] = (np.asarray(nxt, dtype="datetime64[ns]")
                                        - np.timedelta64(1, "D"))
+    return out
+
+
+def _plan_counted(parent: pd.DataFrame, parent_key: str, spec: Any,
+                  table_name: str) -> Optional[pd.DataFrame]:
+    """Exactly ``parent[count_column]`` children per parent, numbered from 0."""
+    col = spec.count_column
+    if col not in parent.columns or parent_key not in parent.columns:
+        warnings.warn(
+            f"rows_per_parent on '{table_name}' needs {col!r} and {parent_key!r} on "
+            f"the parent. Falling back to the declared row count.", UserWarning)
+        return None
+    raw = pd.to_numeric(parent[col], errors="coerce").to_numpy(dtype="float64")
+    bad = np.isnan(raw) | (raw < 0) | (raw != np.floor(raw))
+    if bad.any():
+        warnings.warn(
+            f"rows_per_parent on '{table_name}': {int(bad.sum())} parent(s) have a "
+            f"{col!r} that is not a whole number of children, and contribute none.",
+            UserWarning)
+    counts = np.where(bad, 0, raw).astype("int64")
+    counts = np.minimum(counts, spec.max_periods)
+    total = int(counts.sum())
+    if total == 0:
+        warnings.warn(
+            f"rows_per_parent on '{table_name}' produced no rows: every {col!r} is 0. "
+            f"Falling back to the declared row count.", UserWarning)
+        return None
+    step = np.arange(total, dtype="int64") - np.repeat(np.cumsum(counts) - counts, counts)
+    out = pd.DataFrame({parent_key: np.repeat(parent[parent_key].to_numpy(), counts)})
+    if spec.index_column:
+        out[spec.index_column] = step
+    if spec.last_column:
+        out[spec.last_column] = step == np.repeat(counts - 1, counts)
     return out
 
 

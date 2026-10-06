@@ -1323,7 +1323,10 @@ class DataSimulator:
                 # back to its declared `rows:` and stops being a panel at all.
                 _rpp = getattr(rel, "rows_per_parent", None)
                 if _rpp is not None:
-                    needed_cols.add(_rpp.from_column)
+                    if _rpp.from_column:
+                        needed_cols.add(_rpp.from_column)
+                    if getattr(_rpp, "count_column", None):
+                        needed_cols.add(_rpp.count_column)
                     if _rpp.to_column:
                         needed_cols.add(_rpp.to_column)
                     if getattr(_rpp, "every_column", None):

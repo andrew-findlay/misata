@@ -273,10 +273,11 @@ def _parse_rows_per_parent(raw: Optional[Dict[str, Any]]) -> Optional["RowsPerPa
             "{from_column: started_at, to_column: ended_at, grain: day, "
             f"date_column: usage_date}}; got {type(raw).__name__}"
         )
-    if not raw.get("from_column"):
+    if not raw.get("from_column") and not raw.get("count_column"):
         raise ValueError(
             "rows_per_parent needs from_column — the parent column its periods "
-            f"start at. Got keys: {sorted(raw)}"
+            "start at — or count_column, a parent column holding the number of "
+            f"children. Got keys: {sorted(raw)}"
         )
     # Every field goes through, and an unknown one is refused rather than
     # dropped: a misspelt key here would silently change a table's row count.

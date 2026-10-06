@@ -1855,9 +1855,6 @@
             "rows_per_parent": {
               "type": "object",
               "description": "The child's row count is a duration, not a number: one row per period between two of the parent's own columns. The child's declared `rows` is ignored. Produces a ragged panel — every parent contributes a different number of rows.",
-              "required": [
-                "from_column"
-              ],
               "additionalProperties": false,
               "properties": {
                 "from_column": {
@@ -1894,7 +1891,10 @@
                 },
                 "anchor": {
                   "type": "string",
-                  "enum": ["period", "exact"],
+                  "enum": [
+                    "period",
+                    "exact"
+                  ],
                   "description": "period (default) snaps steps to calendar period starts; exact steps from the parent's own from_column instant, keeping its day and time."
                 },
                 "every": {
@@ -1917,8 +1917,24 @@
                 "period_end_column": {
                   "type": "string",
                   "description": "Child column for the step's inclusive end: one day before the next step starts."
+                },
+                "count_column": {
+                  "type": "string",
+                  "description": "Instead of a span: a parent column holding the number of children each parent gets."
                 }
-              }
+              },
+              "oneOf": [
+                {
+                  "required": [
+                    "from_column"
+                  ]
+                },
+                {
+                  "required": [
+                    "count_column"
+                  ]
+                }
+              ]
             }
           }
         }

@@ -253,11 +253,17 @@ class RowsPerParent(BaseModel):
         last_column: Child column, true on each parent's final step.
         period_end_column: Child column for the step's inclusive end: one day
             before the next step starts.
+        count_column: Instead of a span, a parent column that IS the number
+            of children -- a subscription with one seat line, or a seat line
+            and an overage line. No dates; ``index_column`` and
+            ``last_column`` still number them. Give this or ``from_column``,
+            not both.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    from_column: str
+    from_column: Optional[str] = None
+    count_column: Optional[str] = None
     to_column: Optional[str] = None
     grain: str = "day"
     date_column: str = "date"
@@ -269,6 +275,14 @@ class RowsPerParent(BaseModel):
     index_column: Optional[str] = None
     last_column: Optional[str] = None
     period_end_column: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _span_or_count(self) -> "RowsPerParent":
+        if bool(self.from_column) == bool(self.count_column):
+            raise ValueError(
+                "rows_per_parent needs exactly one of from_column (children per "
+                "period of a span) or count_column (a number of children per parent)")
+        return self
 
     @field_validator("anchor")
     @classmethod
