@@ -8,7 +8,7 @@ including tables, columns, relationships, and scenario events.
 import warnings
 from typing import Any, ClassVar, Dict, List, Literal, Optional, Tuple, Union
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Column(BaseModel):
@@ -240,7 +240,22 @@ class RowsPerParent(BaseModel):
             nothing.
         max_periods: Backstop against a parent whose dates are implausibly far
             apart producing millions of rows on its own.
+        anchor: ``period`` (default) snaps every step to the start of its
+            calendar period, so two parents' months line up. ``exact`` steps
+            from the parent's own ``from_column`` instant -- a subscription
+            that renews on its anniversary, not on 1 January.
+        every: Steps are this many grains long: ``grain: month, every: 12``
+            is a yearly term on the anniversary.
+        every_column: A parent column giving each parent its own ``every`` --
+            a contract whose term is 12, 24 or 36 months.
+        index_column: Child column for the step's position within its parent,
+            from 0. Formulas can read it: ``seats * 1.22 ** period_index``.
+        last_column: Child column, true on each parent's final step.
+        period_end_column: Child column for the step's inclusive end: one day
+            before the next step starts.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     from_column: str
     to_column: Optional[str] = None
@@ -248,6 +263,26 @@ class RowsPerParent(BaseModel):
     date_column: str = "date"
     default_to: Optional[str] = None
     max_periods: int = 100_000
+    anchor: str = "period"
+    every: int = 1
+    every_column: Optional[str] = None
+    index_column: Optional[str] = None
+    last_column: Optional[str] = None
+    period_end_column: Optional[str] = None
+
+    @field_validator("anchor")
+    @classmethod
+    def _known_anchor(cls, v: str) -> str:
+        if v not in ("period", "exact"):
+            raise ValueError(f"rows_per_parent.anchor must be 'period' or 'exact'; got {v!r}")
+        return v
+
+    @field_validator("every")
+    @classmethod
+    def _positive_every(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError(f"rows_per_parent.every must be at least 1; got {v}")
+        return v
 
     GRAINS: ClassVar[tuple] = ("day", "week", "month", "quarter", "year")
 

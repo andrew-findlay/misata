@@ -278,14 +278,9 @@ def _parse_rows_per_parent(raw: Optional[Dict[str, Any]]) -> Optional["RowsPerPa
             "rows_per_parent needs from_column — the parent column its periods "
             f"start at. Got keys: {sorted(raw)}"
         )
-    return RowsPerParent(
-        from_column=raw["from_column"],
-        to_column=raw.get("to_column"),
-        grain=str(raw.get("grain", "day")),
-        date_column=raw.get("date_column", "date"),
-        default_to=raw.get("default_to"),
-        max_periods=int(raw.get("max_periods", 100_000)),
-    )
+    # Every field goes through, and an unknown one is refused rather than
+    # dropped: a misspelt key here would silently change a table's row count.
+    return RowsPerParent(**raw)
 
 
 def _parse_column(col_name: str, col_def: Dict[str, Any],

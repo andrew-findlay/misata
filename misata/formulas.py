@@ -24,6 +24,46 @@ except ImportError:
     class NameNotDefined(NameError):
         """Fallback used when simpleeval is not installed."""
 
+def _ts(x):
+    return np.asarray(pd.to_datetime(np.asarray(x)), dtype="datetime64[ns]")
+
+
+def _add_days(ts, days):
+    """Timestamp plus a (possibly fractional, per-row) number of days."""
+    ns = np.round(np.asarray(days, dtype="float64") * 86_400e9)
+    ns = np.where(np.isfinite(ns), ns, 0).astype("int64")
+    out = _ts(ts) + ns.astype("timedelta64[ns]")
+    return np.where(np.isnan(np.asarray(days, dtype="float64")), np.datetime64("NaT", "ns"), out)
+
+
+def _add_months(ts, months):
+    """Timestamp plus whole months, keeping the day (clamped) and time."""
+    from misata.panels import add_months
+    return add_months(_ts(ts), np.broadcast_to(np.asarray(months, dtype="int64"), _ts(ts).shape))
+
+
+def _days_between(start, end):
+    """Fractional days from start to end; NaN where either is null."""
+    delta = (_ts(end) - _ts(start)).astype("timedelta64[ns]").astype("float64")
+    out = delta / 86_400e9
+    return np.where(np.isnat(_ts(end)) | np.isnat(_ts(start)), np.nan, out)
+
+
+def _isnull(x):
+    return pd.isna(np.asarray(x, dtype=object)) if np.asarray(x).dtype == object else pd.isna(np.asarray(x))
+
+
+def _coalesce(*values):
+    out = np.asarray(values[0]).copy()
+    for v in values[1:]:
+        out = np.where(_isnull(out), np.asarray(v), out)
+    return out
+
+
+def _timestamp(text):
+    return np.datetime64(pd.Timestamp(text).to_datetime64(), "ns")
+
+
 # Whitelist of safe functions
 SAFE_FUNCTIONS = {
     'where': np.where,
@@ -41,6 +81,16 @@ SAFE_FUNCTIONS = {
     'sqrt': np.sqrt,
     'random': np.random.random,
     'randint': np.random.randint,
+    # Dates. numpy datetime arithmetic works on arrays already, but needs a
+    # literal written as `.astype('timedelta64[D]')`, has no month that keeps
+    # its day, and no null. These say what they mean.
+    'add_days': _add_days,
+    'add_months': _add_months,
+    'days_between': _days_between,
+    'timestamp': _timestamp,
+    'isnull': _isnull,
+    'notnull': lambda x: ~_isnull(x),
+    'coalesce': _coalesce,
 }
 
 # Standard operators to bypass simpleeval's string length checks which fail on numpy arrays
@@ -192,9 +242,18 @@ class FormulaEngine:
                     f"(looked for {singular}_id, {table_name}_id)"
                 )
 
-            lookup_map = ref_table.set_index(parent_key)[col_name].to_dict()
+            ref_col = ref_table.set_index(parent_key)[col_name]
+            looked_up = df[fk_col].map(ref_col.to_dict())
+            # A missing value is 0 only for a number. A null timestamp filled
+            # with 0 is 1 January 1970, and a null label filled with 0 is the
+            # integer zero: an unconverted account's converted_at, read by a
+            # child, became the epoch.
+            if pd.api.types.is_numeric_dtype(ref_col) and not pd.api.types.is_bool_dtype(ref_col):
+                looked_up = looked_up.fillna(0)
+            elif pd.api.types.is_datetime64_any_dtype(ref_col):
+                looked_up = pd.to_datetime(looked_up)
             var_name = f'_ref_{i}'
-            lookup_names[var_name] = df[fk_col].map(lookup_map).fillna(0).values
+            lookup_names[var_name] = looked_up.values
             result = result.replace(f'@{table_name}.{col_name}', var_name)
 
         return result, lookup_names
@@ -254,6 +313,8 @@ class FormulaEngine:
         names = {
             'np': SafeNumpy(),
             'pd': pd,
+            # A null timestamp, for `where(..., nat, ended_at)`.
+            'nat': np.datetime64('NaT', 'ns'),
         }
 
         # Add columns to context

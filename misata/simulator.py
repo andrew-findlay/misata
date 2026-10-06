@@ -262,6 +262,13 @@ class DataSimulator:
         # Narrows _apply_formula_columns to a subset. Only set while recomputing
         # the formulas a lifecycle invalidated; None means "every formula".
         self._formula_column_filter: Optional[set] = None
+        # Tables something reads row by row: a panel planning one row per
+        # parent period, a formula looking up `@parent.column`. The context is
+        # otherwise capped at MAX_CONTEXT_ROWS by random sample, which made a
+        # panel cover only the sampled parents and a lookup return 0 for the
+        # rest -- both silently. These tables keep every row of the columns
+        # they need.
+        self._uncapped_tables: set = self._tables_read_whole(config)
         self.text_gen = TextGenerator(seed=config.seed)
         self.batch_size = batch_size
         self.smart_mode = smart_mode
@@ -842,7 +849,7 @@ class DataSimulator:
         if not cols:
             return
         ctx_df = df[cols].copy()
-        if len(ctx_df) > self.MAX_CONTEXT_ROWS:
+        if len(ctx_df) > self.MAX_CONTEXT_ROWS and table_name not in self._uncapped_tables:
             ctx_df = ctx_df.sample(
                 n=self.MAX_CONTEXT_ROWS,
                 random_state=int(self.rng.integers(0, 2**31)),
@@ -1258,6 +1265,26 @@ class DataSimulator:
             values[roots] = None
         return values
 
+    @staticmethod
+    def _formula_lookups(config: Any) -> Dict[str, set]:
+        """{parent table: columns some formula reads as @parent.column}."""
+        found: Dict[str, set] = {}
+        for t in config.tables:
+            for col in config.get_columns(t.name):
+                f = (col.distribution_params or {}).get("formula")
+                if isinstance(f, str):
+                    for table, column in re.findall(r"@(\w+)\.(\w+)", f):
+                        found.setdefault(table, set()).add(column)
+        return found
+
+    @classmethod
+    def _tables_read_whole(cls, config: Any) -> set:
+        whole = set(cls._formula_lookups(config))
+        for rel in (getattr(config, "relationships", None) or []):
+            if getattr(rel, "rows_per_parent", None) is not None:
+                whole.add(rel.parent_table)
+        return whole
+
     def _collect_context_columns(self, table_name: str, df: pd.DataFrame) -> List[str]:
         """Return the columns that must be retained for future FK/date/depends_on lookups.
 
@@ -1299,6 +1326,8 @@ class DataSimulator:
                     needed_cols.add(_rpp.from_column)
                     if _rpp.to_column:
                         needed_cols.add(_rpp.to_column)
+                    if getattr(_rpp, "every_column", None):
+                        needed_cols.add(_rpp.every_column)
                 # Denormalized copies: a child column named like this parent's
                 # own head-prefixed attribute (transactions.merchant_city ↔
                 # merchants.merchant_city) is overwritten from the parent later,
@@ -1358,6 +1387,12 @@ class DataSimulator:
                         and rel.parent_table == table_name
                     ):
                         needed_cols.add(target_col)
+
+        # A child formula's @table.column lookup reads this table's context, so
+        # every column one names has to survive trimming.
+        needed_cols.update(
+            c for c in self._formula_lookups(self.config).get(table_name, ())
+            if c in df.columns)
 
         # Gap 3: retain the outcome/rate curve time column so child tables can
         # perform temporal FK weighting (Level-1 curve inheritance).
@@ -3168,6 +3203,23 @@ class DataSimulator:
             )
             return None
 
+        # The relationship's filters choose which parents get a panel at all:
+        # contracts only for enterprise accounts. Same matching as FK sampling.
+        if rel.filters:
+            mask = np.ones(len(parent), dtype=bool)
+            for col, val in rel.filters.items():
+                if col not in parent.columns:
+                    warnings.warn(
+                        f"rows_per_parent on '{table_name}' filters on {col!r}, which "
+                        f"'{rel.parent_table}' does not keep. No parent matches.",
+                        UserWarning)
+                    mask[:] = False
+                elif isinstance(val, (list, tuple, set)):
+                    mask &= parent[col].isin(list(val)).to_numpy()
+                else:
+                    mask &= (parent[col] == val).to_numpy()
+            parent = parent.loc[mask]
+
         plan = panels.plan(parent, rel.parent_key, spec, table_name)
         if plan is None:
             return None
@@ -3217,11 +3269,16 @@ class DataSimulator:
 
         ctx_df = df[cols_to_store].copy()
 
+        uncapped = table_name in self._uncapped_tables
         if table_name not in self.context:
-            if len(ctx_df) > self.MAX_CONTEXT_ROWS:
+            if len(ctx_df) > self.MAX_CONTEXT_ROWS and not uncapped:
                 ctx_df = ctx_df.sample(n=self.MAX_CONTEXT_ROWS, random_state=int(self.rng.integers(0, 2**31)))
             self.context[table_name] = ctx_df
         else:
+            if uncapped:
+                self.context[table_name] = pd.concat(
+                    [self.context[table_name], ctx_df], ignore_index=True)
+                return
             current_len = len(self.context[table_name])
             if current_len >= self.MAX_CONTEXT_ROWS:
                 return
@@ -3324,6 +3381,12 @@ class DataSimulator:
             # Restore the declared column order (generation order may differ
             # when depends_on forced a parent to be generated first).
             df_batch = pd.DataFrame(data)[[c.name for c in columns]]
+
+            # A panel's key, date and step columns go on FIRST as well as last.
+            # Formulas below read them -- `@accounts.plan_id` through the key,
+            # `1.22 ** period_index` -- and stamped only at the end, every
+            # formula saw the randomly drawn key and date instead.
+            df_batch = self._apply_panel_index(df_batch, panel_plan, rows_generated)
 
             # Apply formulas
             df_batch = self._run_pass("formulas", table_name, rows_generated,
@@ -6083,7 +6146,7 @@ class DataSimulator:
             else:
                 # Stream immediately — no post-pass involvement
                 for batch in self.generate_batches(table_name):
-                    yield table_name, batch
+                    yield table_name, self._public(table_name, batch)
                 streamed.append(table_name)
 
         # Phase 2 — apply cascades, then group shares, then roll-ups, to
@@ -6220,7 +6283,20 @@ class DataSimulator:
         # Phase 3 — yield buffered tables in original dependency order
         for table_name in sorted_tables:
             if table_name in buffered:
-                yield table_name, buffered[table_name]
+                yield table_name, self._public(table_name, buffered[table_name])
+
+    def _public(self, table_name: str, df: pd.DataFrame) -> pd.DataFrame:
+        """Drop columns declared `internal: true` from what leaves the engine.
+
+        Working columns -- a per-row draw a formula reads, a panel's step index
+        -- are generated, kept in context and visible to formulas, and are not
+        part of the table anyone receives. A panel's step columns are hidden
+        the same way: declare the column, mark it internal, and the panel's
+        values overwrite whatever it drew.
+        """
+        hidden = [c.name for c in self.config.get_columns(table_name)
+                  if (c.distribution_params or {}).get("internal") and c.name in df.columns]
+        return df.drop(columns=hidden) if hidden else df
 
     def generate_with_reports(
         self,

@@ -208,9 +208,37 @@ mid-month still agree on the month.
 else: every other column generates against the discovered row count as usual.
 
 **Costs.** The row count is discovered, not declared, so it cannot be known
-before the parent exists. The key and date are assigned last, after causality and
-`time_grids`, because either would otherwise put a hole in the panel — so a
-declared clock does not apply to `date_column`.
+before the parent exists. The key and date are assigned first, so formulas read
+them, and again last, after causality and `time_grids`, because either would
+otherwise put a hole in the panel — so a declared clock does not apply to
+`date_column`. The parent is kept whole in memory rather than sampled: a panel
+over a sample covers only the sample.
+
+**Steps that are not calendar periods.** `anchor: exact` steps from the parent's
+own `from_column` instant instead of snapping to period starts, keeping its day
+and time — a subscription renews on its anniversary, not on 1 January. `every`
+makes each step that many grains (`grain: month, every: 12` is a yearly term),
+and `every_column` reads it per parent (a 12, 24 or 36-month contract). A step
+counts only once its start is on or before the span's end.
+
+```yaml
+rows_per_parent:
+  from_column: started_at
+  to_column: churned_at
+  default_to: "2026-06-30"
+  grain: month
+  every: 12
+  anchor: exact
+  date_column: started_at
+  index_column: period_index      # 0, 1, 2 ... per parent
+  last_column: is_last_period     # true on each parent's final step
+  period_end_column: period_end   # the day before the next step starts
+```
+
+`index_column`, `last_column` and `period_end_column` are written onto the child
+and formulas can read them — `seats * 1.22 ** period_index`. Declare one as a
+column with `internal: true` to use it without emitting it. The relationship's
+`filters` choose which parents get a panel at all.
 
 **Refuses.** An unknown `grain`. Two `rows_per_parent` declarations for one
 child, which is a row count asked to be two different durations. A

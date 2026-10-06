@@ -79,6 +79,39 @@ def _period_counts(starts: pd.Series, ends: pd.Series, grain: str) -> np.ndarray
     return np.clip(counts, 0, None).astype("int64")
 
 
+def add_months(ts: np.ndarray, months: np.ndarray) -> np.ndarray:
+    """``ts`` plus a whole number of months each, keeping day and time of day.
+
+    The day is clamped to the target month's length, so 31 January plus one
+    month is 28 or 29 February -- what a monthly billing date does.
+    """
+    ts = np.asarray(ts, dtype="datetime64[ns]")
+    months = np.asarray(months, dtype="int64")
+    month_start = ts.astype("datetime64[M]")
+    within = ts - month_start.astype("datetime64[ns]")          # day-of-month and time
+    day = within.astype("timedelta64[D]").astype("int64")        # 0-based day
+    time_of_day = within - day.astype("timedelta64[D]").astype("timedelta64[ns]")
+    target = month_start + months
+    length = ((target + 1).astype("datetime64[D]") - target.astype("datetime64[D]")).astype("int64")
+    day = np.minimum(day, length - 1)
+    out = (target.astype("datetime64[D]") + day.astype("timedelta64[D]")).astype("datetime64[ns]")
+    return np.where(np.isnat(ts), np.datetime64("NaT", "ns"), out + time_of_day)
+
+
+def _full_months(starts: np.ndarray, ends: np.ndarray) -> np.ndarray:
+    """Whole months from each start to each end: anniversaries passed."""
+    sm = starts.astype("datetime64[M]").astype("int64")
+    em = ends.astype("datetime64[M]").astype("int64")
+    months = em - sm
+    # Short of the anniversary within the last month: one fewer.
+    short = add_months(starts, months) > ends
+    return months - short.astype("int64")
+
+
+def _step_months(grain: str) -> Optional[int]:
+    return {"month": 1, "quarter": 3, "year": 12}.get(grain)
+
+
 def plan(
     parent: pd.DataFrame,
     parent_key: str,
@@ -87,12 +120,13 @@ def plan(
 ) -> Optional[pd.DataFrame]:
     """Build the child's index from the parent frame.
 
-    Returns a frame with two columns — the parent key and the period date —
-    with exactly one row per parent per period. Returns None when the
-    declaration cannot be honoured, having warned; the caller then falls back to
-    the declared row count rather than generating nothing.
+    Returns a frame with the parent key and the period date -- plus the step
+    index, last-step flag and period end when the spec names columns for them
+    -- with exactly one row per parent per period. Returns None when the
+    declaration cannot be honoured, having warned; the caller then falls back
+    to the declared row count rather than generating nothing.
     """
-    for col in (spec.from_column, spec.to_column):
+    for col in (spec.from_column, spec.to_column, getattr(spec, "every_column", None)):
         if col and col not in parent.columns:
             warnings.warn(
                 f"rows_per_parent on '{table_name}' names {col!r}, which is not a "
@@ -124,12 +158,43 @@ def plan(
     if spec.default_to is not None:
         ends = ends.fillna(pd.Timestamp(spec.default_to))
 
-    starts = _floor_to_grain(pd.Series(starts).dt.normalize(), spec.grain)
-    ends = _floor_to_grain(pd.Series(ends).dt.normalize(), spec.grain)
-    starts = pd.Series(pd.to_datetime(starts), index=parent.index)
-    ends = pd.Series(pd.to_datetime(ends), index=parent.index)
+    anchor = getattr(spec, "anchor", "period")
+    every_column = getattr(spec, "every_column", None)
+    if every_column:
+        every = pd.to_numeric(parent[every_column], errors="coerce").to_numpy()
+        bad = ~np.isfinite(every) | (every < 1)
+        if bad.any():
+            warnings.warn(
+                f"rows_per_parent on '{table_name}': {int(bad.sum())} parent(s) have "
+                f"no usable {every_column!r} (null or below 1) and contribute nothing.",
+                UserWarning,
+            )
+        every = np.where(bad, 0, every).astype("int64")
+    else:
+        every = np.full(len(parent), int(getattr(spec, "every", 1)), dtype="int64")
 
-    counts = _period_counts(starts, ends, spec.grain)
+    if anchor == "exact":
+        s_ns = starts.to_numpy(dtype="datetime64[ns]")
+        e_ns = ends.to_numpy(dtype="datetime64[ns]")
+        step_months = _step_months(spec.grain)
+        valid = ~(np.isnat(s_ns) | np.isnat(e_ns)) & (every > 0) & (e_ns >= s_ns)
+        if step_months is not None:
+            span = _full_months(np.where(valid, s_ns, e_ns), e_ns)
+            unit = step_months * every
+        else:
+            span = ((e_ns - s_ns) // np.timedelta64(1, "D")).astype("int64")
+            unit = (7 if spec.grain == "week" else 1) * every
+        counts = np.where(valid, span // np.maximum(unit, 1) + 1, 0).astype("int64")
+        starts_arr = s_ns
+    else:
+        starts = _floor_to_grain(pd.Series(starts).dt.normalize(), spec.grain)
+        ends = _floor_to_grain(pd.Series(ends).dt.normalize(), spec.grain)
+        starts = pd.Series(pd.to_datetime(starts), index=parent.index)
+        ends = pd.Series(pd.to_datetime(ends), index=parent.index)
+        periods = _period_counts(starts, ends, spec.grain)
+        counts = np.where((periods > 0) & (every > 0),
+                          (periods - 1) // np.maximum(every, 1) + 1, 0).astype("int64")
+        starts_arr = starts.to_numpy(dtype="datetime64[ns]")
 
     over = counts > spec.max_periods
     if over.any():
@@ -156,21 +221,38 @@ def plan(
     # parent's own run. np.arange over the total minus the run start gives the
     # per-parent step index without a Python loop.
     repeated_keys = np.repeat(keys.to_numpy(), counts)
-    repeated_starts = np.repeat(starts.to_numpy(), counts)
+    repeated_starts = np.repeat(starts_arr, counts)
+    repeated_every = np.repeat(every, counts)
     run_starts = np.repeat(np.cumsum(counts) - counts, counts)
     step = np.arange(total, dtype="int64") - run_starts
 
-    dates = _advance(repeated_starts, step, spec.grain)
+    dates = _advance(repeated_starts, step * repeated_every, spec.grain, anchor)
+    out = pd.DataFrame({parent_key: repeated_keys, spec.date_column: dates})
 
-    return pd.DataFrame({parent_key: repeated_keys, spec.date_column: dates})
+    if getattr(spec, "index_column", None):
+        out[spec.index_column] = step
+    if getattr(spec, "last_column", None):
+        out[spec.last_column] = step == np.repeat(counts - 1, counts)
+    if getattr(spec, "period_end_column", None):
+        nxt = _advance(repeated_starts, (step + 1) * repeated_every, spec.grain, anchor)
+        out[spec.period_end_column] = (np.asarray(nxt, dtype="datetime64[ns]")
+                                       - np.timedelta64(1, "D"))
+    return out
 
 
-def _advance(starts: np.ndarray, step: np.ndarray, grain: str) -> np.ndarray:
-    """starts + step periods, vectorised."""
+def _advance(starts: np.ndarray, step: np.ndarray, grain: str,
+             anchor: str = "period") -> np.ndarray:
+    """starts + step grains, vectorised.
+
+    Anchored to the period start, a month step lands on the 1st. Anchored
+    exactly, it keeps the start's own day and time of day.
+    """
     if grain == "day":
         return starts + step.astype("timedelta64[D]")
     if grain == "week":
         return starts + (step * 7).astype("timedelta64[D]")
+    if anchor == "exact":
+        return add_months(starts, step * _step_months(grain))
     months = starts.astype("datetime64[M]").astype("int64")
     if grain == "month":
         return (months + step).astype("datetime64[M]").astype("datetime64[ns]")

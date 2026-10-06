@@ -1891,6 +1891,32 @@
                   "type": "integer",
                   "minimum": 1,
                   "description": "Backstop against one parent's dates being implausibly far apart. Defaults to 100000."
+                },
+                "anchor": {
+                  "type": "string",
+                  "enum": ["period", "exact"],
+                  "description": "period (default) snaps steps to calendar period starts; exact steps from the parent's own from_column instant, keeping its day and time."
+                },
+                "every": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Steps are this many grains long: grain month, every 12 is a yearly term."
+                },
+                "every_column": {
+                  "type": "string",
+                  "description": "Parent column giving each parent its own step length, in grains."
+                },
+                "index_column": {
+                  "type": "string",
+                  "description": "Child column for the step's position within its parent, from 0."
+                },
+                "last_column": {
+                  "type": "string",
+                  "description": "Child column, true on each parent's final step."
+                },
+                "period_end_column": {
+                  "type": "string",
+                  "description": "Child column for the step's inclusive end: one day before the next step starts."
                 }
               }
             }
