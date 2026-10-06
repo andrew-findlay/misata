@@ -377,6 +377,13 @@ class FormulaEngine:
             names[col] = df[col].values
         names.update(lookup_names)
 
+        # A formula is one expression, and a YAML block scalar wraps it over
+        # several lines. Python reads a newline at the top level as the end of
+        # the statement, so a long formula whose line breaks fall outside any
+        # bracket failed to parse and the column was skipped with a warning.
+        # Brackets make the line breaks insignificant.
+        result = f"({result.strip()})"
+
         # Evaluate safely
         try:
             return np.array(simple_eval(
