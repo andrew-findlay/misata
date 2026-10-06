@@ -325,6 +325,11 @@ def _parse_column(col_name: str, col_def: Dict[str, Any],
 
     if misata_type == "categorical":
         params["choices"] = [str(c) for c in (choices or ["Unknown"])]
+        # Choices are carried as strings through the engine, so remember when
+        # every one was written as an integer: a typed writer (Parquet) puts
+        # the type back, where a CSV reader had to guess it.
+        if choices and all(isinstance(c, int) and not isinstance(c, bool) for c in choices):
+            params["choice_type"] = "int"
         probs = col_def.get("probabilities")
         if probs:
             params["probabilities"] = list(probs)

@@ -133,11 +133,48 @@ class TestCLIGenerate:
         frame = pd.read_parquet(out_pq / "accounts.parquet")
         assert not (out_pq / "accounts.csv").exists()
         assert len(frame) == 50
-        assert str(frame["big"].dtype) == "int64"
-        assert str(frame["active"].dtype) == "bool"
+        assert str(frame["big"].dtype).lower() == "int64"
+        assert str(frame["active"].dtype).lower() in ("bool", "boolean")
         assert str(frame["created_at"].dtype).startswith("datetime64")
         from_csv = pd.read_csv(out_csv / "accounts.csv")
         assert list(frame["id"]) == list(from_csv["id"])
+
+    def test_parquet_columns_take_their_declared_types(self, runner, tmp_path):
+        """What pandas infers is not what was declared: integer choices are
+        carried as text, an integer with nulls is a float, an all-null column
+        has no type, and timestamps are nanosecond. Parquet records types, so
+        the writer applies the declaration."""
+        pytest.importorskip("pyarrow")
+        import pyarrow.parquet as pq
+        config = tmp_path / "misata.yaml"
+        config.write_text(
+            "name: types\nseed: 7\ntables:\n"
+            "  campaigns:\n    columns:\n"
+            "      id: {type: int}\n      customer_id: {type: int}\n"
+            "      subtype: {type: text}\n"
+            "    inline_data:\n"
+            "      - {id: 1, customer_id: 4417820396, subtype: null}\n"
+            "      - {id: 2, customer_id: null, subtype: null}\n"
+            "  accounts:\n    rows: 60\n    columns:\n"
+            "      id: {type: int, unique: true, min: 1, max: 60}\n"
+            "      term_months: {type: categorical, choices: [12, 24, 36]}\n"
+            "      rep_id: {type: categorical, choices: [1, 2, 3], null_rate: 0.5}\n"
+            "      created_at: {type: datetime, start: '2024-01-01', end: '2024-12-31'}\n"
+        )
+        result = runner.invoke(generate, [
+            "--config", str(config), "--output-dir", str(tmp_path), "--format", "parquet"])
+        assert result.exit_code == 0, result.output
+
+        campaigns = pq.read_schema(tmp_path / "campaigns.parquet")
+        assert str(campaigns.field("customer_id").type) == "int64"
+        assert str(campaigns.field("subtype").type) == "string"
+        accounts = pq.read_schema(tmp_path / "accounts.parquet")
+        assert str(accounts.field("term_months").type) == "int64"
+        assert str(accounts.field("rep_id").type) == "int64"
+        assert str(accounts.field("created_at").type) == "timestamp[us]"
+        frame = pq.read_table(tmp_path / "accounts.parquet").to_pandas()
+        assert set(frame["term_months"]) <= {12, 24, 36}
+        assert frame["rep_id"].isna().any() and frame["rep_id"].notna().any()
 
     def test_generate_with_db_url_sqlite(self, runner):
         """Test generate with db-url seeds SQLite."""

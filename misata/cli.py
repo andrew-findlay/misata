@@ -125,6 +125,52 @@ def _serialize_validation_report(report: Any) -> Dict[str, Any]:
     }
 
 
+def _read_parquet_plain(path: Any) -> pd.DataFrame:
+    import pyarrow.parquet as pq
+    return pq.read_table(path).to_pandas(ignore_metadata=True)
+
+
+def _with_declared_types(frame: pd.DataFrame, columns: List[Any]) -> pd.DataFrame:
+    """Give each column the type its declaration states, for a typed writer.
+
+    The engine's frames carry what pandas happened to infer: an integer with
+    nulls is a float, a categorical of integers is text, an all-null column has
+    no type at all, and a timestamp is nanosecond-precise. CSV hid this because
+    the reader guessed again. Parquet records it, so it is put right here --
+    from the declaration, never from the values. Undeclared columns are left
+    alone. Timestamps are written to the microsecond, the precision every
+    common reader of Parquet expects.
+    """
+    frame = frame.copy()
+    declared = {c.name: c for c in (columns or [])}
+    for name in frame.columns:
+        series = frame[name]
+        if pd.api.types.is_datetime64_any_dtype(series):
+            frame[name] = series.astype("datetime64[us]")
+            continue
+        col = declared.get(name)
+        if col is None:
+            continue
+        params = col.distribution_params or {}
+        kind = "int" if params.get("choice_type") == "int" else col.type
+        try:
+            if kind == "int":
+                frame[name] = pd.to_numeric(series).astype("Int64")
+            elif kind == "float":
+                frame[name] = pd.to_numeric(series).astype("float64")
+            elif kind == "boolean":
+                frame[name] = series.astype("boolean")
+            elif kind in ("text", "categorical") and (
+                    series.dtype == object or series.isna().all()):
+                frame[name] = series.astype("string")
+        except (TypeError, ValueError) as exc:
+            import warnings
+            warnings.warn(
+                f"{name}: declared {kind}, but a value cannot be held as one "
+                f"({exc}); written as generated.", UserWarning)
+    return frame
+
+
 def _generate_tables_to_csv(
     schema_config: SchemaConfig,
     output_dir: str,
@@ -175,6 +221,7 @@ def _generate_tables_to_csv(
 
     for table_name, batches in parquet_batches.items():
         frame = batches[0] if len(batches) == 1 else pd.concat(batches, ignore_index=True)
+        frame = _with_declared_types(frame, schema_config.get_columns(table_name))
         frame.to_parquet(os.path.join(output_dir, f"{table_name}.parquet"), index=False)
 
     console.print("\n" + "=" * 70)
@@ -665,7 +712,10 @@ def generate(
     if oracle:
         output_path = Path(output_dir)
         tables = {
-            table_name: (pd.read_parquet(output_path / f"{table_name}.parquet")
+            # Read back with plain numpy dtypes, as a CSV would come back: the
+            # report's checks are written for those, and a nullable Int64
+            # column's std() is pd.NA, which cannot be compared.
+            table_name: (_read_parquet_plain(output_path / f"{table_name}.parquet")
                          if output_format == "parquet"
                          else pd.read_csv(output_path / f"{table_name}.csv"))
             for table_name in table_rows
